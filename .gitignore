@@ -1,0 +1,60 @@
+# =====================================================================
+# Dr.Gupet — root .gitignore
+# =====================================================================
+
+# --- Dependencies ---
+node_modules/
+.yarn/
+.pnp.*
+
+# --- Builds & compiled output ---
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# --- Testing & coverage ---
+coverage/
+.nyc_output/
+
+# --- Environment & secrets (keep .env.example tracked) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Runtime data (user uploads, caches) ---
+uploads/
+.cache/
+
+# --- Local databases / docker volumes ---
+pgdata/
+docker-data/
+*.sqlite
+*.sqlite3
+*.db
+
+# --- OS files ---
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# --- Editors / IDEs ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
