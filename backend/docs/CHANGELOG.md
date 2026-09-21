@@ -1,8 +1,44 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3 & 4 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4 & 5 Implementation
 
 ### Added
+
+#### Phase 5: Pets
+**Pets Module:**
+- `src/modules/pets/pets.module.ts` - PetsModule
+- `src/modules/pets/pets.service.ts` - PetsService with:
+  - `findAll()` - List my pets with type, breed, tags
+  - `findOne()` - Get pet by ID (ownership check)
+  - `create()` - Create pet (max 10, breed/type validation)
+  - `update()` - Update pet (ownership check)
+  - `setTags()` - Replace all tags in transaction (allergen + diet)
+  - `remove()` - Soft delete (set deletedAt)
+  - `computeLifeStage()` - Calculate PUPPY_KITTEN/ADULT/SENIOR from birthDate
+- `src/modules/pets/pets.controller.ts` - Pet endpoints:
+  - `GET /pets` - List my pets
+  - `POST /pets` - Create pet
+  - `GET /pets/:id` - Get pet by ID
+  - `PATCH /pets/:id` - Update pet
+  - `PUT /pets/:id/tags` - Set pet tags (replace all)
+  - `DELETE /pets/:id` - Soft delete pet
+
+**DTOs:**
+- `src/modules/pets/dto/create-pet.dto.ts` - name, petTypeId, breedId, birthDate, gender, isNeutered, weightKg, photo
+- `src/modules/pets/dto/update-pet.dto.ts` - Partial update (all fields optional)
+- `src/modules/pets/dto/set-pet-tags.dto.ts` - allergenTagIds[], dietTagIds[]
+
+**Rules:**
+- Max 10 pets per user
+- Breed must belong to specified petType
+- Birth date cannot be in future
+- Weight between 0.1 and 200 kg
+- Soft delete (deletedAt) - queries filter deletedAt: null
+- Tags replaced in transaction (delete all, create new)
+- Tag IDs validated for correct type (ALLERGEN/DIET)
+- Life stage computed from birthDate: <12mo=PUPPY_KITTEN, >=84mo=SENIOR, else=ADULT
+
+---
 
 #### Phase 4: Upload & Reference Data
 **Upload Module:**

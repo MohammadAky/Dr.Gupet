@@ -20,6 +20,7 @@ import { UploadModule } from './upload/upload.module';
 import { PetTypesModule } from './modules/pet-types/pet-types.module';
 import { BreedsModule } from './modules/breeds/breeds.module';
 import { TagsModule } from './modules/tags/tags.module';
+import { PetsModule } from './modules/pets/pets.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -66,6 +67,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     PetTypesModule,
     BreedsModule,
     TagsModule,
+    PetsModule,
   ],
   providers: [
     // Global guards
