@@ -11,7 +11,9 @@ import smsConfig from './config/sms.config';
 import paymentConfig from './config/payment.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { SmsModule } from './sms/sms.module';
 import { HealthModule } from './health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -47,9 +49,11 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     // Infrastructure modules
     PrismaModule,
     RedisModule,
+    SmsModule,
 
     // Feature modules
     HealthModule,
+    AuthModule,
   ],
   providers: [
     // Global guards

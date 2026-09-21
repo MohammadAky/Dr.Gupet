@@ -1,8 +1,54 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0 & 1 Implementation
+## [Unreleased] - Phase 0, 1 & 2 Implementation
 
 ### Added
+
+#### Phase 2: Auth (OTP + JWT)
+**SMS Module:**
+- `src/sms/sms.module.ts` - Global SmsModule
+- `src/sms/sms.service.ts` - SmsService with driver pattern:
+  - ConsoleSmsDriver (dev only, logs to stdout)
+  - KavenegarSmsDriver (placeholder)
+  - SmsIrSmsDriver (placeholder)
+  - Driver selected via `SMS_DRIVER` env var
+
+**Auth Module:**
+- `src/modules/auth/auth.module.ts` - AuthModule with JwtModule and PassportModule
+- `src/modules/auth/auth.service.ts` - AuthService with:
+  - `requestOtp()` - Generate and send OTP
+  - `verifyOtp()` - Verify OTP, upsert user, generate tokens
+  - `refreshTokens()` - Rotate refresh tokens
+  - `logout()` - Invalidate refresh token
+- `src/modules/auth/auth.controller.ts` - Auth endpoints:
+  - `POST /auth/otp/request` - Request OTP (throttled: 10/min)
+  - `POST /auth/otp/verify` - Verify OTP (throttled: 10/min)
+  - `POST /auth/refresh` - Refresh access token
+  - `POST /auth/logout` - Logout (requires auth)
+- `src/modules/auth/otp.service.ts` - OtpService with:
+  - HMAC-SHA256 hashed OTP storage in Redis
+  - Cooldown between requests (60s)
+  - Hourly rate limit (5/hour)
+  - Attempt limit (5 attempts)
+  - Timing-safe comparison
+  - Dev code support (`OTP_DEV_CODE`)
+
+**JWT Strategies:**
+- `src/modules/auth/strategies/jwt.strategy.ts` - JWT validation, user loading, block check
+- `src/modules/auth/strategies/jwt-refresh.strategy.ts` - Refresh token validation
+
+**DTOs:**
+- `src/modules/auth/dto/request-otp.dto.ts` - Phone validation (09XXXXXXXXX)
+- `src/modules/auth/dto/verify-otp.dto.ts` - Phone + code validation
+- `src/modules/auth/dto/refresh-token.dto.ts` - Refresh token string
+
+**Token Rules:**
+- Access token: `{ sub: userId, role }`, configurable TTL
+- Refresh token: `{ sub, jti }`, stored in Redis with TTL
+- Token rotation on refresh (delete old, issue new)
+- Logout deletes refresh token from Redis
+
+---
 
 #### Phase 0: Bootstrap
 **Configuration Files:**
