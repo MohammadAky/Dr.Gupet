@@ -1,8 +1,47 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1 & 2 Implementation
+## [Unreleased] - Phase 0, 1, 2 & 3 Implementation
 
 ### Added
+
+#### Phase 3: Users & Addresses
+**Users Module:**
+- `src/modules/users/users.module.ts` - UsersModule
+- `src/modules/users/users.service.ts` - UsersService with:
+  - `getProfile()` - Get current user profile
+  - `updateProfile()` - Update firstName, lastName, avatar only
+- `src/modules/users/users.controller.ts` - User endpoints:
+  - `GET /users/me` - Get current profile
+  - `PATCH /users/me` - Update profile (phone and role not editable)
+
+**Addresses Module:**
+- `src/modules/addresses/addresses.module.ts` - AddressesModule
+- `src/modules/addresses/addresses.service.ts` - AddressesService with:
+  - `findAll()` - List addresses (default first)
+  - `create()` - Create address (first becomes default)
+  - `update()` - Update address with ownership check
+  - `setDefault()` - Set default (unset others in transaction)
+  - `remove()` - Delete address (promote most recent if was default)
+- `src/modules/addresses/addresses.controller.ts` - Address endpoints:
+  - `GET /addresses` - List my addresses
+  - `POST /addresses` - Create address (max 10)
+  - `PATCH /addresses/:id` - Update address
+  - `PATCH /addresses/:id/default` - Set as default
+  - `DELETE /addresses/:id` - Delete address
+
+**DTOs:**
+- `src/modules/users/dto/update-profile.dto.ts` - firstName, lastName, avatar
+- `src/modules/addresses/dto/create-address.dto.ts` - Full address fields
+- `src/modules/addresses/dto/update-address.dto.ts` - Partial address fields
+
+**Rules:**
+- Max 10 addresses per user
+- First address automatically becomes default
+- Default address is always unset for others when changed (transaction)
+- When deleting default address, most recent remaining is promoted
+- Ownership check on all address operations (404 if not found or not owned)
+
+---
 
 #### Phase 2: Auth (OTP + JWT)
 **SMS Module:**
