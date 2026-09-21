@@ -1,25 +1,39 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
+import { ProductsRecommendationService } from './products-recommendation.service';
 import { Public } from '../../common/decorators/public.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
-  constructor(private productsService: ProductsService) {}
+  constructor(
+    private productsService: ProductsService,
+    private recommendationsService: ProductsRecommendationService,
+  ) {}
 
-  @Public()
   @Get('recommendations')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get product recommendations for a pet' })
   @ApiQuery({ name: 'petId', type: Number, required: true })
+  @ApiQuery({ name: 'page', type: Number, required: false })
+  @ApiQuery({ name: 'limit', type: Number, required: false })
   @ApiResponse({ status: 200, description: 'Recommendations returned' })
+  @ApiResponse({ status: 404, description: 'Pet not found' })
   async getRecommendations(
+    @CurrentUser('sub') userId: number,
     @Query('petId') petId: number,
-    @Query() query: PaginationQueryDto,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    // TODO: implement in Phase 7
-    return { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } };
+    return this.recommendationsService.findForPet(
+      userId,
+      Number(petId),
+      page || 1,
+      limit || 20,
+    );
   }
 
   @Public()

@@ -1,8 +1,41 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4, 5 & 6 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6 & 7 Implementation
 
 ### Added
+
+#### Phase 7: Recommendations
+**ProductsRecommendationService:**
+- `src/modules/products/products-recommendation.service.ts` - Recommendation engine with:
+  - `findForPet()` - Get personalized product recommendations
+  - `computeLifeStage()` - Calculate life stage from birthDate
+  - `computeSizeClass()` - Calculate size class from weight (dogs only)
+
+**Recommendation Algorithm:**
+- Filter by pet's petType
+- Life stage matching: PUPPY_KITTEN (<12mo), ADULT, SENIOR (>=84mo), ALL
+- Size class matching (dogs only): SMALL (<10kg), MEDIUM (10-25kg), LARGE (>25kg), ALL
+- Neuter suitability: if neutered → ANY or NEUTERED_ONLY
+- Allergen exclusion: exclude products with CONTAINS tags matching pet's ALLERGEN tags
+- Must have at least one in-stock active variant
+- Ranking: number of matching DIET tags (descending), then newest
+
+**Endpoint:**
+- `GET /products/recommendations?petId=<id>&page&limit` (requires auth)
+- Returns product card shape + `matchedTags: string[]` + `matchScore: number`
+
+**Query Parameters:**
+- `petId` (required) - Pet ID (must belong to caller)
+- `page` (optional, default 1)
+- `limit` (optional, default 20)
+
+**Rules:**
+- Pet must belong to the authenticated user (404 otherwise)
+- Products ranked by number of matching diet tags
+- Matched tag names returned for UI display
+- Only in-stock products recommended
+
+---
 
 #### Phase 6: Catalog (Brands, Categories, Products)
 **Brands Module:**
