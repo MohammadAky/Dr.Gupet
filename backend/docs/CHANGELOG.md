@@ -1,8 +1,64 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4 & 5 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4, 5 & 6 Implementation
 
 ### Added
+
+#### Phase 6: Catalog (Brands, Categories, Products)
+**Brands Module:**
+- `src/modules/brands/brands.module.ts` - BrandsModule
+- `src/modules/brands/brands.service.ts` - BrandsService with:
+  - `findAll()` - Get all active brands
+- `src/modules/brands/brands.controller.ts` - Brands endpoint:
+  - `GET /brands` - List all brands (public)
+
+**Categories Module:**
+- `src/modules/categories/categories.module.ts` - CategoriesModule
+- `src/modules/categories/categories.service.ts` - CategoriesService with:
+  - `findAll()` - Get categories as tree (parent → children), optional petType filter
+- `src/modules/categories/categories.controller.ts` - Categories endpoint:
+  - `GET /categories` - List categories (public, optional ?petTypeId=)
+
+**Products Module:**
+- `src/modules/products/products.module.ts` - ProductsModule
+- `src/modules/products/products.service.ts` - ProductsService with:
+  - `findAll()` - List products with filtering, search, sorting, pagination
+  - `findBySlug()` - Get product detail by slug
+  - `getChildCategoryIds()` - Recursive category tree helper
+- `src/modules/products/product-variants.service.ts` - ProductVariantsService with:
+  - `recalculateMinPrice()` - Update product.minPrice to cheapest active variant
+- `src/modules/products/products.controller.ts` - Product endpoints:
+  - `GET /products` - List products (public, with query params)
+  - `GET /products/:slug` - Product detail (public)
+  - `GET /products/recommendations` - Placeholder for Phase 7
+
+**Product Query Filters:**
+- `q` - Search by name (normalized Persian, case-insensitive)
+- `petTypeId` - Filter by pet type
+- `categorySlug` - Filter by category (includes children)
+- `brandId` - Filter by brand
+- `lifeStage` - Filter by life stage (PUPPY_KITTEN, ADULT, SENIOR, ALL)
+- `sizeClass` - Filter by size (SMALL, MEDIUM, LARGE, ALL)
+- `tagIds` - Comma-separated tag IDs (product must have ALL)
+- `minPrice`, `maxPrice` - Price range (matches any variant)
+- `inStock` - Only products with stock
+- `sort` - newest (default), price_asc, price_desc
+
+**Product Card Shape:**
+- id, name, slug, brand, image, minPrice, inStock, lifeStage, sizeClass
+
+**Product Detail Shape:**
+- All fields + category, petType, images, variants (with inStock/lowStock), tags
+
+**Rules:**
+- Only active products with at least one active variant
+- Inactive variants never returned
+- Stock numbers hidden (only inStock boolean)
+- lowStock flag when stock <= LOW_STOCK_THRESHOLD
+- minPrice denormalized on Product (recalculate on variant change)
+- Category filter includes child categories recursively
+
+---
 
 #### Phase 5: Pets
 **Pets Module:**
