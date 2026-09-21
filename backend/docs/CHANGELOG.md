@@ -1,8 +1,28 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6 & 7 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7 & 8 Implementation
 
 ### Added
+
+#### Phase 8: Favorites
+**Favorites Module:**
+- `src/modules/favorites/favorites.module.ts` - FavoritesModule
+- `src/modules/favorites/favorites.service.ts` - FavoritesService with:
+  - `findAll()` - List favorites (paginated product cards)
+  - `add()` - Add to favorites (idempotent)
+  - `remove()` - Remove from favorites (idempotent)
+- `src/modules/favorites/favorites.controller.ts` - Favorites endpoints:
+  - `GET /favorites` - List my favorites (paginated)
+  - `PUT /favorites/:productId` - Add to favorites
+  - `DELETE /favorites/:productId` - Remove from favorites
+
+**Rules:**
+- Product must exist and be active to add (404 otherwise)
+- Add/remove are idempotent (adding twice = ok, removing non-existent = ok)
+- Inactive products filtered out from list
+- Returns product card shape (same as product list)
+
+---
 
 #### Phase 7: Recommendations
 **ProductsRecommendationService:**
