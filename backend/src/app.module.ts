@@ -25,6 +25,7 @@ import { BrandsModule } from './modules/brands/brands.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
+import { CartModule } from './modules/cart/cart.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -76,6 +77,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     CategoriesModule,
     ProductsModule,
     FavoritesModule,
+    CartModule,
   ],
   providers: [
     // Global guards

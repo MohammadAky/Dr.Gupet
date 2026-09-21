@@ -1,8 +1,44 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7 & 8 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7, 8 & 9 Implementation
 
 ### Added
+
+#### Phase 9: Cart
+**Cart Module:**
+- `src/modules/cart/cart.module.ts` - CartModule
+- `src/modules/cart/cart.service.ts` - CartService with:
+  - `getCart()` - Get cart with computed totals
+  - `addItem()` - Add item (or increase quantity if exists)
+  - `updateItem()` - Update item quantity
+  - `removeItem()` - Remove item from cart
+  - `clearCart()` - Clear all items
+- `src/modules/cart/cart.controller.ts` - Cart endpoints:
+  - `GET /cart` - Get my cart
+  - `POST /cart/items` - Add item to cart
+  - `PATCH /cart/items/:id` - Update item quantity
+  - `DELETE /cart/items/:id` - Remove item
+  - `DELETE /cart` - Clear cart
+
+**DTOs:**
+- `src/modules/cart/dto/add-cart-item.dto.ts` - variantId, quantity (optional, default 1)
+- `src/modules/cart/dto/update-cart-item.dto.ts` - quantity (1-20)
+
+**Cart Item Shape:**
+- id, variantId, productName, productSlug, productImage, weightGram
+- unitPrice (current from variant), quantity, total
+- available (boolean), stockProblem ('OUT_OF_STOCK' | 'INSUFFICIENT')
+
+**Rules:**
+- Cart created lazily on first add
+- Variant and product must be active (VARIANT_UNAVAILABLE)
+- Quantity cannot exceed stock (OUT_OF_STOCK)
+- Max 20 items per variant (MAX_CART_ITEM_QTY)
+- If item already exists, increase quantity
+- Prices always computed from current variant (never stored)
+- Unavailable items flagged (not silently deleted)
+
+---
 
 #### Phase 8: Favorites
 **Favorites Module:**
