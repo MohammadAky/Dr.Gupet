@@ -1,8 +1,50 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2 & 3 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3 & 4 Implementation
 
 ### Added
+
+#### Phase 4: Upload & Reference Data
+**Upload Module:**
+- `src/upload/upload.module.ts` - UploadModule
+- `src/upload/upload.service.ts` - UploadService with:
+  - Magic bytes validation (JPEG, PNG, WebP)
+  - File size limit (configurable via UPLOAD_MAX_MB)
+  - Random UUID filename
+  - Public URL generation
+- `src/upload/upload.controller.ts` - Upload endpoint:
+  - `POST /upload/image` - Upload image (multipart/form-data)
+
+**Pet Types Module:**
+- `src/modules/pet-types/pet-types.module.ts` - PetTypesModule
+- `src/modules/pet-types/pet-types.service.ts` - PetTypesService with:
+  - `findAll()` - Get all active pet types
+  - `findBreeds()` - Get breeds for a pet type
+- `src/modules/pet-types/pet-types.controller.ts` - Pet type endpoints:
+  - `GET /pet-types` - List all active pet types (public)
+  - `GET /pet-types/:id/breeds` - List breeds for pet type (public)
+
+**Breeds Module:**
+- `src/modules/breeds/breeds.module.ts` - BreedsModule
+- `src/modules/breeds/breeds.service.ts` - BreedsService with:
+  - `findAll()` - Get all active breeds (optional petType filter)
+- `src/modules/breeds/breeds.controller.ts` - Breeds endpoint:
+  - `GET /breeds` - List all breeds (public, optional ?petTypeId=)
+
+**Tags Module:**
+- `src/modules/tags/tags.module.ts` - TagsModule
+- `src/modules/tags/tags.service.ts` - TagsService with:
+  - `findAll()` - Get tags filtered by type (ALLERGEN or DIET)
+- `src/modules/tags/tags.controller.ts` - Tags endpoint:
+  - `GET /tags` - List tags (public, optional ?type=ALLERGEN|DIET)
+
+**Seed Data Required:**
+- Pet types: dog (سگ), cat (گربه)
+- ~10 breeds each
+- Allergen tags: chicken, beef, fish, lamb, wheat/gluten, corn, soy, dairy, egg
+- Diet tags: grain-free, weight-control, urinary-care, sensitive-digestion, hypoallergenic, skin-and-coat, joint-care, dental-care
+
+---
 
 #### Phase 3: Users & Addresses
 **Users Module:**
