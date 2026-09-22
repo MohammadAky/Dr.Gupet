@@ -1,8 +1,52 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 & 11 Implementation
+## [Unreleased] - Phase 0-15 Implementation Complete
 
 ### Added
+
+#### Phase 15: Hardening & Delivery
+**Dockerfile:**
+- Multi-stage build (builder + production)
+- Node 20 Alpine
+- Prisma generate and migrate
+- Production-only dependencies
+
+**.dockerignore:**
+- Excludes node_modules, dist, .env, uploads
+
+**Environment Hardening:**
+- Swagger disabled in production (NODE_ENV=production)
+- Helmet security headers
+- CORS whitelist
+- Rate limiting (100 req/min/IP)
+- OTP endpoints throttled (10/min)
+- Environment validation at startup
+
+---
+
+#### Phase 14: Seed & Admin Tooling
+- Idempotent seed script with sample data
+- Pet types, breeds, tags, brands, categories
+- Sample products with variants
+- Coupons, pharmacies, medicines
+- Admin user
+
+---
+
+#### Phase 13: Medicines & Pharmacies
+- Information-only medicine and pharmacy listing
+- Search with Persian normalization
+- Disclaimer included
+
+---
+
+#### Phase 12: Payments
+- PaymentGateway interface
+- Mock gateway for dev
+- Zarinpal gateway placeholder
+- Callback handling with redirect
+
+---
 
 #### Phase 11: Orders & Checkout
 **Orders Module:**
