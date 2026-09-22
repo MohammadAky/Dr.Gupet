@@ -1,8 +1,34 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7, 8 & 9 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 & 10 Implementation
 
 ### Added
+
+#### Phase 10: Coupons
+**Coupons Module:**
+- `src/modules/coupons/coupons.module.ts` - CouponsModule
+- `src/modules/coupons/coupons.service.ts` - CouponsService with:
+  - `validate()` - Validate coupon and preview discount (no recording)
+  - `evaluate()` - Single reusable validation function (used by checkout too)
+- `src/modules/coupons/coupons.controller.ts` - Coupon endpoints:
+  - `POST /coupons/validate` - Validate coupon against current cart
+
+**DTOs:**
+- `src/modules/coupons/dto/apply-coupon.dto.ts` - code
+
+**Coupon Rules (in order):**
+1. Not found or inactive → COUPON_INVALID
+2. Date not valid (startAt/endAt) → COUPON_EXPIRED
+3. itemsTotal < minOrderAmount → COUPON_MIN_AMOUNT
+4. Total redemptions >= totalLimit → COUPON_LIMIT_REACHED
+5. User redemptions >= perUserLimit → COUPON_LIMIT_REACHED
+
+**Discount Calculation:**
+- PERCENT: Math.floor(itemsTotal * value / 100), capped by maxDiscount
+- FIXED: value
+- Final: min(discount, itemsTotal)
+
+---
 
 #### Phase 9: Cart
 **Cart Module:**
