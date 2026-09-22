@@ -28,6 +28,7 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -82,6 +83,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     CartModule,
     CouponsModule,
     OrdersModule,
+    PaymentsModule,
   ],
   providers: [
     // Global guards
