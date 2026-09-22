@@ -29,6 +29,8 @@ import { CartModule } from './modules/cart/cart.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { MedicinesModule } from './modules/medicines/medicines.module';
+import { PharmaciesModule } from './modules/pharmacies/pharmacies.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -84,6 +86,8 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     CouponsModule,
     OrdersModule,
     PaymentsModule,
+    MedicinesModule,
+    PharmaciesModule,
   ],
   providers: [
     // Global guards
