@@ -1,8 +1,50 @@
 # Pet System Backend - Changelog
 
-## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 & 10 Implementation
+## [Unreleased] - Phase 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 & 11 Implementation
 
 ### Added
+
+#### Phase 11: Orders & Checkout
+**Orders Module:**
+- `src/modules/orders/orders.module.ts` - OrdersModule
+- `src/modules/orders/orders.service.ts` - OrdersService with:
+  - `checkout()` - Complete checkout from cart
+  - `findAll()` - List my orders (paginated)
+  - `findOne()` - Get order by ID
+  - `cancel()` - Cancel pending payment order
+  - `expirePendingOrders()` - Cron job to expire old orders
+- `src/modules/orders/order-stock.service.ts` - OrderStockService with:
+  - `reserve()` - Atomic stock decrement
+  - `release()` - Stock increment back (cancel/expiry)
+- `src/modules/orders/orders.controller.ts` - Order endpoints:
+  - `POST /orders` - Checkout
+  - `GET /orders` - List my orders
+  - `GET /orders/:id` - Get order detail
+  - `POST /orders/:id/cancel` - Cancel order
+
+**DTOs:**
+- `src/modules/orders/dto/create-order.dto.ts` - addressId, couponCode?, note?
+- `src/modules/orders/dto/order-query.dto.ts` - status filter
+
+**Checkout Algorithm (all in one transaction):**
+1. Load cart → CART_EMPTY if empty
+2. Load address → 404 if not owned
+3. Validate all items still available
+4. Calculate itemsTotal from variant prices
+5. Validate coupon if provided
+6. Calculate shipping (flat or free above threshold)
+7. Reserve stock atomically (rollback on failure)
+8. Create order (PENDING_PAYMENT) with orderNumber
+9. Create order items (snapshots)
+10. Record coupon redemption if used
+11. Clear cart items
+
+**Scheduled Job:**
+- Cron every 5 minutes
+- Expires PENDING_PAYMENT orders older than ORDER_EXPIRE_MINUTES
+- Releases stock and deletes coupon redemptions
+
+---
 
 #### Phase 10: Coupons
 **Coupons Module:**
