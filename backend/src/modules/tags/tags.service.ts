@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { TagType } from '@prisma/client';
 
 @Injectable()
 export class TagsService {
@@ -9,7 +8,7 @@ export class TagsService {
   /**
    * Get tags filtered by type (ALLERGEN or DIET)
    */
-  async findAll(type?: TagType) {
+  async findAll(type?: string) {
     const where = type ? { type } : {};
 
     return this.prisma.tag.findMany({

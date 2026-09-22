@@ -1,6 +1,5 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsEnum, IsDateString, Min, Max, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsIn, IsDateString, Min, Max, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender } from '@prisma/client';
 
 export class CreatePetDto {
   @ApiProperty({ example: 'دوست من' })
@@ -22,10 +21,10 @@ export class CreatePetDto {
   @IsDateString()
   birthDate?: string;
 
-  @ApiPropertyOptional({ enum: Gender })
+  @ApiPropertyOptional({ enum: ['MALE', 'FEMALE'] })
   @IsOptional()
-  @IsEnum(Gender)
-  gender?: Gender;
+  @IsIn(['MALE', 'FEMALE'])
+  gender?: string;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()

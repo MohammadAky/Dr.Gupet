@@ -1,6 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { CouponsService } from '../coupons/coupons.service';
@@ -120,7 +119,7 @@ export class OrdersService {
           shippingCost,
           finalAmount,
           couponId,
-          status: OrderStatus.PENDING_PAYMENT,
+          status: 'PENDING_PAYMENT',
           note: data.note,
         },
       });
@@ -238,7 +237,7 @@ export class OrdersService {
       throw new NotFoundException('سفارش یافت نشد');
     }
 
-    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+    if (order.status !== 'PENDING_PAYMENT') {
       throw new AppException('ORDER_INVALID_STATE', 'فقط سفارش‌های در انتظار پرداخت قابل لغو هستند', 400);
     }
 
@@ -262,7 +261,7 @@ export class OrdersService {
       // Update order status
       return tx.order.update({
         where: { id: orderId },
-        data: { status: OrderStatus.CANCELED },
+        data: { status: 'CANCELED' },
       });
     });
   }
@@ -305,7 +304,7 @@ export class OrdersService {
           // Update order status
           await tx.order.update({
             where: { id: order.id },
-            data: { status: OrderStatus.CANCELED },
+            data: { status: 'CANCELED' },
           });
         });
       } catch (error) {

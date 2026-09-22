@@ -1,11 +1,10 @@
-import { IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { OrderStatus } from '@prisma/client';
 
 export class OrderQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ enum: OrderStatus })
+  @ApiPropertyOptional({ enum: ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELED'] })
   @IsOptional()
-  @IsEnum(OrderStatus)
-  status?: OrderStatus;
+  @IsIn(['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELED'])
+  status?: string;
 }

@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentGateway } from './gateways/payment-gateway.interface';
 import { MockPaymentGateway } from './gateways/mock.gateway';
@@ -42,7 +41,7 @@ export class PaymentsService {
       throw new NotFoundException('سفارش یافت نشد');
     }
 
-    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+    if (order.status !== 'PENDING_PAYMENT') {
       throw new NotFoundException('سفارش قابل پرداخت نیست');
     }
 
@@ -52,7 +51,7 @@ export class PaymentsService {
         orderId: order.id,
         amount: order.finalAmount,
         gateway: this.configService.get<string>('payment.driver') || 'mock',
-        status: PaymentStatus.INITIATED,
+        status: 'INITIATED',
       },
     });
 
@@ -89,7 +88,7 @@ export class PaymentsService {
     }
 
     // Idempotent: if already successful, just return
-    if (payment.status === PaymentStatus.SUCCESS) {
+    if (payment.status === 'SUCCESS') {
       return { success: true, orderNumber: payment.order.orderNumber };
     }
 
@@ -97,7 +96,7 @@ export class PaymentsService {
       // Mark as failed
       await this.prisma.payment.update({
         where: { id: payment.id },
-        data: { status: PaymentStatus.FAILED },
+        data: { status: 'FAILED' },
       });
 
       return { success: false, orderNumber: payment.order.orderNumber };
@@ -112,7 +111,7 @@ export class PaymentsService {
     if (!verifyResult.success) {
       await this.prisma.payment.update({
         where: { id: payment.id },
-        data: { status: PaymentStatus.FAILED },
+        data: { status: 'FAILED' },
       });
 
       return { success: false, orderNumber: payment.order.orderNumber };
@@ -123,14 +122,14 @@ export class PaymentsService {
       await tx.payment.update({
         where: { id: payment.id },
         data: {
-          status: PaymentStatus.SUCCESS,
+          status: 'SUCCESS',
           paidAt: new Date(),
         },
       });
 
       await tx.order.update({
         where: { id: payment.orderId },
-        data: { status: OrderStatus.PAID },
+        data: { status: 'PAID' },
       });
     });
 

@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAX_PETS_PER_USER } from '../../common/constants';
-import { LifeStage } from '@prisma/client';
 
 @Injectable()
 export class PetsService {
@@ -270,8 +269,8 @@ export class PetsService {
   /**
    * Compute life stage from birth date
    */
-  private computeLifeStage(birthDate: Date | null): LifeStage {
-    if (!birthDate) return LifeStage.ALL;
+  private computeLifeStage(birthDate: Date | null): string {
+    if (!birthDate) return 'ALL';
 
     const now = new Date();
     const birth = new Date(birthDate);
@@ -279,8 +278,8 @@ export class PetsService {
       (now.getFullYear() - birth.getFullYear()) * 12 +
       (now.getMonth() - birth.getMonth());
 
-    if (monthsDiff < 12) return LifeStage.PUPPY_KITTEN;
-    if (monthsDiff >= 84) return LifeStage.SENIOR;
-    return LifeStage.ADULT;
+    if (monthsDiff < 12) return 'PUPPY_KITTEN';
+    if (monthsDiff >= 84) return 'SENIOR';
+    return 'ADULT';
   }
 }

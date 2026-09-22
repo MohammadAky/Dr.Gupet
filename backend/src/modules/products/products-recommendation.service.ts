@@ -1,6 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { LifeStage, SizeClass, TagType } from '@prisma/client';
 import {
   PUPPY_KITTEN_MAX_MONTHS,
   SENIOR_MIN_MONTHS,
@@ -46,12 +45,12 @@ export class ProductsRecommendationService {
 
     // Get pet's allergen tag IDs
     const allergenTagIds = pet.tags
-      .filter((pt) => pt.tag.type === TagType.ALLERGEN)
+      .filter((pt) => pt.tag.type === 'ALLERGEN')
       .map((pt) => pt.tag.id);
 
     // Get pet's diet tag IDs
     const dietTagIds = pet.tags
-      .filter((pt) => pt.tag.type === TagType.DIET)
+      .filter((pt) => pt.tag.type === 'DIET')
       .map((pt) => pt.tag.id);
 
     // Build where clause
@@ -69,12 +68,12 @@ export class ProductsRecommendationService {
 
     // Life stage filter
     if (lifeStage) {
-      where.lifeStage = { in: [lifeStage, LifeStage.ALL] };
+      where.lifeStage = { in: [lifeStage, 'ALL'] };
     }
 
     // Size class filter (dogs only)
     if (sizeClass) {
-      where.sizeClass = { in: [sizeClass, SizeClass.ALL] };
+      where.sizeClass = { in: [sizeClass, 'ALL'] };
     }
 
     // Neuter suitability filter
@@ -151,7 +150,7 @@ export class ProductsRecommendationService {
       if (b.matchScore !== a.matchScore) {
         return b.matchScore - a.matchScore;
       }
-      return 0; // Keep original order (newest) for ties
+      return 0;
     });
 
     return {
@@ -168,7 +167,7 @@ export class ProductsRecommendationService {
   /**
    * Compute life stage from birth date
    */
-  private computeLifeStage(birthDate: Date | null): LifeStage | null {
+  private computeLifeStage(birthDate: Date | null): string | null {
     if (!birthDate) return null;
 
     const now = new Date();
@@ -177,21 +176,21 @@ export class ProductsRecommendationService {
       (now.getFullYear() - birth.getFullYear()) * 12 +
       (now.getMonth() - birth.getMonth());
 
-    if (monthsDiff < PUPPY_KITTEN_MAX_MONTHS) return LifeStage.PUPPY_KITTEN;
-    if (monthsDiff >= SENIOR_MIN_MONTHS) return LifeStage.SENIOR;
-    return LifeStage.ADULT;
+    if (monthsDiff < PUPPY_KITTEN_MAX_MONTHS) return 'PUPPY_KITTEN';
+    if (monthsDiff >= SENIOR_MIN_MONTHS) return 'SENIOR';
+    return 'ADULT';
   }
 
   /**
    * Compute size class (dogs only)
    */
-  private computeSizeClass(petTypeSlug: string, weightKg: any): SizeClass | null {
+  private computeSizeClass(petTypeSlug: string, weightKg: any): string | null {
     if (petTypeSlug !== 'dog' || !weightKg) return null;
 
     const weight = Number(weightKg);
 
-    if (weight < DOG_SMALL_MAX_KG) return SizeClass.SMALL;
-    if (weight <= DOG_MEDIUM_MAX_KG) return SizeClass.MEDIUM;
-    return SizeClass.LARGE;
+    if (weight < DOG_SMALL_MAX_KG) return 'SMALL';
+    if (weight <= DOG_MEDIUM_MAX_KG) return 'MEDIUM';
+    return 'LARGE';
   }
 }
