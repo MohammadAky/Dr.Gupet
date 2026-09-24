@@ -428,6 +428,8 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 
 `BE-REQ` = a change we need in the backend. `BE-Q` = a question we need answered. Both are reported by the frontend owner to the backend owner; nothing here is implemented silently, and the frontend must ship a documented workaround until the answer arrives.
 
+**GitHub tracking:** the backend blockers (SCHEMA-001, BE-REQ-02/03/11/12/13) are filed as issue **#2** → https://github.com/MohammadAky/Dr.Gupet/issues/2 (created 2026-09-24, includes the raw `tsc` output and an acceptance checklist). This table is the frontend-side mirror of that issue.
+
 | ID | Type | What we need | Evidence (read from `main`) | Needed before | Status |
 |---|---|---|---|---|---|
 | SCHEMA-001 | change | Resolve the `Product.minPrice` mismatch: either add the field (with migration + backfill) or remove its usages. **It is not a theoretical risk: the build fails** (`TS2353` in `prisma/seed.ts:145/161/177` and `product-variants.service.ts:24`) | `npx tsc --noEmit` (Prisma Client 6.19.3, TS 5.9.3) + `prisma/schema.prisma` has no `minPrice`; also recorded in `backend/docs/SCHEMA_CHANGE_REQUESTS.md` | F5 acceptance / any backend run | OPEN — waiting for the backend owner |
@@ -475,12 +477,17 @@ Findings from the remote (read on 2026-09-24):
 | Repository owner | `MohammadAky` (`Mohammad Akbary`), author of `9c7fb66 first commit` | holds write access; the account that can push/merge today |
 | Backend implementation commits | Phases 0–15 authored by `Developer <dev@local>` in `main` @ `d3f99bc` | backend was produced by an **AI agent identity** (sandbox author, not a GitHub account) and pushed with the owner's credentials |
 | Local-only branch `codex/phase-0-bootstrap` (at `7beae2f`, ancestor of `main`) | exists only in this workspace; never pushed | leftover from the backend agent's first session; keep until its author confirms, then it can be deleted (`git branch -d`) |
-| Issue #1 (open, no comments) | `درخواست دسترسی Collaborator برای KianTheGoat` by `KianTheGoat`, asking for write access "to push development branches and open pull requests" | a second collaborator without write access yet — this matches the **frontend** role, which has no code in the repo |
+| Issue #1 (open, no comments) | `درخواست دسترسی Collaborator برای KianTheGoat` by `KianTheGoat`, asking for write access "to push development branches and open pull requests" | the request is **satisfied in practice**: pushes from this workspace and issue creation both succeed under the `KianTheGoat` credential — issue #1 can be closed |
+| Issue #2 (open) | `بلاکرهای اجرای بکاند…` created 2026-09-24 | filed by this roadmap's owner with the full backend blocker report (§7); the reference the frontend owner will point the backend owner to |
 | Untracked local files | `backend/docs/DEVELOPMENT_CHECKLIST.fa.md`, `backend/docs/SCHEMA_CHANGE_REQUESTS.md`, `backend/package-lock.json` | produced locally (backend/agent side), not on GitHub — GitHub stays authoritative; do not commit them from frontend work |
 
-**Working assumption (confirm in one line when replying):** frontend owner = the person driving this roadmap (git identity not configured locally; matches the collaborator request pattern), backend owner = `MohammadAky` (repo owner) working through an AI agent. Ownership column in §12 uses `FE` for all frontend phases.
+**Confirmed on 2026-09-24 by hard evidence (not inference):** the GitHub credential stored on this development machine belongs to **`KianTheGoat`** — issue **#2** was created through that credential and every push from this workspace (`c4dcb94`, `3eaccb7`, `67fc0ac`) succeeds. Therefore:
 
-Governance note: until write access is resolved (Issue #1), the frontend can only work locally; the roadmap file and every phase must be pushed through whoever holds access, or the issue must be accepted first.
+- **frontend owner = `KianTheGoat`** (drives this roadmap; the `frontend/` folder is theirs),
+- **backend owner = `MohammadAky`** (repository owner; the backend phases are authored by the `Developer <dev@local>` agent identity and pushed to `main`),
+- **git identity note:** no `user.name`/`user.email` is configured locally, so commits default to the agent identity; set `git config user.name/user.email` if the frontend commits should be attributed to `KianTheGoat`.
+
+Issue #1 is satisfied in practice (write access works) and may be closed.
 
 ---
 
@@ -616,6 +623,7 @@ Legend: ☐ not started · ◐ in progress · ☑ done (evidence linked) · ⚠ 
 |---|---|---|---|---|
 | 2026-09-24 | — (roadmap) | `c4dcb94` | backend inventory and §7 findings read from `main` @ `d3f99bc` | frontend owner + AI session |
 | 2026-09-24 | — (backend env diagnosis) | this commit | Prisma CLI root cause + `generate` OK with the local 6.19.3 workaround, full `tsc` error list, Docker/WSL inventory (§7 BE-REQ-11..13) | frontend owner + AI session |
+| 2026-09-24 | — (backend blockers filed) | issue **#2** | GitHub issue with raw `tsc` output, version evidence and an acceptance checklist; identity confirmed: frontend = `KianTheGoat`, backend = `MohammadAky` (§9) | frontend owner + AI session |
 
 ### 12.3 Frontend regression checklist (used from F5 onward, mandatory in F11)
 
