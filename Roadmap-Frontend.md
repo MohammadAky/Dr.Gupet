@@ -617,6 +617,8 @@ npm run build && npm run preview
 
 Legend: ☐ not started · ◐ in progress · ☑ done (evidence linked) · ⚠ done with an open caveat (list it).
 
+> **Current resume point (2026-09-24):** no frontend phase has started. The only blocker for *live-API* validation is issue **#2** (backend build/`prisma`/database); F0 itself may start immediately using MSW mocks, with the F0 health smoke test marked ⚠ until the API runs. Environment left behind on this machine: `backend/.env` copied from `.env.example` (gitignored) and a **local-only** Prisma workaround (`npm install --no-save prisma@6.19.3 @prisma/client@6.19.3`, `npx prisma generate` OK) — a plain `npm install` will revert it to the broken `8.0.0-rc.15` until BE-REQ-12 is fixed. Local `main` equals `origin/main` (`e410e5e`); the stale local branch `codex/phase-0-bootstrap` is untouched.
+
 ### 12.2 Progress log (append-only)
 
 | Date | Phase | Commit / PR | Evidence | By |
