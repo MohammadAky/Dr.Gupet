@@ -91,12 +91,13 @@ Everything below was read directly from `main` @ `d3f99bc` (controllers/services
 
 | ID | Finding (evidence read from `main`) | Frontend impact |
 |---|---|---|
-| SCHEMA-001 | `Product.minPrice` is used by `products.service.ts:112-113` (price sort), written by `product-variants.service.ts:24` and the seed, but **does not exist in `prisma/schema.prisma`** | "sort by price" may fail at runtime; blocks acceptance of F5's sorting; needs a backend decision |
+| SCHEMA-001 | `Product.minPrice` is used by `products.service.ts:112-113` (price sort), written by `product-variants.service.ts:24` and the seed, but **does not exist in `prisma/schema.prisma`** — proved by a real `tsc --noEmit` run: `prisma/seed.ts(145,161,177)` and `src/modules/products/product-variants.service.ts(24)` raise `TS2353: 'minPrice' does not exist` | the backend **cannot build** until this is resolved; "sort by price" would also fail at runtime; blocks F5 acceptance |
+| BE-REQ-11 | the delivered code has further compile errors that are independent of versions: `medicines.service.ts(83,103)` (`lastConfirmedAt` not on `PharmacySelect`, `medicine.pharmacies` missing), `orders.service.ts(133)` (`product.isActive` object has no `name`), `auth.controller.ts(9)` (`Throttle` imported from `@nestjs/common`), `main.ts(37,57)`, `upload.controller.ts(30)`/`upload.service.ts(39)` (`Express.Multer` namespace, `@types/multer` absent), `redis.service.ts(12,14)`, `jwt.strategy.ts(14)`, `auth.module.ts(17)`, `pagination-query.dto.ts(22,26)`, `all-exceptions.filter.ts(30)` | no live API before this is fixed; blocks F0's health smoke test and every later integration test |
 | BE-REQ-03 | `GET /products` is typed `PaginationQueryDto & any` (`products.controller.ts:43`) and `ProductQueryDto` is not wired; `inStock` uses `@Type(() => Boolean)` (`product-query.dto.ts:56-60`) | filters must be verified against a running server; the UI sends `inStock=true` only, never `false` |
 | BE-REQ-02 | The payment callback redirects with `orderNumber` only (`payments.callback.controller.ts:38`) while `GET /orders/:id` requires the numeric `id` | the result page needs a workaround (store `orderId` before redirect) or a small backend addition |
 | BE-REQ-04 | `GET /cart` returns only `itemsTotal` (no shipping/discount estimate) | the cart page must label the shipping amount as an estimate; constants must stay in sync |
 | BE-REQ-05 | The product card shape omits `compareAtPrice` although README Phase 6 lists it | discount badge placement decision (card vs. detail page) |
-| ENV-01 | `docker` was not found in `PATH` on this machine, `backend/.env` does not exist and `prisma generate` did not complete during this review | the dev environment must be set up and recorded before F0 acceptance (§11) |
+| ENV-01 | `docker` was not found in `PATH`, `backend/.env` did not exist and `npx prisma generate` failed: `package.json` with empty version strings resolves `prisma` to **`8.0.0-rc.15`** (the new Platform CLI, which has **no `generate` command**) while `@prisma/client` resolved to `7.10.0`; `typescript` resolved to `6.0.3` (which rejects the repo's `baseUrl`) and `@nestjs/core` to `12.0.4` | the workspace could not build or boot the backend; a local-only workaround was applied (see §11) but the repository itself still needs pinned versions |
 
 ---
 
@@ -429,7 +430,7 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 
 | ID | Type | What we need | Evidence (read from `main`) | Needed before | Status |
 |---|---|---|---|---|---|
-| SCHEMA-001 | change | Resolve the `Product.minPrice` mismatch: either add the field (with migration + backfill) or remove its usages | `product-variants.service.ts:24`, `products.service.ts:112-113`, `seed.ts`; field absent from `prisma/schema.prisma` (also recorded in `backend/docs/SCHEMA_CHANGE_REQUESTS.md`) | F5 acceptance | OPEN — waiting for the backend owner |
+| SCHEMA-001 | change | Resolve the `Product.minPrice` mismatch: either add the field (with migration + backfill) or remove its usages. **It is not a theoretical risk: the build fails** (`TS2353` in `prisma/seed.ts:145/161/177` and `product-variants.service.ts:24`) | `npx tsc --noEmit` (Prisma Client 6.19.3, TS 5.9.3) + `prisma/schema.prisma` has no `minPrice`; also recorded in `backend/docs/SCHEMA_CHANGE_REQUESTS.md` | F5 acceptance / any backend run | OPEN — waiting for the backend owner |
 | BE-REQ-02 | change | Return the numeric `orderId` in the payment redirect (or add `GET /orders/by-number/:orderNumber`) so the result page can fetch the order deterministically | `payments.callback.controller.ts:38` redirects with `orderNumber` only; `GET /orders/:id` needs the id | F9 | OPEN — FE ships with the sessionStorage workaround |
 | BE-REQ-03 | change/verify | Wire `ProductQueryDto` to `GET /products` (`products.controller.ts:43` currently uses `PaginationQueryDto & any`) and parse `inStock`/booleans with a real boolean transform | `product-query.dto.ts:56-60` uses `@Type(() => Boolean)` (so `inStock=false` becomes `true`) | F5 | OPEN — FE sends `inStock=true` only |
 | BE-REQ-04 | question | Should `GET /cart` return a shipping/discount estimate, or stay as-is (FE renders a clearly-marked estimate from constants)? | `cart.service.ts:93-98` returns only `itemsTotal` | F8/F9 | OPEN — FE uses the estimate |
@@ -439,6 +440,10 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 | BE-REQ-08 | question | `GET /orders` has no documented status filter in the controller (only pagination). Is filtering by status planned, or is client-side filtering the contract? | `orders.controller.ts:35-43` uses `PaginationQueryDto` only | F9 | OPEN — FE does not invent query params |
 | BE-REQ-09 | info | Dev-only: `PAYMENT_DRIVER=mock` + `OTP_DEV_CODE=12345` are required for local QA. Confirm they are never enabled in production (env validation already blocks Swagger in production) | `payments.service.ts:19-30`, `.env.example:18,23` | F0 | CONFIRMED for dev usage |
 | BE-REQ-10 | info | Uploads are served from `/uploads` **without** the `/api/v1` prefix (`main.ts:38-39`). Any reverse proxy/deployment must route `/uploads/*` to the backend so stored absolute URLs keep working | `main.ts:38-39`, `upload.service.ts:71` | F11 deployment | OPEN — needs confirmation at deployment |
+
+| BE-REQ-11 | change | Fix the remaining compile errors before any integration test: `medicines.service.ts(83,103)` (`lastConfirmedAt` is not part of `PharmacySelect`; `medicine.pharmacies` does not exist on the selected type), `orders.service.ts(133)` (`product.isActive` select has no `name`), `auth.controller.ts(9)` (`Throttle` must be imported from `@nestjs/throttler`), `main.ts(37,57)` (`useStaticAssets` needs `NestExpressApplication`), `upload.controller.ts(30)` + `upload.service.ts(39)` (`Express.Multer` needs `@types/multer`), `redis.service.ts(12,14)`, `jwt.strategy.ts(14)`, `auth.module.ts(17)`, `auth.service.ts(186,196)`, `pagination-query.dto.ts(22,26)`, `all-exceptions.filter.ts(30)` | full output of `npx tsc --noEmit -p tsconfig.json` (24+ errors, grouped above) | before the live API is needed (F0 smoke test onward) | OPEN |
+| BE-REQ-12 | change | Pin dependency versions in `backend/package.json` and commit `package-lock.json`. Empty version strings currently resolve to majors that cannot run this code: `prisma` → `8.0.0-rc.15` (a Platform CLI with **no `generate` command**), `@prisma/client` → `7.10.0`, `@nestjs/core` → `12.0.4`, `typescript` → `6.0.3` (errors on the repo's `baseUrl`) | `npm view prisma dist-tags` → `latest: 8.0.0-rc.15`; installed versions read from `node_modules/*/package.json`; `TS5101 Option 'baseUrl' is deprecated` | before any backend run | OPEN |
+| BE-REQ-13 | env | Provide a runnable database for local development: Docker is absent on this machine and WSL Ubuntu 26.04 has neither PostgreSQL nor Redis; choose Docker Desktop, packages inside WSL, or a hosted dev database, then hand over `DATABASE_URL`/`REDIS_URL` | `docker` not in `PATH`; `wsl -d Ubuntu -u root` → `NO-PSQL`, `NO-REDIS`, no `/etc/postgresql`; `prisma/migrations/` contains only `.gitkeep` | F0 acceptance | OPEN |
 
 **Rule for the frontend:** never fix a `BE-REQ` by changing `backend/`, and never mask a failing endpoint in the UI. If an endpoint is broken, the phase must record the failure and ship the documented fallback (see F5 note on price sorting).
 
@@ -532,9 +537,11 @@ Deliver:
 
 ## 11. Local development runbook
 
-Verified on this machine on 2026-09-24: `node v24.21.0` available, `backend/node_modules` present, **`docker` not found in `PATH`**, `backend/.env` missing, and `npx prisma generate` failed (`.prisma/client` was never produced), `backend/prisma/migrations/` contains only `.gitkeep`. PowerShell blocks `npm.ps1`/`npx.ps1` (`ExecutionPolicy`) — use `npm.cmd`/`npx.cmd` or `cmd /c`.
+Environment status (2026-09-24): `node v24.21.0`; **`docker` not in `PATH`** (no Docker Desktop, no Podman); WSL `Ubuntu 26.04` exists but has **no PostgreSQL and no Redis**; `backend/prisma/migrations/` holds only `.gitkeep`; PowerShell blocks `npm.ps1`/`npx.ps1` (`ExecutionPolicy`) → use `npm.cmd`/`npx.cmd` or `cmd /c`.
 
-> **Environment blocker (report to the backend owner):** `npx prisma generate` in this workspace returned `{"kind":"result","envelope":{"ok":false,...,"summary":"No command registered for 'generate'"}}` together with a Prisma Composer skills notice, so no Prisma Client exists here and the backend cannot boot locally yet. The backend owner must supply a verified `npm install` + `generate` + `migrate` + `seed` path; until then the frontend can only be validated against MSW mocks, and F0's "health smoke test" must be marked `⚠` instead of `☑`.
+> **Root cause of "cannot generate / cannot run" (for the backend owner):** `backend/package.json` has empty version strings, so `npm install` resolved `prisma@8.0.0-rc.15` — the new Prisma Platform CLI, which has **no `generate` command** — plus `@prisma/client@7.10.0`, `@nestjs/core@12.0.4` and `typescript@6.0.3` (which rejects the repo's `baseUrl` with `TS5101`). Fix = pin the versions the code was written for and commit the lockfile (BE-REQ-12).
+
+> **Local, non-committed workaround applied on 2026-09-24** (no tracked backend file was modified; `git status` stayed clean apart from the pre-existing untracked files): `npm install --no-save prisma@6.19.3 @prisma/client@6.19.3`, `Copy-Item .env.example .env`, then `npx prisma generate` → **`✔ Generated Prisma Client (v6.19.3)`**. Afterwards `npx --yes -p typescript@5.9.3 tsc --noEmit -p tsconfig.json` produced the 24+ compile errors listed in §7 (BE-REQ-11 and SCHEMA-001) — that is the real state of the backend today, and it is why a live API is not yet available for frontend integration tests.
 
 ### 11.1 Backend (required for real API testing)
 
@@ -608,7 +615,8 @@ Legend: ☐ not started · ◐ in progress · ☑ done (evidence linked) · ⚠ 
 
 | Date | Phase | Commit / PR | Evidence | By |
 |---|---|---|---|---|
-| 2026-09-24 | — (roadmap) | this file's commit | backend inventory and §7 findings read from `main` @ `d3f99bc` | frontend owner + AI session |
+| 2026-09-24 | — (roadmap) | `c4dcb94` | backend inventory and §7 findings read from `main` @ `d3f99bc` | frontend owner + AI session |
+| 2026-09-24 | — (backend env diagnosis) | this commit | Prisma CLI root cause + `generate` OK with the local 6.19.3 workaround, full `tsc` error list, Docker/WSL inventory (§7 BE-REQ-11..13) | frontend owner + AI session |
 
 ### 12.3 Frontend regression checklist (used from F5 onward, mandatory in F11)
 
