@@ -4,7 +4,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import { ErrorState, LoadingState } from '../components/states';
-import { clearPendingOrder, readPendingOrder, writePendingOrder } from '../features/checkout/pending-order';
+import {
+  clearPendingOrder,
+  readPendingOrder,
+  writePendingOrder,
+} from '../features/checkout/pending-order';
 import { ORDER_EXPIRE_MINUTES } from '../lib/constants';
 import { formatToman } from '../lib/format';
 import { errorText, ORDER_STATUS_FA } from '../lib/labels';
@@ -22,35 +26,38 @@ export function PaymentResultPage() {
   const status = params.get('status') ?? 'failed';
 
   const pending = readPendingOrder();
-  const [orderId, setOrderId] = useState<number | null>(
-    pending && pending.orderNumber === orderNumber ? pending.orderId : null,
-  );
+  const pendingOrderId = pending && pending.orderNumber === orderNumber ? pending.orderId : null;
   const [notice, setNotice] = useState<string | null>(null);
 
   const scan = useQuery({
     queryKey: queryKeys.orders(1),
     queryFn: () => shopApi.orders(1, 20),
-    enabled: orderId === null && orderNumber.length > 0,
+    enabled: pendingOrderId === null && orderNumber.length > 0,
   });
 
+  const found = scan.data?.data.find((order) => order.orderNumber === orderNumber);
+  const orderId = pendingOrderId ?? found?.id ?? null;
+
   useEffect(() => {
-    if (orderId !== null || !scan.data || !orderNumber) return;
-    const found = scan.data.data.find((order) => order.orderNumber === orderNumber);
-    if (found) {
-      setOrderId(found.id);
-      writePendingOrder({ orderId: found.id, orderNumber: found.orderNumber });
-    }
-  }, [scan.data, orderNumber, orderId]);
+    if (found) writePendingOrder({ orderId: found.id, orderNumber: found.orderNumber });
+  }, [found]);
 
   const order = useQuery({
     queryKey: queryKeys.order(orderId ?? -1),
     queryFn: () => shopApi.order(orderId as number),
     enabled: orderId !== null,
   });
+  // The callback query is user-editable. Only the server's order state can confirm payment.
+  const paymentConfirmed =
+    order.data && ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'].includes(order.data.status);
 
   const startPayment = useMutation({
     mutationFn: () => shopApi.startPayment(orderId as number),
-    onSuccess: ({ paymentUrl }) => window.location.assign(paymentUrl),
+    onSuccess: ({ paymentUrl }) => {
+      if (order.data)
+        writePendingOrder({ orderId: order.data.id, orderNumber: order.data.orderNumber });
+      window.location.assign(paymentUrl);
+    },
     onError: (error) => setNotice(errorText(error)),
   });
 
@@ -80,16 +87,23 @@ export function PaymentResultPage() {
       <h1>نتیجه پرداخت</h1>
       <p dir="ltr">{orderNumber}</p>
 
-      {status === 'success' && <p role="status">پرداخت با موفقیت انجام شد.</p>}
-      {status !== 'success' && (
+      {paymentConfirmed && <p role="status">پرداخت این سفارش در سامانه تأیید شده است.</p>}
+      {!paymentConfirmed && status === 'success' && (
+        <p role="status">در حال بررسی نتیجهٔ پرداخت هستیم. وضعیت قطعی را در جزئیات سفارش ببینید.</p>
+      )}
+      {!paymentConfirmed && status !== 'success' && (
         <p role="alert">
-          پرداخت ناموفق بود. تا {ORDER_EXPIRE_MINUTES} دقیقه می‌توانید دوباره تلاش کنید یا سفارش را لغو کنید.
+          پرداخت ناموفق بود. تا {ORDER_EXPIRE_MINUTES} دقیقه می‌توانید دوباره تلاش کنید یا سفارش را
+          لغو کنید.
         </p>
       )}
 
       {(order.isLoading || scan.isLoading) && <LoadingState />}
       {(order.error || scan.error) && (
-        <ErrorState error={order.error ?? scan.error} onRetry={() => void order.refetch()} />
+        <ErrorState
+          error={order.error ?? scan.error}
+          onRetry={() => void (orderId !== null ? order.refetch() : scan.refetch())}
+        />
       )}
 
       {order.data && (
@@ -107,20 +121,24 @@ export function PaymentResultPage() {
                 type="button"
                 disabled={startPayment.isPending}
                 onClick={() => {
-                  clearPendingOrder();
                   startPayment.mutate();
                 }}
               >
                 پرداخت مجدد
               </button>
-              <button type="button" disabled={cancelOrder.isPending} onClick={() => cancelOrder.mutate()}>
+              <button
+                type="button"
+                disabled={cancelOrder.isPending}
+                onClick={() => cancelOrder.mutate()}
+              >
                 انصراف از سفارش
               </button>
             </div>
           )}
 
           <p>
-            <Link to={`/orders/${order.data.id}`}>مشاهدهٔ جزئیات سفارش</Link> · <Link to="/orders">سفارش‌های من</Link>
+            <Link to={`/orders/${order.data.id}`}>مشاهدهٔ جزئیات سفارش</Link> ·{' '}
+            <Link to="/orders">سفارش‌های من</Link>
           </p>
         </>
       )}

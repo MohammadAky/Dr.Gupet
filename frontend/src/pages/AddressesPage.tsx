@@ -28,7 +28,8 @@ export function AddressesPage() {
   });
 
   if (addresses.isLoading) return <LoadingState />;
-  if (addresses.error) return <ErrorState error={addresses.error} onRetry={() => void addresses.refetch()} />;
+  if (addresses.error)
+    return <ErrorState error={addresses.error} onRetry={() => void addresses.refetch()} />;
 
   const items = addresses.data ?? [];
   const atLimit = items.length >= MAX_ADDRESSES_PER_USER;
@@ -38,7 +39,10 @@ export function AddressesPage() {
       <h1>آدرس‌های من</h1>
 
       {items.length === 0 && (
-        <EmptyState text="هنوز آدرسی ثبت نکرده‌اید." action={<Link to="/addresses/new">افزودن آدرس</Link>} />
+        <EmptyState
+          text="هنوز آدرسی ثبت نکرده‌اید."
+          action={<Link to="/addresses/new">افزودن آدرس</Link>}
+        />
       )}
 
       <ul>

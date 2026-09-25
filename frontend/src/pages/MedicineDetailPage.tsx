@@ -19,7 +19,8 @@ export function MedicineDetailPage() {
   });
 
   if (medicine.isLoading) return <LoadingState />;
-  if (medicine.error) return <ErrorState error={medicine.error} onRetry={() => void medicine.refetch()} />;
+  if (medicine.error)
+    return <ErrorState error={medicine.error} onRetry={() => void medicine.refetch()} />;
   if (!medicine.data) return null;
 
   const item = medicine.data;

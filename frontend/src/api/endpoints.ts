@@ -58,29 +58,44 @@ export const api = {
   health: () => requestData<HealthResult>('/health', { auth: false }),
 
   requestOtp: (phone: string) =>
-    requestData<OtpRequestResult>('/auth/otp/request', { method: 'POST', body: { phone }, auth: false }),
+    requestData<OtpRequestResult>('/auth/otp/request', {
+      method: 'POST',
+      body: { phone },
+      auth: false,
+    }),
 
   verifyOtp: (phone: string, code: string) =>
-    requestData<AuthResult>('/auth/otp/verify', { method: 'POST', body: { phone, code }, auth: false }),
+    requestData<AuthResult>('/auth/otp/verify', {
+      method: 'POST',
+      body: { phone, code },
+      auth: false,
+    }),
 
   refresh: (refreshToken: string) =>
-    requestData<TokenPair>('/auth/refresh', { method: 'POST', body: { refreshToken }, auth: false }),
+    requestData<TokenPair>('/auth/refresh', {
+      method: 'POST',
+      body: { refreshToken },
+      auth: false,
+    }),
 
   logout: (refreshToken: string) =>
     requestData<{ ok: true }>('/auth/logout', { method: 'POST', body: { refreshToken } }),
 
   me: () => requestData<UserProfile>('/users/me'),
 
-  updateMe: (body: UpdateProfileInput) => requestData<UserProfile>('/users/me', { method: 'PATCH', body }),
+  updateMe: (body: UpdateProfileInput) =>
+    requestData<UserProfile>('/users/me', { method: 'PATCH', body }),
 
   listAddresses: () => requestData<Address[]>('/addresses'),
 
-  createAddress: (body: CreateAddressInput) => requestData<Address>('/addresses', { method: 'POST', body }),
+  createAddress: (body: CreateAddressInput) =>
+    requestData<Address>('/addresses', { method: 'POST', body }),
 
   updateAddress: (id: number, body: UpdateAddressInput) =>
     requestData<Address>(`/addresses/${id}`, { method: 'PATCH', body }),
 
-  setDefaultAddress: (id: number) => requestData<Address>(`/addresses/${id}/default`, { method: 'PATCH' }),
+  setDefaultAddress: (id: number) =>
+    requestData<Address>(`/addresses/${id}/default`, { method: 'PATCH' }),
 
   deleteAddress: (id: number) => requestData<void>(`/addresses/${id}`, { method: 'DELETE' }),
 
@@ -102,7 +117,8 @@ export const api = {
 
   createPet: (body: CreatePetInput) => requestData<Pet>('/pets', { method: 'POST', body }),
 
-  updatePet: (id: number, body: UpdatePetInput) => requestData<Pet>(`/pets/${id}`, { method: 'PATCH', body }),
+  updatePet: (id: number, body: UpdatePetInput) =>
+    requestData<Pet>(`/pets/${id}`, { method: 'PATCH', body }),
 
   setPetTags: (id: number, body: SetPetTagsInput) =>
     requestData<Pet>(`/pets/${id}/tags`, { method: 'PUT', body }),

@@ -1,0 +1,19 @@
+:root {
+  color-scheme: light;
+  --forest: #122f12;
+  --forest-deep: #0c240e;
+  --forest-soft: #315237;
+  --gold: #d49f28;
+  --gold-soft: #f6e9c7;
+  --cream: #fcf9f1;
+  --sand: #f3eee2;
+  --paper: #fff;
+  --ink: #1b291b;
+  --muted: #596859;
+  --line: #e5e8de;
+  --danger: #a62424;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 32px;
+  --shadow-card: 0 14px 36px rgb(18 47 18 / 8%);
+}

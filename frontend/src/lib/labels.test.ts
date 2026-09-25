@@ -50,7 +50,14 @@ describe('errorText', () => {
   });
 
   it('labels every order status', () => {
-    for (const status of ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELED'] as const) {
+    for (const status of [
+      'PENDING_PAYMENT',
+      'PAID',
+      'PROCESSING',
+      'SHIPPED',
+      'DELIVERED',
+      'CANCELED',
+    ] as const) {
       expect(ORDER_STATUS_FA[status]).toBeTruthy();
     }
   });

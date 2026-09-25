@@ -15,7 +15,7 @@ export const queryKeys = {
   categories: (petTypeId?: number) => ['categories', petTypeId ?? 'all'] as const,
   products: (filters: Record<string, unknown>) => ['products', filters] as const,
   product: (slug: string) => ['products', 'detail', slug] as const,
-  recommendations: (petId: number) => ['recommendations', petId] as const,
+  recommendations: (petId: number, page: number) => ['recommendations', petId, page] as const,
   favorites: (page: number) => ['favorites', page] as const,
   cart: ['cart'] as const,
   orders: (page: number) => ['orders', page] as const,

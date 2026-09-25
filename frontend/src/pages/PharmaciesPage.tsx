@@ -44,7 +44,11 @@ export function PharmaciesPage() {
         <label htmlFor="city">شهر</label>
         <input id="city" value={city} onChange={(event) => setCity(event.target.value)} />
         <label htmlFor="province">استان</label>
-        <input id="province" value={province} onChange={(event) => setProvince(event.target.value)} />
+        <input
+          id="province"
+          value={province}
+          onChange={(event) => setProvince(event.target.value)}
+        />
         <label>
           <input
             type="checkbox"
@@ -62,8 +66,12 @@ export function PharmaciesPage() {
       </form>
 
       {pharmacies.isLoading && <LoadingState />}
-      {pharmacies.error && <ErrorState error={pharmacies.error} onRetry={() => void pharmacies.refetch()} />}
-      {pharmacies.data && pharmacies.data.data.length === 0 && <EmptyState text="داروخانه‌ای با این فیلتر پیدا نشد." />}
+      {pharmacies.error && (
+        <ErrorState error={pharmacies.error} onRetry={() => void pharmacies.refetch()} />
+      )}
+      {pharmacies.data && pharmacies.data.data.length === 0 && (
+        <EmptyState text="داروخانه‌ای با این فیلتر پیدا نشد." />
+      )}
 
       {pharmacies.data && pharmacies.data.data.length > 0 && (
         <>

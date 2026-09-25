@@ -32,10 +32,12 @@ export function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
 
-  const variants = product.data?.variants ?? [];
   const activeVariant = useMemo(
-    () => variants.find((variant) => variant.id === variantId) ?? variants[0] ?? null,
-    [variants, variantId],
+    () =>
+      product.data?.variants.find((variant) => variant.id === variantId) ??
+      product.data?.variants[0] ??
+      null,
+    [product.data, variantId],
   );
 
   const addToCart = useMutation({
@@ -51,19 +53,23 @@ export function ProductDetailPage() {
   });
 
   const isFavorite =
-    product.data !== undefined && (favorites.data?.data.some((card) => card.id === product.data.id) ?? false);
+    product.data !== undefined &&
+    (favorites.data?.data.some((card) => card.id === product.data.id) ?? false);
 
   const toggleFavorite = useMutation({
     mutationFn: () => {
       if (!product.data) throw new Error('محصول بارگذاری نشده است');
-      return isFavorite ? shopApi.removeFavorite(product.data.id) : shopApi.addFavorite(product.data.id);
+      return isFavorite
+        ? shopApi.removeFavorite(product.data.id)
+        : shopApi.addFavorite(product.data.id);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['favorites'] }),
     onError: (error) => setMessage(errorText(error)),
   });
 
   if (product.isLoading) return <LoadingState />;
-  if (product.error) return <ErrorState error={product.error} onRetry={() => void product.refetch()} />;
+  if (product.error)
+    return <ErrorState error={product.error} onRetry={() => void product.refetch()} />;
   if (!product.data) return <ErrorState error="محصول یافت نشد" />;
 
   const detail = product.data;
@@ -88,7 +94,7 @@ export function ProductDetailPage() {
       <form onSubmit={submitAddToCart}>
         <fieldset>
           <legend>وزن</legend>
-          {variants.map((variant) => (
+          {detail.variants.map((variant) => (
             <label key={variant.id}>
               <input
                 type="radio"
@@ -119,16 +125,25 @@ export function ProductDetailPage() {
           }}
         />
 
-        <button type="submit" disabled={!activeVariant || !activeVariant.inStock || addToCart.isPending}>
+        <button
+          type="submit"
+          disabled={!activeVariant || !activeVariant.inStock || addToCart.isPending}
+        >
           {addToCart.isPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
         </button>
 
         {isAuthenticated ? (
-          <button type="button" disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate()}>
+          <button
+            type="button"
+            disabled={toggleFavorite.isPending}
+            onClick={() => toggleFavorite.mutate()}
+          >
             {isFavorite ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها'}
           </button>
         ) : (
-          <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>برای ذخیره وارد شوید</Link>
+          <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
+            برای ذخیره وارد شوید
+          </Link>
         )}
       </form>
 

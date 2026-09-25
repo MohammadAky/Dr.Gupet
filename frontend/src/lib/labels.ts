@@ -81,10 +81,12 @@ const FALLBACK_MESSAGE = 'خطایی رخ داد، دوباره تلاش کنی�
 
 /** Server Persian message when present, otherwise the code-based fallback. */
 export function errorText(error: unknown): string {
+  if (typeof error === 'string' && /[\u0600-\u06ff]/.test(error)) return error;
   if (isApiError(error)) {
     if (error.message && error.message !== `HTTP ${error.statusCode}`) return error.message;
     return ERROR_FA[error.code] ?? FALLBACK_MESSAGE;
   }
-  if (error instanceof Error && error.message) return error.message;
+  if (error instanceof TypeError) return ERROR_FA.NETWORK ?? FALLBACK_MESSAGE;
+  if (error instanceof Error && /[\u0600-\u06ff]/.test(error.message)) return error.message;
   return FALLBACK_MESSAGE;
 }

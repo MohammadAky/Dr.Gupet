@@ -23,12 +23,7 @@ export type TagType = 'ALLERGEN' | 'DIET';
 export type ProductTagKind = 'CONTAINS' | 'SUITABLE_FOR';
 export type CouponType = 'PERCENT' | 'FIXED';
 export type OrderStatus =
-  | 'PENDING_PAYMENT'
-  | 'PAID'
-  | 'PROCESSING'
-  | 'SHIPPED'
-  | 'DELIVERED'
-  | 'CANCELED';
+  'PENDING_PAYMENT' | 'PAID' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELED';
 export type PaymentStatus = 'INITIATED' | 'SUCCESS' | 'FAILED';
 export type SortOption = 'newest' | 'price_asc' | 'price_desc';
 
@@ -265,7 +260,10 @@ export interface OrderSummary extends OrderTotals {
   status: OrderStatus;
   createdAt: string;
   updatedAt: string;
-  items: Pick<OrderItemRow, 'id' | 'productName' | 'weightGram' | 'unitPrice' | 'quantity' | 'total'>[];
+  items: Pick<
+    OrderItemRow,
+    'id' | 'productName' | 'weightGram' | 'unitPrice' | 'quantity' | 'total'
+  >[];
   payments: { status: PaymentStatus }[];
 }
 
@@ -357,4 +355,3 @@ export interface HealthResult {
 export interface UploadResult {
   url: string;
 }
-

@@ -1,6 +1,6 @@
 # Dr. Gupet — Frontend Roadmap (MVP v1)
 
-> **خلاصه فارسی (برای انسان‌ها):** این سند نقشه‌ی راه توسعهٔ **فرانت‌اند** پنل کاربر Dr. Gupet است و مکمل README ریشهٔ مخزن است؛ README هنوز مرجع قرارداد API و قواعد محصول است. مرجع کد فقط **GitHub** است و نقطهٔ مبنا: شاخهٔ `main` در کامیت `d3f99bc` (فازهای ۰ تا ۱۵ بک‌اند تحویل شده‌اند). فرانت‌اند در مخزن وجود ندارد و در پوشهٔ جدید `frontend/` ساخته می‌شود. هر فاز فرانت با شناسهٔ `F0..F11` تعریف شده و **هر بار فقط یک فاز** انجام می‌شود و بعد از سبز شدن معیارهای پذیرش، جدول «Status» و «Progress log» همین فایل در همان کامیت به‌روز می‌شود تا همهٔ LLMها و انسان‌ها وضعیت واقعی را ببینند. کارهای لازم سمت بک‌اند در بخش ۷ (`BE-REQ-*`) ثبت شده‌اند و **بدون دستور صریح صاحب بک‌اند اجرا نمی‌شوند**.
+> **خلاصه فارسی (برای انسان‌ها):** این سند نقشه‌ی راه توسعهٔ **فرانت‌اند** پنل کاربر Dr. Gupet است و مکمل README ریشهٔ مخزن است؛ README هنوز مرجع قرارداد API و قواعد محصول است. مرجع کد فقط **GitHub** است. متن اولیهٔ این سند بر مبنای `d3f99bc` نوشته شده بود؛ در بازبینی ۲۰۲۶-۰۹-۲۵، `main` در `f175c14` دارای کد `frontend/` است. وضعیت فعلی و شواهد در بخش ۱۲ آمده‌اند. هر فاز فرانت با شناسهٔ `F0..F11` تعریف شده و پذیرش آن فقط با شواهد معیارهای همان فاز ثبت می‌شود. کارهای لازم سمت بک‌اند در بخش ۷ (`BE-REQ-*`) ثبت شده‌اند و **بدون دستور صریح صاحب بک‌اند اجرا نمی‌شوند**.
 
 ---
 
@@ -15,6 +15,8 @@ This file is the **single source of truth for the frontend**. It does not replac
 - **Language rule (from README §3.12):** code, identifiers, file names and API fields are English; user-facing strings are Persian.
 
 Baseline recorded when this file was written:
+
+Current source baseline for the 2026-09-25 local preview: GitHub `origin/main` at `f175c145092eea767a7850df450c6cbe11aa6df4`; `frontend/` exists. The table below is retained as historical context.
 
 | Item | Value |
 |---|---|
@@ -598,12 +600,12 @@ npm run build && npm run preview
 
 > Update this section **in the same commit** as the phase work. Never mark a phase done without evidence. Mirrors README §16.
 
-### 12.1 Status (at the time this file was created, 2026-09-24)
+### 12.1 Status (reviewed 2026-09-25; owner-approved preview)
 
 | Phase | Name | Owner | Status | Evidence |
 |---|---|---|---|---|
-| F0 | Bootstrap & foundations | FE | ☐ | — |
-| F1 | Design system & app shell | FE | ☐ | — |
+| F0 | Bootstrap & foundations | FE | ◐ | Frontend branch from `origin/main` `f175c14`; lint/typecheck/build, 91 frontend tests and `prettier --check src` pass. Live `/health` success/CORS remains unavailable without backend. See `frontend/docs/DEVELOPMENT_CHECKLIST.md`. |
+| F1 | Design system & app shell | FE | ◐ | Brand shell, responsive header/footer/bottom navigation, global toast and UI gallery; owner approved the current visual preview on 2026-09-25, while complete accessibility acceptance remains open |
 | F2 | Authentication & session | FE | ☐ | — |
 | F3 | Profile & addresses | FE | ☐ | — |
 | F4 | Pets | FE | ☐ | — |
@@ -615,9 +617,9 @@ npm run build && npm run preview
 | F10 | Medicines & pharmacies | FE | ☐ | — |
 | F11 | Quality, performance & delivery | FE | ☐ | — |
 
-Legend: ☐ not started · ◐ in progress · ☑ done (evidence linked) · ⚠ done with an open caveat (list it).
+Legend: ☐ acceptance not yet verified (existing code may be present) · ◐ in progress · ☑ done (evidence linked) · ⚠ done with an open caveat (list it).
 
-> **Current resume point (2026-09-24):** no frontend phase has started. The only blocker for *live-API* validation is issue **#2** (backend build/`prisma`/database); F0 itself may start immediately using MSW mocks, with the F0 health smoke test marked ⚠ until the API runs. Environment left behind on this machine: `backend/.env` copied from `.env.example` (gitignored) and a **local-only** Prisma workaround (`npm install --no-save prisma@6.19.3 @prisma/client@6.19.3`, `npx prisma generate` OK) — a plain `npm install` will revert it to the broken `8.0.0-rc.15` until BE-REQ-12 is fixed. Local `main` equals `origin/main` (`e410e5e`); the stale local branch `codex/phase-0-bootstrap` is untouched.
+> **Current resume point (2026-09-25, owner-approved preview):** a frontend already exists on GitHub `main` `f175c14`, superseding the historical 2026-09-24 no-frontend note. Isolated worktree `frontend/design-system` contains F0/F1 reconciliation and page presentation. The owner approved the current visual preview and explicitly authorized commit and push on 2026-09-25. F0 remains open because the live `/health` smoke cannot pass without a running backend; `http://localhost:3000/api/v1/health` refused the connection. F1 accessibility acceptance is in progress. Earlier backend environment notes above are historical only; this frontend worktree has not modified `backend/`.
 
 ### 12.2 Progress log (append-only)
 
@@ -626,6 +628,14 @@ Legend: ☐ not started · ◐ in progress · ☑ done (evidence linked) · ⚠ 
 | 2026-09-24 | — (roadmap) | `c4dcb94` | backend inventory and §7 findings read from `main` @ `d3f99bc` | frontend owner + AI session |
 | 2026-09-24 | — (backend env diagnosis) | this commit | Prisma CLI root cause + `generate` OK with the local 6.19.3 workaround, full `tsc` error list, Docker/WSL inventory (§7 BE-REQ-11..13) | frontend owner + AI session |
 | 2026-09-24 | — (backend blockers filed) | issue **#2** | GitHub issue with raw `tsc` output, version evidence and an acceptance checklist; identity confirmed: frontend = `KianTheGoat`, backend = `MohammadAky` (§9) | frontend owner + AI session |
+| 2026-09-25 | F0/F1 local work | uncommitted `frontend/design-system` from `f175c14` | ESLint/typecheck/build/77 tests; desktop/mobile visual inspection and dev gallery; `/health` unreachable; details in `frontend/docs/DEVELOPMENT_CHECKLIST.md`. Phase acceptance and owner preview still pending. | frontend AI session |
+| 2026-09-25 | F0/F1 and existing-flow fixes | uncommitted `frontend/design-system` from `f175c14` | StrictMode refresh rotation and account-cache isolation fixed; API envelope rejects malformed success, OTP phone removed from URL, responsive layout/gallery checked at 360/768/desktop without horizontal overflow, pet retry and recommendations pagination fixed. Full final command evidence and remaining gates in `frontend/docs/LOCAL_PREVIEW_REPORT.md`; live backend and owner acceptance pending. | frontend AI team |
+| 2026-09-25 | F1 visual review | uncommitted `frontend/design-system` from `f175c14` | Owner response: «نمونه تا اینجا تاییده» (current preview approved). This approves the current visual direction; F0 health, F1 accessibility and F2–F11 acceptance remain separate gates. | frontend owner |
+| 2026-09-25 | F1 owner corrections and privacy copy | uncommitted `frontend/design-system` from `f175c14` | Mobile menu placed beside logo on the right; health promo title bold. Cookie banner and `/privacy` changed to English with first-layer Accept/Deny and a settings route per DEC-010; logout clears private local state before network revocation completes. Lint, typecheck, build, 91 tests/16 files (bounded worker run), audit (0 reported) and 360 px browser checks passed. `/health` still refuses connection; technical F0/F1 acceptance remains open. | frontend AI session |
+| 2026-09-25 | F1 menu refinement and first-visit notice | uncommitted `frontend/design-system` from `f175c14` | Owner clarified exact mobile order: menu button immediately right of the circular logo, shifting logo left. DEC-011 replaces `/privacy`, footer link and category settings with an animated English first-visit Accept/Deny notice; neither choice enables tracking. Lint, build/typecheck, 91 tests/16 files, and 499/360 px browser checks passed. Persistent public privacy disclosures remain a release gap. | frontend AI session |
+| 2026-09-25 | Cross-page visual review | uncommitted `frontend/design-system` from `f175c14` | Reviewed production preview at 320/360/499/768/1280 px and development UI gallery. F1 shell/notice corrections verified; F5 catalog and F10 medicine/pharmacy filters are crowded at mobile widths and recorded for their phases. Live data and full accessibility remain unverified. Evidence and ordered checklist: `frontend/docs/DESIGN_REVIEW_2026-09-25.md`. | frontend AI session |
+| 2026-09-25 | F0/F1 focused audit | uncommitted `frontend/design-system` from `f175c14` | Reconfirmed GitHub main unchanged and `/health` connection refused. `npx prettier --check src` failed on 80 frontend files, so F0 formatter acceptance stays open. Gallery keyboard tests verified tab selection/focus, modal focus loop/Escape restoration; ten sampled color pairs measured 5.62:1–14.57:1. Full AT/zoom/contrast review remains open; details in `frontend/docs/DEVELOPMENT_CHECKLIST.md`. | frontend AI session |
+| 2026-09-25 | F0/F1 approved preview | `frontend/design-system` from `f175c14` | Owner approved the current design and explicitly authorized commit and push. Frontend source formatting completed; lint, build/typecheck, `npx prettier --check src` and 91 tests/16 files pass. Live backend and full accessibility acceptance remain open. | frontend owner + AI session |
 
 ### 12.3 Frontend regression checklist (used from F5 onward, mandatory in F11)
 

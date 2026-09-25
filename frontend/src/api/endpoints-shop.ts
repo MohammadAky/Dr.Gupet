@@ -1,4 +1,6 @@
 import { request, requestData } from './client';
+import { API_BASE_URL } from '../lib/env';
+import { safePaymentUrl } from '../lib/security';
 import type {
   Brand,
   CartView,
@@ -83,16 +85,23 @@ function productQuery(filters: ProductFilters): Record<string, string | number |
 export const shopApi = {
   brands: () => requestData<Brand[]>('/brands'),
 
-  categories: (petTypeId?: number) => requestData<Category[]>('/categories', { query: { petTypeId } }),
+  categories: (petTypeId?: number) =>
+    requestData<Category[]>('/categories', { query: { petTypeId } }),
 
   products: async (filters: ProductFilters): Promise<Page<ProductCard>> => {
-    const { data, meta } = await request<ProductCard[]>('/products', { query: productQuery(filters) });
+    const { data, meta } = await request<ProductCard[]>('/products', {
+      query: productQuery(filters),
+    });
     return { data, meta };
   },
 
   product: (slug: string) => requestData<ProductDetail>(`/products/${slug}`),
 
-  recommendations: async (petId: number, page = 1, limit = 20): Promise<Page<RecommendationItem>> => {
+  recommendations: async (
+    petId: number,
+    page = 1,
+    limit = 20,
+  ): Promise<Page<RecommendationItem>> => {
     const { data, meta } = await request<RecommendationItem[]>('/products/recommendations', {
       query: { petId, page, limit },
     });
@@ -104,9 +113,11 @@ export const shopApi = {
     return { data, meta };
   },
 
-  addFavorite: (productId: number) => requestData<void>(`/favorites/${productId}`, { method: 'PUT' }),
+  addFavorite: (productId: number) =>
+    requestData<void>(`/favorites/${productId}`, { method: 'PUT' }),
 
-  removeFavorite: (productId: number) => requestData<void>(`/favorites/${productId}`, { method: 'DELETE' }),
+  removeFavorite: (productId: number) =>
+    requestData<void>(`/favorites/${productId}`, { method: 'DELETE' }),
 
   cart: () => requestData<CartView>('/cart'),
 
@@ -116,7 +127,8 @@ export const shopApi = {
   updateCartItem: (itemId: number, quantity: number) =>
     requestData<CartView>(`/cart/items/${itemId}`, { method: 'PATCH', body: { quantity } }),
 
-  removeCartItem: (itemId: number) => requestData<CartView>(`/cart/items/${itemId}`, { method: 'DELETE' }),
+  removeCartItem: (itemId: number) =>
+    requestData<CartView>(`/cart/items/${itemId}`, { method: 'DELETE' }),
 
   clearCart: () => requestData<CartView>('/cart', { method: 'DELETE' }),
 
@@ -130,12 +142,21 @@ export const shopApi = {
 
   order: (id: number) => requestData<OrderDetail>(`/orders/${id}`),
 
-  createOrder: (body: CreateOrderInput) => requestData<OrderDetail>('/orders', { method: 'POST', body }),
+  createOrder: (body: CreateOrderInput) =>
+    requestData<OrderDetail>('/orders', { method: 'POST', body }),
 
   cancelOrder: (id: number) => requestData<OrderDetail>(`/orders/${id}/cancel`, { method: 'POST' }),
 
-  startPayment: (orderId: number) =>
-    requestData<{ paymentUrl: string }>('/payments/start', { method: 'POST', body: { orderId } }),
+  startPayment: async (orderId: number) => {
+    const result = await requestData<{ paymentUrl: string }>('/payments/start', {
+      method: 'POST',
+      body: { orderId },
+    });
+    const paymentUrl = safePaymentUrl(result.paymentUrl, API_BASE_URL, import.meta.env.DEV);
+    if (!paymentUrl)
+      throw new Error('آدرس درگاه پرداخت معتبر نیست. پرداخت را از بخش سفارش‌ها دوباره بررسی کنید.');
+    return { paymentUrl };
+  },
 
   medicines: async (filters: MedicineFilters): Promise<Page<Medicine>> => {
     const { data, meta } = await request<Medicine[]>('/medicines', { query: { ...filters } });

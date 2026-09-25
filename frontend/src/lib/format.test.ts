@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatAmount, formatToman, formatWeight, groupDigits, toEnDigits, toFaDigits } from './format';
+import {
+  formatAmount,
+  formatToman,
+  formatWeight,
+  groupDigits,
+  toEnDigits,
+  toFaDigits,
+} from './format';
 
 describe('digit helpers', () => {
   it('maps latin digits to persian', () => {

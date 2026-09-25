@@ -60,7 +60,11 @@ describe('serializeProductFilters', () => {
   });
 
   it('serializes inStock=true as 1 and false as absent (BE-REQ-03)', () => {
-    expect(serializeProductFilters(new URLSearchParams(), { inStock: true }).get('inStock')).toBe('1');
-    expect(serializeProductFilters(new URLSearchParams('inStock=1'), { inStock: false }).get('inStock')).toBeNull();
+    expect(serializeProductFilters(new URLSearchParams(), { inStock: true }).get('inStock')).toBe(
+      '1',
+    );
+    expect(
+      serializeProductFilters(new URLSearchParams('inStock=1'), { inStock: false }).get('inStock'),
+    ).toBeNull();
   });
 });

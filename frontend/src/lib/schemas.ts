@@ -1,10 +1,7 @@
 import { z } from 'zod';
 import { normalizeOtpCode, normalizePhone } from './phone';
 import { todayIso } from './jalali';
-import {
-  MAX_CART_ITEM_QTY,
-  UPLOAD_MAX_MB,
-} from './constants';
+import { MAX_CART_ITEM_QTY, UPLOAD_MAX_MB } from './constants';
 
 /** Zod schemas mirror the backend DTO rules (class-validator) with Persian messages. */
 
@@ -12,7 +9,7 @@ export const phoneSchema = z
   .string()
   .min(1, 'شماره موبایل را وارد کنید')
   .transform((value) => normalizePhone(value))
-  .refine((value): value is string => value !== null, 'شماره موبایل معتبر نیست (مثال: 09123456789)');
+  .refine((value): value is string => value !== null, 'شماره موبایل معتبر نیست');
 
 export const otpCodeSchema = z
   .string()
@@ -74,6 +71,7 @@ export const quantitySchema = z
 export function validateUploadFile(file: File): string | null {
   const allowed = ['image/jpeg', 'image/png', 'image/webp'];
   if (!allowed.includes(file.type)) return 'فقط فایل‌های JPEG، PNG و WebP مجاز هستند';
-  if (file.size > UPLOAD_MAX_MB * 1024 * 1024) return `حجم فایل نباید بیش از ${UPLOAD_MAX_MB} مگابایت باشد`;
+  if (file.size > UPLOAD_MAX_MB * 1024 * 1024)
+    return `حجم فایل نباید بیش از ${UPLOAD_MAX_MB} مگابایت باشد`;
   return null;
 }

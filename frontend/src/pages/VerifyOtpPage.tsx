@@ -1,18 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/auth-provider';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
 import { OTP_RESEND_COOLDOWN_SECONDS } from '../lib/constants';
-import { otpCodeSchema } from '../lib/schemas';
+import { otpCodeSchema, phoneSchema } from '../lib/schemas';
+import { sanitizeInternalRedirect } from '../lib/security';
+import { clearOtpPhone, readOtpPhone } from '../auth/otp-flow';
 
 /** Step 2 of login — POST /auth/otp/verify, then the session is restored via GET /users/me. */
 export function VerifyOtpPage() {
   const [params] = useSearchParams();
-  const phone = params.get('phone') ?? '';
-  const next = params.get('next') ?? '/';
+  const location = useLocation();
+  const routePhone = (location.state as { otpPhone?: unknown } | null)?.otpPhone;
+  const phone = phoneSchema.safeParse(routePhone ?? readOtpPhone()).data ?? '';
+  const next = sanitizeInternalRedirect(params.get('next'));
   const navigate = useNavigate();
   const { verifyOtp } = useAuth();
 
@@ -33,7 +37,10 @@ export function VerifyOtpPage() {
 
   const login = useMutation({
     mutationFn: async (value: string) => verifyOtp(phone, value),
-    onSuccess: () => navigate(next, { replace: true }),
+    onSuccess: () => {
+      clearOtpPhone();
+      navigate(next, { replace: true });
+    },
   });
 
   if (!phone) return <Navigate to="/login" replace />;
@@ -50,7 +57,7 @@ export function VerifyOtpPage() {
   }
 
   return (
-    <section>
+    <section className="auth-page">
       <h1>کد تأیید</h1>
       <p>
         کد پیامک‌شده به <span dir="ltr">{phone}</span> را وارد کنید.
@@ -77,12 +84,22 @@ export function VerifyOtpPage() {
 
       {login.error && <ErrorState error={login.error} />}
 
-      <button type="button" disabled={cooldown > 0 || resend.isPending} onClick={() => resend.mutate()}>
+      <button
+        type="button"
+        disabled={cooldown > 0 || resend.isPending}
+        onClick={() => resend.mutate()}
+      >
         {cooldown > 0 ? `ارسال مجدد کد (${cooldown} ثانیه)` : 'ارسال مجدد کد'}
       </button>
       {resend.error && <ErrorState error={resend.error} />}
 
-      <button type="button" onClick={() => navigate('/login')}>
+      <button
+        type="button"
+        onClick={() => {
+          clearOtpPhone();
+          navigate('/login');
+        }}
+      >
         تغییر شماره
       </button>
     </section>

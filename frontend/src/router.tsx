@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { RequireAuth, RequireGuest } from './auth/guards';
 import { AddressEditPage } from './pages/AddressEditPage';
@@ -28,6 +28,7 @@ import { Shell } from './App';
 
 const authed = (element: ReactNode) => <RequireAuth>{element}</RequireAuth>;
 const guestOnly = (element: ReactNode) => <RequireGuest>{element}</RequireGuest>;
+const UiGalleryPage = import.meta.env.DEV ? lazy(() => import('./pages/UiGalleryPage')) : null;
 
 export function AppRouter() {
   return (
@@ -57,6 +58,16 @@ export function AppRouter() {
         <Route path="medicines/:id" element={<MedicineDetailPage />} />
         <Route path="pharmacies" element={<PharmaciesPage />} />
         <Route path="pharmacies/:id" element={<PharmacyDetailPage />} />
+        {UiGalleryPage && (
+          <Route
+            path="dev/ui"
+            element={
+              <Suspense fallback={<p>در حال بارگذاری…</p>}>
+                <UiGalleryPage />
+              </Suspense>
+            }
+          />
+        )}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
