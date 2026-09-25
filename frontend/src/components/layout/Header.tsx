@@ -111,7 +111,7 @@ export function Header({
         <div className="header-actions">
           {status === 'authed' ? (
             <>
-              <Link to="/profile">
+              <Link to="/profile" aria-label={userName ? `${userName}، حساب من` : 'حساب من'}>
                 <Icon name="user" />
                 <span className="header-label">{userName ?? 'حساب من'}</span>
               </Link>
@@ -120,7 +120,7 @@ export function Header({
               </button>
             </>
           ) : (
-            <Link to="/login">
+            <Link to="/login" aria-label="ورود">
               <Icon name="user" />
               <span className="header-label">ورود</span>
             </Link>

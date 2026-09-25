@@ -465,6 +465,7 @@ textarea.ui-control {
 }
 .ui-gallery__hero h1 {
   margin: 0.4rem 0;
+  color: #fff;
   font-size: clamp(1.7rem, 4vw, 2.8rem);
   line-height: 1.3;
 }

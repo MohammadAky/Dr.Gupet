@@ -8,7 +8,7 @@ html {
 }
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   background: var(--cream);
   color: var(--ink);
   direction: rtl;
@@ -1017,7 +1017,7 @@ img {
 }
 @media (max-width: 760px) {
   .app-shell {
-    padding-bottom: calc(74px + env(safe-area-inset-bottom));
+    padding-bottom: calc(max(74px, 4.5rem) + env(safe-area-inset-bottom));
   }
   .mobile-bottom-nav {
     position: fixed;
@@ -1051,6 +1051,11 @@ img {
     background: var(--gold-soft);
     color: var(--forest);
   }
+  .mobile-bottom-nav a span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
   .mobile-bottom-nav__count {
     position: absolute;
     top: 2px;
@@ -1072,12 +1077,26 @@ img {
   .header-main {
     min-height: 70px;
   }
+  .header-brand {
+    flex: 1;
+    min-width: 0;
+  }
   .app-logo img {
     width: 45px;
     height: 45px;
+    flex: none;
   }
   .app-logo {
+    min-width: 0;
     font-size: 1rem;
+    white-space: normal;
+  }
+  .app-logo span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .header-actions {
+    flex: none;
   }
   .header-search {
     display: none;
@@ -1266,6 +1285,20 @@ img {
     grid-column: auto;
   }
 }
+@media (max-width: 340px) {
+  .app-shell {
+    padding-bottom: calc(max(130px, 5rem) + env(safe-area-inset-bottom));
+  }
+  .app-logo span {
+    display: none;
+  }
+  .mobile-bottom-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .privacy-banner {
+    bottom: calc(max(140px, 5.5rem) + env(safe-area-inset-bottom));
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1277,3 +1310,9 @@ img {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Temporary local text-resize probe; remove after inspection. */
+html {
+  font-size: 200%;
+}
+

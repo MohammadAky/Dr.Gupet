@@ -162,15 +162,22 @@ export function Tabs({ items, activeId, onChange, label }: TabsProps) {
           </button>
         ))}
       </div>
-      <div
-        id={`${baseId}-panel-${active.id}`}
-        role="tabpanel"
-        aria-labelledby={`${baseId}-tab-${active.id}`}
-        tabIndex={0}
-        className="ui-tabs__panel"
-      >
-        {active.content}
-      </div>
+      {items.map((item) => {
+        const selected = active.id === item.id;
+        return (
+          <div
+            key={item.id}
+            id={`${baseId}-panel-${item.id}`}
+            role="tabpanel"
+            aria-labelledby={`${baseId}-tab-${item.id}`}
+            tabIndex={selected ? 0 : -1}
+            hidden={!selected}
+            className="ui-tabs__panel"
+          >
+            {selected ? item.content : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
