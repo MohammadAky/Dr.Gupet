@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
+import { sanitizeInternalRedirect } from '../lib/security';
 import { DEV_OTP_CODE } from '../lib/constants';
 import { phoneSchema } from '../lib/schemas';
 
@@ -13,7 +14,7 @@ export function LoginPage() {
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const next = params.get('next') ?? '/';
+  const next = sanitizeInternalRedirect(params.get('next'));
 
   const requestOtp = useMutation({
     mutationFn: (value: string) => api.requestOtp(value),

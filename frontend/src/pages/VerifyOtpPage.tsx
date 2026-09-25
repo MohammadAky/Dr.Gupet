@@ -5,6 +5,7 @@ import { api } from '../api/endpoints';
 import { useAuth } from '../auth/auth-provider';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
+import { sanitizeInternalRedirect } from '../lib/security';
 import { OTP_RESEND_COOLDOWN_SECONDS } from '../lib/constants';
 import { otpCodeSchema } from '../lib/schemas';
 
@@ -12,7 +13,7 @@ import { otpCodeSchema } from '../lib/schemas';
 export function VerifyOtpPage() {
   const [params] = useSearchParams();
   const phone = params.get('phone') ?? '';
-  const next = params.get('next') ?? '/';
+  const next = sanitizeInternalRedirect(params.get('next'));
   const navigate = useNavigate();
   const { verifyOtp } = useAuth();
 
