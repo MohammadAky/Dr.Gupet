@@ -376,6 +376,27 @@ model Pharmacy {
   medicines PharmacyMedicine[]
 }
 
+model Clinic {
+  id           Int     @id @default(autoincrement())
+  name         String
+  province     String
+  city         String
+  address      String
+  lat          Float?
+  lng          Float?
+  phone        String?
+  workingHours String?
+  is24h        Boolean @default(false)
+  isVerified   Boolean @default(false)
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([city])
+  @@index([province])
+  @@index([isActive])
+}
+
 model PharmacyMedicine {
   pharmacyId      Int
   medicineId      Int
