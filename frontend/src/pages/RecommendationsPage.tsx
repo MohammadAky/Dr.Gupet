@@ -7,6 +7,11 @@ import { Pagination } from '../components/Pagination';
 import { ProductCardView } from '../components/ProductCardView';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 
+export function parseRecommendationPage(params: URLSearchParams): number {
+  const page = Number(params.get('page'));
+  return Number.isSafeInteger(page) && page >= 1 ? page : 1;
+}
+
 /** Recommendations (F6): pick a pet, show matched diet tags. */
 export function RecommendationsPage() {
   const [params, setParams] = useSearchParams();
@@ -14,16 +19,18 @@ export function RecommendationsPage() {
 
   const urlPetId = Number(params.get('petId') ?? '0') || 0;
   const petId = urlPetId > 0 ? urlPetId : (pets.data?.[0]?.id ?? 0);
+  const page = parseRecommendationPage(params);
 
   const recommendations = useQuery({
-    queryKey: queryKeys.recommendations(petId),
-    queryFn: () => shopApi.recommendations(petId),
+    queryKey: queryKeys.recommendations(petId, page),
+    queryFn: () => shopApi.recommendations(petId, page),
     enabled: petId > 0,
   });
 
   function selectPet(nextId: number) {
     const query = new URLSearchParams(params);
     query.set('petId', String(nextId));
+    query.delete('page');
     setParams(query);
   }
 
@@ -48,7 +55,11 @@ export function RecommendationsPage() {
       <h1>محصولات مناسب پت شما</h1>
 
       <label htmlFor="petSelect">حیوان</label>
-      <select id="petSelect" value={petId} onChange={(event) => selectPet(Number(event.target.value))}>
+      <select
+        id="petSelect"
+        value={petId}
+        onChange={(event) => selectPet(Number(event.target.value))}
+      >
         {petList.map((pet) => (
           <option key={pet.id} value={pet.id}>
             {pet.name}
@@ -56,7 +67,10 @@ export function RecommendationsPage() {
         ))}
       </select>
 
-      <p>پیشنهادها بر اساس سن، وزن، وضعیت عقیمی و برچسب‌های آلرژن/رژیمی ساخته می‌شوند؛ جایگزین مشاورهٔ دامپزشک نیستند.</p>
+      <p>
+        پیشنهادها بر اساس سن، وزن، وضعیت عقیمی و برچسب‌های آلرژن/رژیمی ساخته می‌شوند؛ جایگزین
+        مشاورهٔ دامپزشک نیستند.
+      </p>
 
       {recommendations.isLoading && <LoadingState />}
       {recommendations.error && (

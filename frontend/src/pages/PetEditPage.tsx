@@ -9,6 +9,9 @@ import { toEnDigits } from '../lib/format';
 import { todayIso } from '../lib/jalali';
 import { petSchema, validateUploadFile } from '../lib/schemas';
 import { errorText } from '../lib/labels';
+import { API_BASE_URL } from '../lib/env';
+import { safeImageUrl } from '../lib/image-url';
+import { savePetWithTags } from '../features/pets/save';
 
 interface FormState {
   name: string;
@@ -44,10 +47,16 @@ export function PetEditPage() {
   const [dietIds, setDietIds] = useState<number[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
+  const [partialPetId, setPartialPetId] = useState<number | null>(null);
+  const photoUrl = safeImageUrl(form.photo, window.location.origin, API_BASE_URL);
   const initialized = useRef(false);
+  const createdPetId = useRef<number | null>(null);
 
   const petTypes = useQuery({ queryKey: queryKeys.petTypes, queryFn: () => api.petTypes() });
-  const allergenTags = useQuery({ queryKey: queryKeys.tags('ALLERGEN'), queryFn: () => api.tags('ALLERGEN') });
+  const allergenTags = useQuery({
+    queryKey: queryKeys.tags('ALLERGEN'),
+    queryFn: () => api.tags('ALLERGEN'),
+  });
   const dietTags = useQuery({ queryKey: queryKeys.tags('DIET'), queryFn: () => api.tags('DIET') });
   const breeds = useQuery({
     queryKey: queryKeys.breeds(form.petTypeId),
@@ -79,16 +88,29 @@ export function PetEditPage() {
   }, [existing.data]);
 
   const save = useMutation({
-    mutationFn: async ({ input, tags }: { input: CreatePetInput; tags: SetPetTagsInput }) => {
-      const pet = editingId ? await api.updatePet(editingId, input) : await api.createPet(input);
-      await api.setPetTags(pet.id, tags);
-      return pet;
-    },
-    onSuccess: (pet) => {
+    mutationFn: ({ input, tags }: { input: CreatePetInput; tags: SetPetTagsInput }) =>
+      savePetWithTags(api, editingId ?? createdPetId.current, input, tags, (createdId) => {
+        createdPetId.current = createdId;
+      }),
+    onSuccess: (result) => {
+      const { pet } = result;
       void queryClient.invalidateQueries({ queryKey: queryKeys.pets });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pet(pet.id) });
+      if (!result.tagsSaved) {
+        setPartialPetId(pet.id);
+        setFailure(
+          `اطلاعات حیوان ذخیره شد، اما برچسب‌ها ذخیره نشدند. دوباره ذخیره کنید؛ حیوان تازه‌ای ساخته نمی‌شود. ${errorText(result.tagError)}`,
+        );
+        return;
+      }
       navigate(`/pets/${pet.id}`);
     },
-    onError: (error) => setFailure(errorText(error)),
+    onError: (error) =>
+      setFailure(
+        partialPetId === null
+          ? errorText(error)
+          : `حیوان قبلاً ثبت شده است؛ ذخیرهٔ دوباره ناموفق بود. ${errorText(error)}`,
+      ),
   });
 
   const upload = useMutation({
@@ -169,7 +191,11 @@ export function PetEditPage() {
 
       <form onSubmit={submit} noValidate>
         <Field label="نام" htmlFor="petName" error={errors.name}>
-          <input id="petName" value={form.name} onChange={(event) => set('name', event.target.value)} />
+          <input
+            id="petName"
+            value={form.name}
+            onChange={(event) => set('name', event.target.value)}
+          />
         </Field>
 
         <Field label="نوع حیوان" htmlFor="petType" error={errors.petTypeId}>
@@ -208,7 +234,12 @@ export function PetEditPage() {
           </select>
         </Field>
 
-        <Field label="تاریخ تولد" htmlFor="birthDate" error={errors.birthDate} hint="تقویم میلادی؛ نمایش شمسی است">
+        <Field
+          label="تاریخ تولد"
+          htmlFor="birthDate"
+          error={errors.birthDate}
+          hint="تقویم میلادی؛ نمایش شمسی است"
+        >
           <input
             id="birthDate"
             type="date"
@@ -219,7 +250,11 @@ export function PetEditPage() {
         </Field>
 
         <Field label="جنسیت" htmlFor="gender">
-          <select id="gender" value={form.gender} onChange={(event) => set('gender', event.target.value as '' | 'MALE' | 'FEMALE')}>
+          <select
+            id="gender"
+            value={form.gender}
+            onChange={(event) => set('gender', event.target.value as '' | 'MALE' | 'FEMALE')}
+          >
             <option value="">نامشخص</option>
             <option value="MALE">نر</option>
             <option value="FEMALE">ماده</option>
@@ -246,9 +281,22 @@ export function PetEditPage() {
         </label>
 
         <Field label="تصویر" htmlFor="petPhoto" hint="JPEG، PNG یا WebP — حداکثر ۵ مگابایت">
-          <input id="petPhoto" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => pickFile(event.target.files?.[0])} />
+          <input
+            id="petPhoto"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => pickFile(event.target.files?.[0])}
+          />
         </Field>
-        {form.photo && <img src={form.photo} alt={form.name || 'تصویر حیوان'} width={96} height={96} />}
+        {photoUrl && (
+          <img
+            src={photoUrl}
+            alt={form.name || 'تصویر حیوان'}
+            width={96}
+            height={96}
+            referrerPolicy="no-referrer"
+          />
+        )}
 
         <fieldset>
           <legend>برچسب‌های آلرژن</legend>
@@ -259,7 +307,9 @@ export function PetEditPage() {
                 checked={allergenIds.includes(tag.id)}
                 onChange={() =>
                   setAllergenIds((current) =>
-                    current.includes(tag.id) ? current.filter((value) => value !== tag.id) : [...current, tag.id],
+                    current.includes(tag.id)
+                      ? current.filter((value) => value !== tag.id)
+                      : [...current, tag.id],
                   )
                 }
               />
@@ -277,7 +327,9 @@ export function PetEditPage() {
                 checked={dietIds.includes(tag.id)}
                 onChange={() =>
                   setDietIds((current) =>
-                    current.includes(tag.id) ? current.filter((value) => value !== tag.id) : [...current, tag.id],
+                    current.includes(tag.id)
+                      ? current.filter((value) => value !== tag.id)
+                      : [...current, tag.id],
                   )
                 }
               />
@@ -287,11 +339,16 @@ export function PetEditPage() {
         </fieldset>
 
         <button type="submit" disabled={save.isPending}>
-          {save.isPending ? 'در حال ذخیره…' : 'ذخیره'}
+          {save.isPending
+            ? 'در حال ذخیره…'
+            : partialPetId === null
+              ? 'ذخیره'
+              : 'تلاش دوباره برای ذخیره'}
         </button>
       </form>
 
       {failure && <ErrorState error={failure} />}
+      {partialPetId !== null && <Link to={`/pets/${partialPetId}`}>دیدن حیوان ثبت‌شده</Link>}
       <Link to={editingId ? `/pets/${editingId}` : '/pets'}>انصراف</Link>
     </section>
   );

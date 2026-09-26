@@ -84,7 +84,8 @@ export function CartPage() {
 
   const view = cart.data;
   const hasProblem = view?.items.some((item) => !item.available) ?? false;
-  const shippingEstimate = view && view.itemsTotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_COST;
+  const shippingEstimate =
+    view && view.itemsTotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_COST;
 
   function submitCoupon(event: FormEvent) {
     event.preventDefault();
@@ -97,7 +98,10 @@ export function CartPage() {
       <h1>سبد خرید</h1>
 
       {view && view.items.length === 0 && (
-        <EmptyState text="سبد خرید شما خالی است." action={<Link to="/products">مشاهدهٔ محصولات</Link>} />
+        <EmptyState
+          text="سبد خرید شما خالی است."
+          action={<Link to="/products">مشاهدهٔ محصولات</Link>}
+        />
       )}
 
       {view && view.items.length > 0 && (
@@ -144,14 +148,20 @@ export function CartPage() {
 
           <form onSubmit={submitCoupon}>
             <label htmlFor="coupon">کد تخفیف</label>
-            <input id="coupon" dir="ltr" value={couponCode} onChange={(event) => setCouponCode(event.target.value)} />
+            <input
+              id="coupon"
+              dir="ltr"
+              value={couponCode}
+              onChange={(event) => setCouponCode(event.target.value)}
+            />
             <button type="submit" disabled={validateCoupon.isPending}>
               اعمال کد
             </button>
           </form>
           {couponPreview && (
             <p>
-              تخفیف {couponPreview.code}: {formatToman(couponPreview.discountAmount)} (بدون هزینهٔ ارسال)
+              تخفیف {couponPreview.code}: {formatToman(couponPreview.discountAmount)} (بدون هزینهٔ
+              ارسال)
             </p>
           )}
 

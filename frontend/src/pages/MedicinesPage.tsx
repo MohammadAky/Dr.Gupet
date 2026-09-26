@@ -58,8 +58,12 @@ export function MedicinesPage() {
       </form>
 
       {medicines.isLoading && <LoadingState />}
-      {medicines.error && <ErrorState error={medicines.error} onRetry={() => void medicines.refetch()} />}
-      {medicines.data && medicines.data.data.length === 0 && <EmptyState text="دارویی با این جستجو پیدا نشد." />}
+      {medicines.error && (
+        <ErrorState error={medicines.error} onRetry={() => void medicines.refetch()} />
+      )}
+      {medicines.data && medicines.data.data.length === 0 && (
+        <EmptyState text="دارویی با این جستجو پیدا نشد." />
+      )}
 
       {medicines.data && medicines.data.data.length > 0 && (
         <>

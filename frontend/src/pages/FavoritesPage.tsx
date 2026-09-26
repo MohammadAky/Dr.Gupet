@@ -27,7 +27,8 @@ export function FavoritesPage() {
   });
 
   if (favorites.isLoading) return <LoadingState />;
-  if (favorites.error) return <ErrorState error={favorites.error} onRetry={() => void favorites.refetch()} />;
+  if (favorites.error)
+    return <ErrorState error={favorites.error} onRetry={() => void favorites.refetch()} />;
 
   const items = favorites.data?.data ?? [];
 
@@ -43,7 +44,11 @@ export function FavoritesPage() {
             key={card.id}
             card={card}
             actions={
-              <button type="button" disabled={remove.isPending} onClick={() => remove.mutate(card.id)}>
+              <button
+                type="button"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(card.id)}
+              >
                 حذف
               </button>
             }

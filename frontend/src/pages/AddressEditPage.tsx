@@ -36,7 +36,9 @@ export function AddressEditPage() {
   const queryClient = useQueryClient();
 
   const addresses = useQuery({ queryKey: queryKeys.addresses, queryFn: () => api.listAddresses() });
-  const existing = editingId ? addresses.data?.find((address) => address.id === editingId) : undefined;
+  const existing = editingId
+    ? addresses.data?.find((address) => address.id === editingId)
+    : undefined;
 
   const [form, setForm] = useState<FormState>(() =>
     existing
@@ -129,7 +131,11 @@ export function AddressEditPage() {
 
       <form onSubmit={submit} noValidate>
         <Field label="عنوان (مثلاً خانه)" htmlFor="title" error={errors.title}>
-          <input id="title" value={form.title} onChange={(event) => set('title', event.target.value)} />
+          <input
+            id="title"
+            value={form.title}
+            onChange={(event) => set('title', event.target.value)}
+          />
         </Field>
         <Field label="نام گیرنده" htmlFor="receiverName" error={errors.receiverName}>
           <input
@@ -147,10 +153,18 @@ export function AddressEditPage() {
           />
         </Field>
         <Field label="استان" htmlFor="province" error={errors.province}>
-          <input id="province" value={form.province} onChange={(event) => set('province', event.target.value)} />
+          <input
+            id="province"
+            value={form.province}
+            onChange={(event) => set('province', event.target.value)}
+          />
         </Field>
         <Field label="شهر" htmlFor="city" error={errors.city}>
-          <input id="city" value={form.city} onChange={(event) => set('city', event.target.value)} />
+          <input
+            id="city"
+            value={form.city}
+            onChange={(event) => set('city', event.target.value)}
+          />
         </Field>
         <Field label="نشانی کامل" htmlFor="fullAddress" error={errors.fullAddress}>
           <textarea

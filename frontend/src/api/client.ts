@@ -49,12 +49,20 @@ async function toFailure(res: Response): Promise<ApiFailure> {
   return {
     success: false,
     statusCode: res.status,
-    code: res.status === 401 ? 'UNAUTHORIZED' : res.status >= 500 ? 'INTERNAL_ERROR' : 'VALIDATION_ERROR',
+    code:
+      res.status === 401
+        ? 'UNAUTHORIZED'
+        : res.status >= 500
+          ? 'INTERNAL_ERROR'
+          : 'VALIDATION_ERROR',
     message: `HTTP ${res.status}`,
   };
 }
 
-async function doRequest<T>(path: string, options: RequestOptions): Promise<{ data: T; meta?: PageInfo }> {
+async function doRequest<T>(
+  path: string,
+  options: RequestOptions,
+): Promise<{ data: T; meta?: PageInfo }> {
   const { method = 'GET', body, query, formData, auth = true } = options;
   const headers: Record<string, string> = { Accept: 'application/json' };
 
@@ -71,19 +79,39 @@ async function doRequest<T>(path: string, options: RequestOptions): Promise<{ da
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(buildUrl(path, query), init);
-  if (!res.ok) throw new ApiError(await toFailure(res));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(buildUrl(path, query), { ...init, signal: controller.signal });
+    if (!res.ok) throw new ApiError(await toFailure(res));
 
-  const json = (await res.json().catch(() => null)) as Envelope<T> | null;
-  if (!json) return { data: undefined as T };
-  return { data: json.data, meta: json.meta };
+    if (res.status === 204) return { data: undefined as T };
+    const json = (await res.json().catch(() => null)) as Envelope<T> | null;
+    if (!json || json.success !== true || !('data' in json)) {
+      throw new ApiError({
+        success: false,
+        statusCode: res.status,
+        code: 'INVALID_RESPONSE',
+        message: 'پاسخ نامعتبر از سرور دریافت شد.',
+      });
+    }
+    return { data: json.data, meta: json.meta };
+  } catch (error) {
+    if (controller.signal.aborted) throw new TypeError('NETWORK_TIMEOUT', { cause: error });
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
  * Envelope-aware request with 401 → refresh → retry-once semantics.
  * Parallel 401s share one refresh call (single-flight, see refreshOnce).
  */
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<{ data: T; meta?: PageInfo }> {
+export async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ data: T; meta?: PageInfo }> {
   try {
     return await doRequest<T>(path, options);
   } catch (error) {

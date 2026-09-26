@@ -16,7 +16,8 @@ export function PharmacyDetailPage() {
   });
 
   if (pharmacy.isLoading) return <LoadingState />;
-  if (pharmacy.error) return <ErrorState error={pharmacy.error} onRetry={() => void pharmacy.refetch()} />;
+  if (pharmacy.error)
+    return <ErrorState error={pharmacy.error} onRetry={() => void pharmacy.refetch()} />;
   if (!pharmacy.data) return null;
 
   const item = pharmacy.data;

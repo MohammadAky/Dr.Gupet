@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
@@ -18,9 +18,8 @@ export function ProductsPage() {
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => parseProductFilters(params), [params]);
 
-  const [search, setSearch] = useState(filters.q ?? '');
-  const [minPrice, setMinPrice] = useState(filters.minPrice ? String(filters.minPrice) : '');
-  const [maxPrice, setMaxPrice] = useState(filters.maxPrice ? String(filters.maxPrice) : '');
+  const searchFormRef = useRef<HTMLFormElement>(null);
+  const priceFormRef = useRef<HTMLFormElement>(null);
 
   const petTypes = useQuery({ queryKey: queryKeys.petTypes, queryFn: () => api.petTypes() });
   const brands = useQuery({ queryKey: queryKeys.brands, queryFn: () => shopApi.brands() });
@@ -35,27 +34,40 @@ export function ProductsPage() {
     setParams(serializeProductFilters(params, next));
   }
 
-  function submitSearch(event: FormEvent) {
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    patch({ q: search.trim() || undefined });
+    const search = String(new FormData(event.currentTarget).get('q') ?? '').trim();
+    patch({ q: search || undefined });
   }
 
-  function submitPrices(event: FormEvent) {
+  function submitPrices(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parse = (value: string) => {
-      const normalized = Number(toEnDigits(value.trim()));
+      const digits = toEnDigits(value.trim());
+      if (!digits) return undefined;
+      const normalized = Number(digits);
       return Number.isFinite(normalized) && normalized >= 0 ? normalized : undefined;
     };
-    patch({ minPrice: parse(minPrice), maxPrice: parse(maxPrice) });
+    const values = new FormData(event.currentTarget);
+    patch({
+      minPrice: parse(String(values.get('minPrice') ?? '')),
+      maxPrice: parse(String(values.get('maxPrice') ?? '')),
+    });
+  }
+
+  function clearFilters() {
+    setParams(new URLSearchParams());
+    searchFormRef.current?.reset();
+    priceFormRef.current?.reset();
   }
 
   return (
     <section>
       <h1>محصولات</h1>
 
-      <form onSubmit={submitSearch}>
+      <form ref={searchFormRef} onSubmit={submitSearch}>
         <label htmlFor="q">جستجو</label>
-        <input id="q" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <input id="q" name="q" key={filters.q ?? ''} defaultValue={filters.q ?? ''} />
         <button type="submit">جستجو</button>
       </form>
 
@@ -64,7 +76,9 @@ export function ProductsPage() {
         <select
           id="petType"
           value={filters.petTypeId ?? ''}
-          onChange={(event) => patch({ petTypeId: event.target.value ? Number(event.target.value) : undefined })}
+          onChange={(event) =>
+            patch({ petTypeId: event.target.value ? Number(event.target.value) : undefined })
+          }
         >
           <option value="">همه</option>
           {petTypes.data?.map((type) => (
@@ -78,7 +92,9 @@ export function ProductsPage() {
         <select
           id="brand"
           value={filters.brandId ?? ''}
-          onChange={(event) => patch({ brandId: event.target.value ? Number(event.target.value) : undefined })}
+          onChange={(event) =>
+            patch({ brandId: event.target.value ? Number(event.target.value) : undefined })
+          }
         >
           <option value="">همه</option>
           {brands.data?.map((brand) => (
@@ -113,7 +129,11 @@ export function ProductsPage() {
         </select>
 
         <label htmlFor="sort">مرتب‌سازی</label>
-        <select id="sort" value={filters.sort ?? 'newest'} onChange={(event) => patch({ sort: event.target.value })}>
+        <select
+          id="sort"
+          value={filters.sort ?? 'newest'}
+          onChange={(event) => patch({ sort: event.target.value })}
+        >
           <option value="newest">جدیدترین</option>
           <option value="price_asc">ارزان‌ترین</option>
           <option value="price_desc">گران‌ترین</option>
@@ -128,42 +148,40 @@ export function ProductsPage() {
           فقط موجود
         </label>
 
-        <form onSubmit={submitPrices}>
+        <form ref={priceFormRef} onSubmit={submitPrices}>
           <label htmlFor="minPrice">از قیمت</label>
-          <input id="minPrice" dir="ltr" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} />
+          <input
+            id="minPrice"
+            name="minPrice"
+            dir="ltr"
+            key={`min-${filters.minPrice ?? ''}`}
+            defaultValue={filters.minPrice ?? ''}
+          />
           <label htmlFor="maxPrice">تا قیمت</label>
-          <input id="maxPrice" dir="ltr" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} />
+          <input
+            id="maxPrice"
+            name="maxPrice"
+            dir="ltr"
+            key={`max-${filters.maxPrice ?? ''}`}
+            defaultValue={filters.maxPrice ?? ''}
+          />
           <button type="submit">اعمال قیمت</button>
         </form>
 
-        <button
-          type="button"
-          onClick={() => {
-            setSearch('');
-            setMinPrice('');
-            setMaxPrice('');
-            setParams(new URLSearchParams());
-          }}
-        >
+        <button type="button" onClick={clearFilters}>
           پاک‌کردن فیلترها
         </button>
       </div>
 
       {products.isLoading && <LoadingState />}
-      {products.error && <ErrorState error={products.error} onRetry={() => void products.refetch()} />}
+      {products.error && (
+        <ErrorState error={products.error} onRetry={() => void products.refetch()} />
+      )}
       {products.data && products.data.data.length === 0 && (
         <EmptyState
           text="محصولی با این فیلترها پیدا نشد."
           action={
-            <button
-              type="button"
-              onClick={() => {
-                setSearch('');
-                setMinPrice('');
-                setMaxPrice('');
-                setParams(new URLSearchParams());
-              }}
-            >
+            <button type="button" onClick={clearFilters}>
               پاک‌کردن فیلترها
             </button>
           }

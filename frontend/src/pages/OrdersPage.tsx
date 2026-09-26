@@ -21,7 +21,8 @@ export function OrdersPage() {
   });
 
   if (orders.isLoading) return <LoadingState />;
-  if (orders.error) return <ErrorState error={orders.error} onRetry={() => void orders.refetch()} />;
+  if (orders.error)
+    return <ErrorState error={orders.error} onRetry={() => void orders.refetch()} />;
 
   const items = orders.data?.data ?? [];
 
@@ -30,7 +31,10 @@ export function OrdersPage() {
       <h1>سفارش‌های من</h1>
 
       {items.length === 0 && (
-        <EmptyState text="هنوز سفارشی ثبت نکرده‌اید." action={<Link to="/products">شروع خرید</Link>} />
+        <EmptyState
+          text="هنوز سفارشی ثبت نکرده‌اید."
+          action={<Link to="/products">شروع خرید</Link>}
+        />
       )}
 
       <ul>
@@ -41,8 +45,7 @@ export function OrdersPage() {
             <p>{ORDER_STATUS_FA[order.status]}</p>
             <p dir="ltr">{formatToman(order.finalAmount)}</p>
             <p>
-              {order.items.length} قلم ·{' '}
-              <Link to={`/orders/${order.id}`}>جزئیات</Link>
+              {order.items.length} قلم · <Link to={`/orders/${order.id}`}>جزئیات</Link>
             </p>
           </li>
         ))}

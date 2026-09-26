@@ -24,7 +24,9 @@ export function readPendingOrder(): PendingOrder | null {
     const raw = window.sessionStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingOrder;
-    return typeof parsed.orderId === 'number' && typeof parsed.orderNumber === 'string' ? parsed : null;
+    return typeof parsed.orderId === 'number' && typeof parsed.orderNumber === 'string'
+      ? parsed
+      : null;
   } catch {
     return null;
   }

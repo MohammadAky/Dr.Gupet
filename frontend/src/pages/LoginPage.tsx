@@ -1,12 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
+<<<<<<< HEAD
 import { sanitizeInternalRedirect } from '../lib/security';
 import { DEV_OTP_CODE } from '../lib/constants';
+=======
+>>>>>>> frontend/design-system
 import { phoneSchema } from '../lib/schemas';
+import { sanitizeInternalRedirect } from '../lib/security';
+import { storeOtpPhone } from '../auth/otp-flow';
 
 /** Step 1 of login — POST /auth/otp/request (public, throttled 10/min). */
 export function LoginPage() {
@@ -19,8 +24,9 @@ export function LoginPage() {
   const requestOtp = useMutation({
     mutationFn: (value: string) => api.requestOtp(value),
     onSuccess: (_result, value) => {
-      const query = new URLSearchParams({ phone: value, next });
-      navigate(`/verify?${query.toString()}`);
+      storeOtpPhone(value);
+      const query = new URLSearchParams({ next });
+      navigate(`/verify?${query.toString()}`, { state: { otpPhone: value } });
     },
   });
 
@@ -36,7 +42,7 @@ export function LoginPage() {
   }
 
   return (
-    <section>
+    <section className="auth-page">
       <h1>ورود با شماره موبایل</h1>
       <p>کد یک‌بارمصرف به شمارهٔ شما پیامک می‌شود (نیازی به رمز عبور نیست).</p>
 
@@ -49,7 +55,6 @@ export function LoginPage() {
             inputMode="tel"
             autoComplete="tel"
             dir="ltr"
-            placeholder="09123456789"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
           />
@@ -61,14 +66,6 @@ export function LoginPage() {
       </form>
 
       {requestOtp.error && <ErrorState error={requestOtp.error} />}
-      {DEV_OTP_CODE && (
-        <p className="dev-hint" dir="ltr">
-          DEV OTP: {DEV_OTP_CODE}
-        </p>
-      )}
-      <p>
-        با ورود، <Link to="/">قوانین استفاده</Link> را می‌پذیرید.
-      </p>
     </section>
   );
 }

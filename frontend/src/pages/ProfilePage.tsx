@@ -6,6 +6,8 @@ import { Field } from '../components/Field';
 import { ErrorState, LoadingState } from '../components/states';
 import { validateUploadFile } from '../lib/schemas';
 import { errorText } from '../lib/labels';
+import { API_BASE_URL } from '../lib/env';
+import { safeImageUrl } from '../lib/image-url';
 
 /** Profile (F3): name + avatar editing; the phone number is read-only. */
 export function ProfilePage() {
@@ -16,6 +18,7 @@ export function ProfilePage() {
   const [avatar, setAvatar] = useState<string | null>(user?.avatar ?? null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  const avatarUrl = safeImageUrl(avatar, window.location.origin, API_BASE_URL);
 
   const save = useMutation({
     mutationFn: (payload: UpdateProfileInput) => api.updateMe(payload),
@@ -66,14 +69,30 @@ export function ProfilePage() {
     <section>
       <h1>پروفایل</h1>
       <p dir="ltr">{user.phone}</p>
-      {avatar && <img src={avatar} alt="تصویر پروفایل" width={96} height={96} />}
+      {avatarUrl && (
+        <img
+          src={avatarUrl}
+          alt="تصویر پروفایل"
+          width={96}
+          height={96}
+          referrerPolicy="no-referrer"
+        />
+      )}
 
       <form onSubmit={submit} noValidate>
         <Field label="نام" htmlFor="firstName" error={fieldErrors.firstName}>
-          <input id="firstName" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+          <input
+            id="firstName"
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
+          />
         </Field>
         <Field label="نام خانوادگی" htmlFor="lastName" error={fieldErrors.lastName}>
-          <input id="lastName" value={lastName} onChange={(event) => setLastName(event.target.value)} />
+          <input
+            id="lastName"
+            value={lastName}
+            onChange={(event) => setLastName(event.target.value)}
+          />
         </Field>
         <Field label="تصویر پروفایل" htmlFor="avatar" hint="JPEG، PNG یا WebP — حداکثر ۵ مگابایت">
           <input

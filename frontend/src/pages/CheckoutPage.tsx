@@ -23,15 +23,25 @@ export function CheckoutPage() {
   const [addressId, setAddressId] = useState<number | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [note, setNote] = useState('');
-  const [preview, setPreview] = useState<{ code: string; discountAmount: number; finalAmount: number } | null>(null);
+  const [preview, setPreview] = useState<{
+    code: string;
+    discountAmount: number;
+    finalAmount: number;
+  } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const selectedAddress = addressId ?? addresses.data?.find((address) => address.isDefault)?.id ?? addresses.data?.[0]?.id ?? null;
+  const selectedAddress =
+    addressId ??
+    addresses.data?.find((address) => address.isDefault)?.id ??
+    addresses.data?.[0]?.id ??
+    null;
   const itemsTotal = cart.data?.itemsTotal ?? 0;
   const discount = preview?.discountAmount ?? 0;
   const shipping = itemsTotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_COST;
   const payableEstimate = Math.max(0, itemsTotal - discount + shipping);
-  const blocked = (cart.data?.items.some((item) => !item.available) ?? false) || (cart.data?.items.length ?? 0) === 0;
+  const blocked =
+    (cart.data?.items.some((item) => !item.available) ?? false) ||
+    (cart.data?.items.length ?? 0) === 0;
 
   const previewCoupon = useMutation({
     mutationFn: (code: string) => shopApi.validateCoupon(code),
@@ -63,7 +73,8 @@ export function CheckoutPage() {
   });
 
   if (addresses.isLoading || cart.isLoading) return <LoadingState />;
-  if (addresses.error) return <ErrorState error={addresses.error} onRetry={() => void addresses.refetch()} />;
+  if (addresses.error)
+    return <ErrorState error={addresses.error} onRetry={() => void addresses.refetch()} />;
   if (cart.error) return <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />;
 
   function submit(event: FormEvent) {
@@ -78,8 +89,7 @@ export function CheckoutPage() {
 
       {failure && (
         <p role="alert">
-          {failure}{' '}
-          {failure.includes('خالی') && <Link to="/cart">بازگشت به سبد خرید</Link>}
+          {failure} {failure.includes('خالی') && <Link to="/cart">بازگشت به سبد خرید</Link>}
         </p>
       )}
 
@@ -100,7 +110,8 @@ export function CheckoutPage() {
                 checked={selectedAddress === address.id}
                 onChange={() => setAddressId(address.id)}
               />
-              {address.title} — {address.receiverName}، {address.city} {address.isDefault ? '(پیش‌فرض)' : ''}
+              {address.title} — {address.receiverName}، {address.city}{' '}
+              {address.isDefault ? '(پیش‌فرض)' : ''}
             </label>
           ))}
         </fieldset>
@@ -113,7 +124,11 @@ export function CheckoutPage() {
             onChange={(event) => setCouponCode(event.target.value)}
             placeholder="SUMMER20"
           />
-          <button type="button" disabled={!couponCode.trim() || previewCoupon.isPending} onClick={() => previewCoupon.mutate(couponCode.trim())}>
+          <button
+            type="button"
+            disabled={!couponCode.trim() || previewCoupon.isPending}
+            onClick={() => previewCoupon.mutate(couponCode.trim())}
+          >
             بررسی کد
           </button>
           {preview && <p>تخفیف {formatToman(preview.discountAmount)} اعمال شد.</p>}
@@ -137,7 +152,10 @@ export function CheckoutPage() {
         <label htmlFor="note">یادداشت سفارش (اختیاری)</label>
         <textarea id="note" value={note} onChange={(event) => setNote(event.target.value)} />
 
-        <button type="submit" disabled={selectedAddress === null || blocked || submitOrder.isPending}>
+        <button
+          type="submit"
+          disabled={selectedAddress === null || blocked || submitOrder.isPending}
+        >
           {submitOrder.isPending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و پرداخت'}
         </button>
       </form>

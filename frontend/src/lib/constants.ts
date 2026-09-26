@@ -17,9 +17,6 @@ export const DEFAULT_PAGE_LIMIT = 20;
 export const UPLOAD_MAX_MB = 5;
 export const UPLOAD_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** Dev-only OTP code from backend/.env (never enabled in production). */
-export const DEV_OTP_CODE: string | null = '12345';
-
 export function shippingEstimate(itemsTotal: number): number {
   return itemsTotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_COST;
 }

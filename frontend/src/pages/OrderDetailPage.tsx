@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import { ErrorState, LoadingState } from '../components/states';
+import { writePendingOrder } from '../features/checkout/pending-order';
 import { ORDER_EXPIRE_MINUTES } from '../lib/constants';
 import { formatJalali } from '../lib/jalali';
 import { formatToman, formatWeight } from '../lib/format';
@@ -37,7 +38,11 @@ export function OrderDetailPage() {
 
   const startPayment = useMutation({
     mutationFn: () => shopApi.startPayment(orderId),
-    onSuccess: ({ paymentUrl }) => window.location.assign(paymentUrl),
+    onSuccess: ({ paymentUrl }) => {
+      if (order.data)
+        writePendingOrder({ orderId: order.data.id, orderNumber: order.data.orderNumber });
+      window.location.assign(paymentUrl);
+    },
     onError: (error) => setNotice(errorText(error)),
   });
 
@@ -54,13 +59,15 @@ export function OrderDetailPage() {
       <h1>جزئیات سفارش</h1>
       <p dir="ltr">{detail.orderNumber}</p>
       <p>
-        {formatJalali(detail.createdAt, 'datetime')} · <strong>{ORDER_STATUS_FA[detail.status]}</strong>
+        {formatJalali(detail.createdAt, 'datetime')} ·{' '}
+        <strong>{ORDER_STATUS_FA[detail.status]}</strong>
       </p>
 
       {detail.status === 'PENDING_PAYMENT' && (
         <>
           <p role="alert">
-            این سفارش تا {ORDER_EXPIRE_MINUTES} دقیقه قابل پرداخت است؛ پس از آن به‌صورت خودکار لغو می‌شود.
+            این سفارش تا {ORDER_EXPIRE_MINUTES} دقیقه قابل پرداخت است؛ پس از آن به‌صورت خودکار لغو
+            می‌شود.
           </p>
           <button
             type="button"
@@ -76,7 +83,8 @@ export function OrderDetailPage() {
       )}
       {latestPayment && (
         <p>
-          آخرین پرداخت: {PAYMENT_STATUS_FA[latestPayment.status]} {formatJalali(latestPayment.createdAt, 'datetime')}
+          آخرین پرداخت: {PAYMENT_STATUS_FA[latestPayment.status]}{' '}
+          {formatJalali(latestPayment.createdAt, 'datetime')}
         </p>
       )}
 
@@ -112,7 +120,9 @@ export function OrderDetailPage() {
           <dt>تخفیف</dt>
           <dd dir="ltr">{formatToman(detail.discountAmount)}</dd>
           <dt>ارسال</dt>
-          <dd dir="ltr">{detail.shippingCost === 0 ? 'رایگان' : formatToman(detail.shippingCost)}</dd>
+          <dd dir="ltr">
+            {detail.shippingCost === 0 ? 'رایگان' : formatToman(detail.shippingCost)}
+          </dd>
           <dt>نهایی</dt>
           <dd dir="ltr">{formatToman(detail.finalAmount)}</dd>
         </dl>
