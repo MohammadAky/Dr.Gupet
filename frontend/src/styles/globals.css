@@ -1310,9 +1310,3 @@ img {
     transition-duration: 0.01ms !important;
   }
 }
-
-/* Temporary local text-resize probe; remove after inspection. */
-html {
-  font-size: 200%;
-}
-
