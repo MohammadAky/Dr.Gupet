@@ -95,7 +95,7 @@ export class OtpService {
     const inputBuf = Buffer.from(hashedInput);
 
     if (storedBuf.length !== inputBuf.length || !crypto.timingSafeEqual(storedBuf, inputBuf)) {
-      throw new AppException('OTP_INVALID', 'کد تایید نادرست است', 400);
+      throw new AppException('OTP_INVALID', 'کد تایید نادرست است', 401);
     }
 
     // Success — delete all OTP keys for this phone

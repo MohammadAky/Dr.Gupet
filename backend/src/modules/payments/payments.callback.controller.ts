@@ -35,7 +35,7 @@ export class PaymentsCallbackController {
 
     // Redirect to frontend result page
     const frontendUrl = this.configService.get<string>('payment.frontendResultUrl') || 'http://localhost:5173/payment/result';
-    const redirectUrl = `${frontendUrl}?orderNumber=${result.orderNumber}&status=${result.success ? 'success' : 'failed'}`;
+    const redirectUrl = `${frontendUrl}?orderId=${result.orderId}&orderNumber=${result.orderNumber}&status=${result.success ? 'success' : 'failed'}`;
 
     res.redirect(redirectUrl);
   }

@@ -89,7 +89,7 @@ export class PaymentsService {
 
     // Idempotent: if already successful, just return
     if (payment.status === 'SUCCESS') {
-      return { success: true, orderNumber: payment.order.orderNumber };
+      return { success: true, orderId: payment.orderId, orderNumber: payment.order.orderNumber };
     }
 
     if (!success) {
@@ -99,7 +99,7 @@ export class PaymentsService {
         data: { status: 'FAILED' },
       });
 
-      return { success: false, orderNumber: payment.order.orderNumber };
+      return { success: false, orderId: payment.orderId, orderNumber: payment.order.orderNumber };
     }
 
     // Verify with gateway (server-to-server)
@@ -114,7 +114,7 @@ export class PaymentsService {
         data: { status: 'FAILED' },
       });
 
-      return { success: false, orderNumber: payment.order.orderNumber };
+      return { success: false, orderId: payment.orderId, orderNumber: payment.order.orderNumber };
     }
 
     // Mark payment as success and order as PAID in transaction
@@ -148,6 +148,6 @@ export class PaymentsService {
       // SMS failure should not break payment flow
     }
 
-    return { success: true, orderNumber: payment.order.orderNumber };
+    return { success: true, orderId: payment.orderId, orderNumber: payment.order.orderNumber };
   }
 }

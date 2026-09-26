@@ -53,7 +53,7 @@ export class OrdersService {
       where: { cart: { userId } },
       include: {
         variant: {
-          include: { product: { select: { isActive: true } } },
+          include: { product: { select: { isActive: true, name: true } } },
         },
       },
     });
@@ -276,7 +276,7 @@ export class OrdersService {
 
     const expiredOrders = await this.prisma.order.findMany({
       where: {
-        status: OrderStatus.PENDING_PAYMENT,
+        status: 'PENDING_PAYMENT',
         createdAt: { lt: cutoff },
       },
       include: { items: true },

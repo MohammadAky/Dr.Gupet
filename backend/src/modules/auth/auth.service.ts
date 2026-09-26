@@ -106,9 +106,12 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.role);
 
+    // Return user without sensitive fields
+    const { status: _, role: __, isPhoneVerified: ___, ...safeUser } = user;
+
     return {
       ...tokens,
-      user,
+      user: safeUser,
       isNewUser,
     };
   }

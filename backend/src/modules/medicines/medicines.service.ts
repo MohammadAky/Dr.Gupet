@@ -80,7 +80,6 @@ export class MedicinesService {
                 phone: true,
                 is24h: true,
                 isVerified: true,
-                lastConfirmedAt: true,
               },
             },
           },
