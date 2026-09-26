@@ -37,7 +37,7 @@
 - **Status:** IMPLEMENTED FOR LOCAL REVIEW
 - **Date:** 2026-09-25
 - **Decision:** Use TypeScript 5.9 with the current `typescript-eslint` peer range, ESLint flat config, and Prettier configuration/format script. The pre-existing checkout had TypeScript 7 and no lint script; that combination could not install the current `typescript-eslint` without forcing unsupported peer dependencies.
-- **Consequences:** `npm run lint`, `npm run typecheck`, `npm run build`, and `npm test` must pass together. This is a frontend-only dependency change.
+- **Consequences:** `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`, and `prettier --check src` must pass together. Prettier uses `endOfLine: auto` so Windows CRLF and Unix LF checkouts are both accepted without rewriting unrelated files. This is a frontend-only dependency change.
 
 ## DEC-007: Optional analytics and advertising
 - **Status:** SUPERSEDED BY DEC-011; provider decision open
@@ -72,11 +72,26 @@
 - **Decision:** Put the mobile menu button immediately to the right of the circular logo, shifting the logo left. Show an English, floating first-visit cookie notice with only equally prominent `Accept Cookies` and `Deny Cookies` buttons. Remove the footer privacy link, `/privacy` route, category settings, checkboxes, and Save control from the site UI.
 - **Consequences:** Both buttons save only the user's response to this notice in `drgupet.cookieNotice.v2`; neither enables an optional vendor or grants permission to introduce one later. Future tracking requires a new notice, disclosure, version, and opt-in before loading. The notice explains essential storage, but the owner-requested removal leaves no persistent public policy or preference-revisit path. This cannot be presented as complete privacy-law compliance; operator identity, actual backend/payment cookies, retention/processors, jurisdiction-specific policy and any required user rights mechanism remain unresolved launch gates.
 
+## DEC-012: Main-only frontend workflow
+
+- **Status:** OWNER-DIRECTED
+- **Date:** 2026-09-26
+- **Decision:** Develop in the local `main` checkout and do not create another branch unless the owner explicitly requests it. Refresh and inspect GitHub `main` before each development phase, preserve local work, and show a local preview with test results before committing or pushing to `main`.
+- **Consequences:** The roadmap's earlier branch-per-phase and PR proposal is superseded. Owner approval of a prior preview does not authorize a later change; each new local result is presented before its commit and push.
+
+## DEC-013: Stable local font assets
+
+- **Status:** IMPLEMENTED FOR LOCAL REVIEW
+- **Date:** 2026-09-26
+- **Decision:** Keep Vazirmatn weights 400/500/600/700 and the package's exact Arabic, Latin Extended and Latin CSS ranges, but serve unchanged WOFF2/WOFF files copied from `@fontsource/vazirmatn` 5.3.0 under `public/fonts/vazirmatn/`. Import the local `src/styles/fonts.css` instead of CSS that resolves font URLs through `node_modules` during development.
+- **Why:** The owner's Firefox screenshot showed font sanitizer errors while the local dependency install was being replaced. Fixed public asset URLs avoid partially installed package paths and give the browser fresh URLs after the interrupted install.
+- **Consequences:** The existing SIL OFL notice remains at `public/licenses/Vazirmatn-OFL.txt`. Font assets must be updated together with the CSS and license when the package version changes. This does not resolve API requests when the backend is offline.
+
 ## Open owner and release decisions
 
 
 - **FR-DEC-03:** Deployment target, public URLs, backend CORS origin and payment callback URL are unknown; local preview only.
 - **FR-DEC-06:** Browser E2E tooling remains optional for F11; automated tests and manual preview do not replace live payment/auth acceptance.
-- **FR-DEC-07:** The roadmap proposes phase branches and PRs, but the owner's explicit local-preview approval gate applies before any commit, push or PR.
+- **FR-DEC-07:** Resolved by DEC-012: `main` only until the owner asks for another branch; local preview and approval before commit or push.
 - **FR-DEC-08/09:** The backend development environment and deployment environment list require confirmation from the respective owners. A local `VITE_API_BASE_URL` exists only in ignored `.env`.
 - **FR-DEC-02 release rights:** The owner supplied the visual direction; authority to publish the logo, public operator identity/contact, retention details and processor disclosures remain open before a public launch.

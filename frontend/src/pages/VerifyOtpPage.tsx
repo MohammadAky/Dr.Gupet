@@ -5,7 +5,6 @@ import { api } from '../api/endpoints';
 import { useAuth } from '../auth/auth-provider';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
-import { sanitizeInternalRedirect } from '../lib/security';
 import { OTP_RESEND_COOLDOWN_SECONDS } from '../lib/constants';
 import { otpCodeSchema, phoneSchema } from '../lib/schemas';
 import { sanitizeInternalRedirect } from '../lib/security';
@@ -14,13 +13,9 @@ import { clearOtpPhone, readOtpPhone } from '../auth/otp-flow';
 /** Step 2 of login — POST /auth/otp/verify, then the session is restored via GET /users/me. */
 export function VerifyOtpPage() {
   const [params] = useSearchParams();
-<<<<<<< HEAD
-  const phone = params.get('phone') ?? '';
-=======
   const location = useLocation();
   const routePhone = (location.state as { otpPhone?: unknown } | null)?.otpPhone;
   const phone = phoneSchema.safeParse(routePhone ?? readOtpPhone()).data ?? '';
->>>>>>> frontend/design-system
   const next = sanitizeInternalRedirect(params.get('next'));
   const navigate = useNavigate();
   const { verifyOtp } = useAuth();

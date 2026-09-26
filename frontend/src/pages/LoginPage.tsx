@@ -4,11 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
-<<<<<<< HEAD
-import { sanitizeInternalRedirect } from '../lib/security';
-import { DEV_OTP_CODE } from '../lib/constants';
-=======
->>>>>>> frontend/design-system
 import { phoneSchema } from '../lib/schemas';
 import { sanitizeInternalRedirect } from '../lib/security';
 import { storeOtpPhone } from '../auth/otp-flow';

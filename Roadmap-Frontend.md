@@ -16,7 +16,7 @@ This file is the **single source of truth for the frontend**. It does not replac
 
 Baseline recorded when this file was written:
 
-Current source baseline for the 2026-09-25 local preview: GitHub `origin/main` at `f175c145092eea767a7850df450c6cbe11aa6df4`; `frontend/` exists. The table below is retained as historical context.
+Current source baseline for the 2026-09-26 F0 review: GitHub `origin/main` at `528912ac0575c3419163feda1964168ae35446bb`; `frontend/` exists. The table below is retained as historical context.
 
 | Item | Value |
 |---|---|
@@ -44,7 +44,7 @@ Current source baseline for the 2026-09-25 local preview: GitHub `origin/main` a
 
 ## 2. Verified backend state (what the frontend talks to)
 
-Everything below was read directly from `main` @ `d3f99bc` (controllers/services/DTOs), not from documentation. Global prefix is `/api/v1`; Swagger is available at `http://localhost:3000/docs` when `NODE_ENV !== 'production'`.
+Everything below was read directly from `main` @ `d3f99bc` (controllers/services/DTOs), not from documentation. Global prefix is `/api/v1`; Swagger is available at `http://localhost:3000/docs` when `NODE_ENV !== 'production'`. This inventory is historical: `main` advanced to `528912a` on 2026-09-26, including backend API and SQLite changes. Recheck the current source and a running API before accepting later phase contracts; F0's live health/CORS result is still unverified.
 
 ### 2.1 Endpoint inventory
 
@@ -118,7 +118,7 @@ The backend README's dependency rule is reused verbatim for the frontend: instal
 | Forms & validation | React Hook Form + Zod | mirrors backend constraints (`MaxLength`, ranges) with Persian messages |
 | HTTP | `fetch` in a tiny typed client wrapper (no axios unless a decision says otherwise) | fewer dependencies; envelope + error-code handling is custom anyway |
 | Jalali dates | `Intl.DateTimeFormat('fa-IR-u-ca-persian')` for display + one date-picker dependency (FR-DEC-04) | ISO strings only from the API; display is the frontend's job |
-| Font | Vazirmatn, self-hosted (`@fontsource/vazirmatn`) | Persian UI, no external CDN dependency in production |
+| Font | Vazirmatn, self-hosted (files copied from `@fontsource/vazirmatn` 5.3.0 into `frontend/public/fonts/vazirmatn/`) | Persian UI, no external CDN dependency in production |
 | Tests | Vitest + Testing Library + MSW (mock API) | unit tests for formatters/validators, integration tests for flows without a live backend |
 | Lint/format | ESLint + Prettier (same spirit as `backend/eslint.config.mjs`, `.prettierrc`) | one style across the repo |
 | E2E | Playwright — **optional, decision FR-DEC-06** | only if the team wants browser E2E in F11 |
@@ -182,7 +182,7 @@ Rules for the layout: routes and folders stay aligned with the API domains; a ne
 
 ---
 
-## 6. Frontend phases (one phase per commit/PR)
+## 6. Frontend phases (one phase at a time)
 
 Each phase follows the same shape as the backend README: **Goal → Deliverables → Tasks → Acceptance criteria**. Evidence means a command output, a screenshot path or a recorded manual check — never "it should work".
 
@@ -432,6 +432,10 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 
 **GitHub tracking:** the backend blockers (SCHEMA-001, BE-REQ-02/03/11/12/13) are filed as issue **#2** → https://github.com/MohammadAky/Dr.Gupet/issues/2 (created 2026-09-24, includes the raw `tsc` output and an acceptance checklist). This table is the frontend-side mirror of that issue.
 
+The table records findings against the earlier backend baseline. Backend commits through `528912a` may address some rows; do not close them from the old report alone. Confirm each against current backend source and live behavior with the backend owner before updating its status. The root `BUG-ISSUES-BACKEND.md` file was removed upstream; GitHub issue #2 and this section retain the earlier tracking context.
+
+**Current source recheck (2026-09-26, `528912a`):** `Product.minPrice` now exists in the schema, backend dependency versions and `package-lock.json` are present, and the payment callback now includes `orderId`; the older SCHEMA-001, BE-REQ-02 and BE-REQ-12 descriptions below are historical. No backend build or live endpoint was run from this frontend task, so these items are not marked fully accepted. `ProductQueryDto` still is not bound to `GET /products`, and `OrderQueryDto.status` exists but is not bound to `GET /orders`. BE-REQ-14 is a new source-confirmed catalog filter bug. A focused GitHub Issue was attempted, but the connected GitHub integration returned 403 (`Resource not accessible by integration`); this row preserves the report until an account with Issues write access can submit it.
+
 | ID | Type | What we need | Evidence (read from `main`) | Needed before | Status |
 |---|---|---|---|---|---|
 | SCHEMA-001 | change | Resolve the `Product.minPrice` mismatch: either add the field (with migration + backfill) or remove its usages. **It is not a theoretical risk: the build fails** (`TS2353` in `prisma/seed.ts:145/161/177` and `product-variants.service.ts:24`) | `npx tsc --noEmit` (Prisma Client 6.19.3, TS 5.9.3) + `prisma/schema.prisma` has no `minPrice`; also recorded in `backend/docs/SCHEMA_CHANGE_REQUESTS.md` | F5 acceptance / any backend run | OPEN — waiting for the backend owner |
@@ -447,6 +451,7 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 | BE-REQ-11 | change | Fix the remaining compile errors before any integration test: `medicines.service.ts(83,103)` (`lastConfirmedAt` is not part of `PharmacySelect`; `medicine.pharmacies` does not exist on the selected type), `orders.service.ts(133)` (`product.isActive` select has no `name`), `auth.controller.ts(9)` (`Throttle` must be imported from `@nestjs/throttler`), `main.ts(37,57)` (`useStaticAssets` needs `NestExpressApplication`), `upload.controller.ts(30)` + `upload.service.ts(39)` (`Express.Multer` needs `@types/multer`), `redis.service.ts(12,14)`, `jwt.strategy.ts(14)`, `auth.module.ts(17)`, `auth.service.ts(186,196)`, `pagination-query.dto.ts(22,26)`, `all-exceptions.filter.ts(30)` | full output of `npx tsc --noEmit -p tsconfig.json` (24+ errors, grouped above) | before the live API is needed (F0 smoke test onward) | OPEN |
 | BE-REQ-12 | change | Pin dependency versions in `backend/package.json` and commit `package-lock.json`. Empty version strings currently resolve to majors that cannot run this code: `prisma` → `8.0.0-rc.15` (a Platform CLI with **no `generate` command**), `@prisma/client` → `7.10.0`, `@nestjs/core` → `12.0.4`, `typescript` → `6.0.3` (errors on the repo's `baseUrl`) | `npm view prisma dist-tags` → `latest: 8.0.0-rc.15`; installed versions read from `node_modules/*/package.json`; `TS5101 Option 'baseUrl' is deprecated` | before any backend run | OPEN |
 | BE-REQ-13 | env | Provide a runnable database for local development: Docker is absent on this machine and WSL Ubuntu 26.04 has neither PostgreSQL nor Redis; choose Docker Desktop, packages inside WSL, or a hosted dev database, then hand over `DATABASE_URL`/`REDIS_URL` | `docker` not in `PATH`; `wsl -d Ubuntu -u root` → `NO-PSQL`, `NO-REDIS`, no `/etc/postgresql`; `prisma/migrations/` contains only `.gitkeep` | F0 acceptance | OPEN |
+| BE-REQ-14 | bug | Make `tagIds=1,2` require each selected `SUITABLE_FOR` tag, while allowing unrelated extra tags on the product | `products.service.ts` currently uses `tags.every({ tagId: { in: ids }, kind: 'SUITABLE_FOR' })`; this can match a product with no tags or only one selected tag, and exclude one with additional tags | F5 catalog filter acceptance | OPEN — issue submission blocked by GitHub integration 403; source-level finding, no live API test |
 
 **Rule for the frontend:** never fix a `BE-REQ` by changing `backend/`, and never mask a failing endpoint in the UI. If an endpoint is broken, the phase must record the failure and ship the documented fallback (see F5 note on price sorting).
 
@@ -462,7 +467,7 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 | FR-DEC-04 | Jalali date picker library (e.g. a maintained Persian picker) vs. a native `<input type="date">` + display-only Jalali | F3/F4 | display-only Jalali + native input until decided |
 | FR-DEC-05 | Token storage: `accessToken` in memory + `refreshToken` in `localStorage`, or both in `localStorage`? (Refresh tokens live in Redis server-side, so they cannot be httpOnly cookies today) | F2 | `accessToken` in memory, `refreshToken` in `localStorage`, with an explicit XSS note in `DECISIONS.md` |
 | FR-DEC-06 | Do we add Playwright browser E2E in F11? | F11 | skipped; MSW integration tests only |
-| FR-DEC-07 | Git workflow: branch-per-phase + PR (recommended) or direct commits to `main` (backend precedent), and who merges | F0 onward | branch-per-phase + PR, direct commits only for documentation |
+| FR-DEC-07 | Git workflow | F0 onward | **Resolved 2026-09-26 (DEC-012):** work on `main` only until the owner requests another branch; show the local preview and receive approval before any commit or push |
 | FR-DEC-08 | Dev environment: is Docker allowed/available on the development machine? (Postgres 16 + Redis 7 are required; `docker` was not found in `PATH` during this review) | F0 acceptance | document the actual working setup (Docker or local services) in `frontend/docs/DEVELOPMENT_CHECKLIST.md` |
 | FR-DEC-09 | Which environments exist (dev / staging / production) and whether the frontend gets its own `.env` per environment | F0/F11 | `VITE_API_BASE_URL` only, one local env |
 
@@ -497,17 +502,17 @@ Issue #1 is satisfied in practice (write access works) and may be closed.
 
 ### 10.1 Git workflow
 
-- Branches: `frontend/f<N>-<short-slug>` (e.g. `frontend/f0-bootstrap`), one phase per branch, one PR per phase (pending FR-DEC-07).
+- Work on the local `main` checkout only (DEC-012). Refresh and inspect GitHub `main` before each phase. Do not create another branch unless the owner explicitly requests it.
 - Commit messages follow the backend's style (English, imperative, phase name):
   `feat(web): implement Phase F2 — Auth & session` / `fix(web): cart stockProblem banner` / `docs(roadmap): update frontend status after F2`.
-- A PR must contain: the phase's diff, the command outputs of §10.2, the updated §12 tables, and a short "what I could not do" list.
+- Present the phase's local diff, the command outputs of §10.2, the updated §12 tables, and a short "what I could not do" list to the owner. Commit and push to `main` only after the owner approves that local result.
 - Never commit: `frontend/.env*`, `node_modules`, `dist`, screenshots dumps, tokens/secrets.
 - Do not touch `backend/` in a frontend PR. Backend needs go through §7.
 
 ### 10.2 Definition of Done (per frontend phase)
 
 1. All tasks of the phase are implemented (no partial "TODO later" without a recorded `TODO(decision)`).
-2. `npm run lint`, `npm run typecheck`, `npm run build`, `npm test` are green — outputs pasted in the PR.
+2. `npm run lint`, `npm run typecheck`, `npm run build`, `npm test` are green — outputs recorded with the local preview.
 3. Acceptance criteria of the phase each have recorded evidence (command output, screenshot path, or a test name).
 4. Persian UI strings reviewed (no mixed English text in the UI; numbers/Latin identifiers marked `dir="ltr"` where needed).
 5. Error paths implemented for every API call of the phase (loading/empty/error/retry).
@@ -600,11 +605,11 @@ npm run build && npm run preview
 
 > Update this section **in the same commit** as the phase work. Never mark a phase done without evidence. Mirrors README §16.
 
-### 12.1 Status (reviewed 2026-09-25; owner-approved preview)
+### 12.1 Status (reviewed 2026-09-26; current local preview approved by owner)
 
 | Phase | Name | Owner | Status | Evidence |
 |---|---|---|---|---|
-| F0 | Bootstrap & foundations | FE | ◐ | Frontend branch from `origin/main` `f175c14`; lint/typecheck/build, 91 frontend tests and `prettier --check src` pass. Live `/health` success/CORS remains unavailable without backend. See `frontend/docs/DEVELOPMENT_CHECKLIST.md`. |
+| F0 | Bootstrap & foundations | FE | ◐ | Local `main` refreshed to `origin/main` `528912a`; incoming committed frontend conflict markers resolved locally. Lint, typecheck, build, Prettier and 96 tests/17 files pass. Vazirmatn static assets load from `/fonts/vazirmatn/`; owner approved the current preview on 2026-09-26. Live `/health` success/CORS remains unavailable because port 3000 refuses connections. |
 | F1 | Design system & app shell | FE | ◐ | Brand shell, responsive header/footer/bottom navigation, global toast and UI gallery; owner approved the current visual preview on 2026-09-25, while complete accessibility acceptance remains open |
 | F2 | Authentication & session | FE | ☐ | — |
 | F3 | Profile & addresses | FE | ☐ | — |
@@ -619,7 +624,7 @@ npm run build && npm run preview
 
 Legend: ☐ acceptance not yet verified (existing code may be present) · ◐ in progress · ☑ done (evidence linked) · ⚠ done with an open caveat (list it).
 
-> **Current resume point (2026-09-25, owner-approved preview):** a frontend already exists on GitHub `main` `f175c14`, superseding the historical 2026-09-24 no-frontend note. Isolated worktree `frontend/design-system` contains F0/F1 reconciliation and page presentation. The owner approved the current visual preview and explicitly authorized commit and push on 2026-09-25. F0 remains open because the live `/health` smoke cannot pass without a running backend; `http://localhost:3000/api/v1/health` refused the connection. F1 accessibility acceptance is in progress. Earlier backend environment notes above are historical only; this frontend worktree has not modified `backend/`.
+> **Current resume point (2026-09-26, owner-approved local preview):** local `main` was fast-forwarded to GitHub `main` `528912a` after inspecting incoming changes. The owner approved the current result and authorized commit/push on 2026-09-26. F0 stays open: `http://localhost:3000/api/v1/health` refuses the connection, so live success and CORS acceptance cannot be claimed. The current task did not modify `backend/`. F1 accessibility acceptance remains open.
 
 ### 12.2 Progress log (append-only)
 
@@ -640,6 +645,8 @@ Legend: ☐ acceptance not yet verified (existing code may be present) · ◐ in
 | 2026-09-25 | F1 mobile semantics | local changes after `8198c32` | Browser accessibility tree at 360 px exposed the guest header login icon as an unnamed link because its text is hidden by CSS. Added explicit names to guest login and authenticated profile links; guest link is now announced as «ورود» and has a visible keyboard focus ring. Lint, build/typecheck, Prettier and 91 tests/16 files pass. Authenticated browser verification is still open without a live session. | frontend AI session |
 | 2026-09-25 | F1 tab semantics | local changes after `8198c32` | Browser and focused interaction test confirmed inactive tabs had `aria-controls` values with no matching panel. All panel IDs now exist; hidden inactive panels mount no content. RTL ArrowLeft selection/focus and 360 px overflow check passed. Lint, build/typecheck, Prettier and 92 tests/17 files pass. Full phase acceptance remains open. | frontend AI session |
 | 2026-09-25 | F1 keyboard traversal | local browser evidence after `8198c32` | At 360 px, gallery traversal reached 43 controls by Tab with visible focus; the remaining radio-group option was focused and selected by ArrowDown. Enter opened the dialog; Escape closed it and restored trigger focus. Real screen-reader use and 200% zoom are still unverified. | frontend AI session |
+| 2026-09-26 | F0 reconciliation and Firefox font errors | uncommitted local `main` from `528912a` | Resolved incoming committed frontend conflict markers, kept the OTP phone out of URLs, copied unchanged Vazirmatn 5.3.0 WOFF2/WOFF assets and CSS ranges to stable public paths after the owner's Firefox sanitizer report. All 27 WOFF2 files in the installed package parsed successfully; local font HTTP response is 200 with `font/woff2`. Lint, typecheck, build, Prettier and 96 tests/17 files pass. Backend at `localhost:3000` is offline, so API requests and live CORS remain unverified. Current preview/Firefox recheck awaits owner review; no commit or push. | frontend AI session |
+| 2026-09-26 | Backend contract source recheck | local `main` from `528912a` | Owner approved the current frontend preview and authorized commit/push. Read-only audit found that several old #2 blockers have source changes but live acceptance is missing; newly found `tagIds` logic error is tracked as BE-REQ-14. Attempt to create a separate GitHub Bug Issue returned integration 403; no backend file was changed. | frontend AI session |
 
 ### 12.3 Frontend regression checklist (used from F5 onward, mandatory in F11)
 

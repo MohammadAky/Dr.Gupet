@@ -6,10 +6,7 @@ import { AuthProvider } from './auth/auth-provider';
 import { AppRouter } from './router';
 import { ToastProvider } from './components/ui';
 import { createQueryClient } from './query';
-import '@fontsource/vazirmatn/400.css';
-import '@fontsource/vazirmatn/500.css';
-import '@fontsource/vazirmatn/600.css';
-import '@fontsource/vazirmatn/700.css';
+import './styles/fonts.css';
 import './styles.css';
 
 const queryClient = createQueryClient();

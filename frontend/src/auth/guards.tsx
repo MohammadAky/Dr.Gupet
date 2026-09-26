@@ -25,14 +25,8 @@ export function RequireGuest({ children }: { children: ReactNode }) {
   if (status === 'loading') return <p>در حال بارگذاری…</p>;
   if (status === 'authed') {
     const params = new URLSearchParams(location.search);
-<<<<<<< HEAD
-    const target = sanitizeInternalRedirect(params.get('next'), '/');
-=======
-    const next = params.get('next');
-    const target = sanitizeInternalRedirect(next);
->>>>>>> frontend/design-system
+    const target = sanitizeInternalRedirect(params.get('next'));
     return <Navigate to={target} replace />;
   }
   return <>{children}</>;
 }
-

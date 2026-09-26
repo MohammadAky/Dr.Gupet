@@ -1,24 +1,6 @@
-<<<<<<< HEAD
-/**
- * Validates a redirect destination to prevent Open Redirect attacks.
- * Accepts only internal relative paths starting with a single '/'
- * and rejecting '//' (protocol-relative), whitespace, and protocol handlers.
- */
-export function sanitizeInternalRedirect(target: string | null | undefined, fallback = '/'): string {
-  if (!target) return fallback;
-  const trimmed = target.trim();
-  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
-    return fallback;
-  }
-  // Disallow control characters or newlines
-  if (/[\x00-\x1F\x7F]/.test(trimmed)) {
-    return fallback;
-  }
-  return trimmed;
-=======
 /** Accept only an internal route as the destination after authentication. */
-export function sanitizeInternalRedirect(value: string | null | undefined): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+export function sanitizeInternalRedirect(value: string | null | undefined, fallback = '/'): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return fallback;
   // Browsers can interpret backslashes or control characters as URL separators.
   if (
     value.includes('\\') ||
@@ -26,17 +8,17 @@ export function sanitizeInternalRedirect(value: string | null | undefined): stri
       (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
     )
   )
-    return '/';
+    return fallback;
 
   try {
     const base = 'https://drgupet.invalid';
     const target = new URL(value, base);
-    if (target.origin !== base) return '/';
+    if (target.origin !== base) return fallback;
     // An authenticated user should not bounce back into the login flow.
-    if (target.pathname === '/login' || target.pathname === '/verify') return '/';
+    if (target.pathname === '/login' || target.pathname === '/verify') return fallback;
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {
-    return '/';
+    return fallback;
   }
 }
 
@@ -76,5 +58,4 @@ export function safePaymentUrl(
   } catch {
     return null;
   }
->>>>>>> frontend/design-system
 }

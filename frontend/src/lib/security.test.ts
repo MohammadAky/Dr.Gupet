@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-<<<<<<< HEAD
-import { sanitizeInternalRedirect } from './security';
+import { safePaymentUrl, sanitizeInternalRedirect } from './security';
 
 describe('sanitizeInternalRedirect', () => {
   it('accepts safe internal paths', () => {
@@ -24,8 +23,8 @@ describe('sanitizeInternalRedirect', () => {
   it('falls back to custom fallback if provided', () => {
     expect(sanitizeInternalRedirect('https://evil.com', '/home')).toBe('/home');
     expect(sanitizeInternalRedirect(null, '/home')).toBe('/home');
-=======
-import { safePaymentUrl, sanitizeInternalRedirect } from './security';
+  });
+});
 
 describe('sanitizeInternalRedirect', () => {
   it('keeps an internal route with query and hash', () => {
@@ -76,6 +75,5 @@ describe('safePaymentUrl', () => {
     expect(
       safePaymentUrl('http://localhost:3000/api/v1/payments/mock-pay?orderId=1', api, false),
     ).toBeNull();
->>>>>>> frontend/design-system
   });
 });
