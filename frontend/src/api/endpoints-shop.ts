@@ -5,6 +5,8 @@ import type {
   Brand,
   CartView,
   Category,
+  Clinic,
+  ClinicDetail,
   CouponPreview,
   Medicine,
   MedicineDetail,
@@ -55,6 +57,8 @@ export interface PharmacyFilters {
   province?: string;
   is24h?: boolean;
 }
+
+export type ClinicFilters = PharmacyFilters;
 
 export interface CreateOrderInput {
   addressId: number;
@@ -172,4 +176,11 @@ export const shopApi = {
   },
 
   pharmacy: (id: number) => requestData<PharmacyDetail>(`/pharmacies/${id}`),
+
+  clinics: async (filters: ClinicFilters): Promise<Page<Clinic>> => {
+    const { data, meta } = await request<Clinic[]>('/clinics', { query: { ...filters } });
+    return { data, meta };
+  },
+
+  clinic: (id: number) => requestData<ClinicDetail>(`/clinics/${id}`),
 };

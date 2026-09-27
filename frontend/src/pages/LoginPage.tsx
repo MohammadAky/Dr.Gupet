@@ -7,6 +7,7 @@ import { ErrorState } from '../components/states';
 import { phoneSchema } from '../lib/schemas';
 import { sanitizeInternalRedirect } from '../lib/security';
 import { storeOtpPhone } from '../auth/otp-flow';
+import { LOCAL_PREVIEW_LOGIN, useAuth } from '../auth/auth-provider';
 
 /** Step 1 of login — POST /auth/otp/request (public, throttled 10/min). */
 export function LoginPage() {
@@ -14,6 +15,7 @@ export function LoginPage() {
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { previewLogin } = useAuth();
   const next = sanitizeInternalRedirect(params.get('next'));
 
   const requestOtp = useMutation({
@@ -27,6 +29,15 @@ export function LoginPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (LOCAL_PREVIEW_LOGIN) {
+      if (!phone.trim()) {
+        setFieldError('شماره‌ای برای پیش‌نمایش وارد کنید');
+        return;
+      }
+      setFieldError(undefined);
+      previewLogin(phone.trim());
+      return;
+    }
     const parsed = phoneSchema.safeParse(phone);
     if (!parsed.success) {
       setFieldError(parsed.error.issues[0]?.message);
@@ -39,7 +50,11 @@ export function LoginPage() {
   return (
     <section className="auth-page">
       <h1>ورود با شماره موبایل</h1>
-      <p>کد یک‌بارمصرف به شمارهٔ شما پیامک می‌شود (نیازی به رمز عبور نیست).</p>
+      <p>
+        {LOCAL_PREVIEW_LOGIN
+          ? 'پیش‌نمایش محلی پنل؛ هر شماره‌ای وارد کنید و بدون کد ادامه دهید. این ورود واقعی نیست.'
+          : 'کد یک‌بارمصرف به شمارهٔ شما پیامک می‌شود (نیازی به رمز عبور نیست).'}
+      </p>
 
       <form onSubmit={handleSubmit} noValidate>
         <Field label="شماره موبایل" htmlFor="phone" error={fieldError}>
@@ -56,7 +71,11 @@ export function LoginPage() {
         </Field>
 
         <button type="submit" disabled={requestOtp.isPending}>
-          {requestOtp.isPending ? 'ارسال کد…' : 'ارسال کد تأیید'}
+          {LOCAL_PREVIEW_LOGIN
+            ? 'ورود به پیش‌نمایش پنل'
+            : requestOtp.isPending
+              ? 'ارسال کد…'
+              : 'ارسال کد تأیید'}
         </button>
       </form>
 

@@ -24,4 +24,6 @@ export const queryKeys = {
   medicine: (id: number) => ['medicines', id] as const,
   pharmacies: (filters: Record<string, unknown>) => ['pharmacies', filters] as const,
   pharmacy: (id: number) => ['pharmacies', id] as const,
+  clinics: (filters: Record<string, unknown>) => ['clinics', filters] as const,
+  clinic: (id: number) => ['clinics', id] as const,
 };

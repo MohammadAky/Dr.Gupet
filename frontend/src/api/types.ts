@@ -346,6 +346,15 @@ export interface PharmacyDetail extends Pharmacy {
   workingHours: string | null;
 }
 
+/** Public clinic directory; backend returns the same visible fields as pharmacies. */
+export type Clinic = Pharmacy;
+
+export interface ClinicDetail extends Clinic {
+  lat: number | null;
+  lng: number | null;
+  workingHours: string | null;
+}
+
 /** GET /health */
 export interface HealthResult {
   status: string;

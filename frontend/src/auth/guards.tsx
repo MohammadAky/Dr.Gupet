@@ -19,14 +19,14 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
 /** Authenticated users are bounced away from /login (back to `next` or home). */
 export function RequireGuest({ children }: { children: ReactNode }) {
-  const { status } = useAuth();
+  const { status, previewMode } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') return <p>در حال بارگذاری…</p>;
   if (status === 'authed') {
     const params = new URLSearchParams(location.search);
     const target = sanitizeInternalRedirect(params.get('next'));
-    return <Navigate to={target} replace />;
+    return <Navigate to={previewMode && target === '/' ? '/profile' : target} replace />;
   }
   return <>{children}</>;
 }

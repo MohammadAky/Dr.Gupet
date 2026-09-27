@@ -4,6 +4,8 @@ import { RequireAuth, RequireGuest } from './auth/guards';
 import { AddressEditPage } from './pages/AddressEditPage';
 import { AddressesPage } from './pages/AddressesPage';
 import { CartPage } from './pages/CartPage';
+import { ClinicDetailPage } from './pages/ClinicDetailPage';
+import { ClinicsPage } from './pages/ClinicsPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { HomePage } from './pages/HomePage';
@@ -58,6 +60,8 @@ export function AppRouter() {
         <Route path="medicines/:id" element={<MedicineDetailPage />} />
         <Route path="pharmacies" element={<PharmaciesPage />} />
         <Route path="pharmacies/:id" element={<PharmacyDetailPage />} />
+        <Route path="clinics" element={<ClinicsPage />} />
+        <Route path="clinics/:id" element={<ClinicDetailPage />} />
         {UiGalleryPage && (
           <Route
             path="dev/ui"

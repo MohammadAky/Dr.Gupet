@@ -10,7 +10,7 @@ import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { ConsentBanner } from './privacy/ConsentBanner';
 
 export function Shell() {
-  const { status, user, logout } = useAuth();
+  const { status, user, logout, previewMode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState('');
@@ -19,7 +19,7 @@ export function Shell() {
   const cart = useQuery({
     queryKey: queryKeys.cart,
     queryFn: () => shopApi.cart(),
-    enabled: status === 'authed',
+    enabled: status === 'authed' && !previewMode,
   });
   const cartCount = status === 'authed' ? (cart.data?.items.length ?? 0) : 0;
 
@@ -59,6 +59,11 @@ export function Shell() {
         id="main-content"
         className={`app-main${location.pathname === '/' ? '' : ' content-page'}`}
       >
+        {previewMode && (
+          <p className="preview-session-note" role="status">
+            حالت نمایشی محلی — اطلاعات حساب و عملیات خصوصی به بک‌اند متصل نیستند.
+          </p>
+        )}
         <Outlet />
       </main>
       <Footer onNavigate={() => setMenuOpen(false)} />

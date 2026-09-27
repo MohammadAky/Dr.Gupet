@@ -32,7 +32,7 @@ Current source baseline for the 2026-09-26 F0 review: GitHub `origin/main` at `5
 
 **In scope (user panel only, MVP v1 — README §1):** OTP login, profile, addresses, pets, product catalog (browse/filter/search/detail), recommendations, favorites, cart, coupons, checkout, payment redirect and result page, order list/detail/cancel, medicine & pharmacy information pages.
 
-**Out of scope (do not build):** admin panel, any administrator CRUD, vets/clinics/appointments, medical records & vaccinations, prescriptions, boarding, sitters, trainers, adoption, chat, reviews, subscriptions, refunds, blog (README §15). Also out of scope: any change to backend files, any new backend endpoint without a `BE-REQ`.
+**Out of scope (do not build):** admin panel, any administrator CRUD, vets/appointments, medical records & vaccinations, prescriptions, boarding, sitters, trainers, adoption, chat, reviews, subscriptions, refunds, blog. Also out of scope: any change to backend files, any new backend endpoint without a `BE-REQ`. The owner added the public clinic directory/detail to the frontend MVP on 2026-09-27 after backend commit `ef2584d`; this supersedes the earlier clinic exclusion in README §15 for frontend scope only. Backend roadmap ownership remains with the backend owner.
 
 **Hard boundaries**
 
@@ -385,9 +385,9 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 - The result page works after a **hard reload** (sessionStorage fallback path) and shows a clear message if it cannot resolve the order.
 - `lint`/`typecheck`/`build`/`test` green.
 
-### F10 — Medicines & pharmacies (information only)
+### F10 — Medicines, pharmacies & clinics (information only)
 
-**Goal:** the informational medicine section with its mandatory disclaimer.
+**Goal:** the informational medicine section with its mandatory disclaimer, plus public pharmacy and clinic directories.
 
 **Deliverables:** `pages/medicines/index.tsx`, `pages/medicines/[id].tsx`, `pages/pharmacies/index.tsx`, `pages/pharmacies/[id].tsx`, `features/medicines/*`, `features/pharmacies/*`, `api/endpoints/medicines.ts`.
 
@@ -397,11 +397,14 @@ Each phase follows the same shape as the backend README: **Goal → Deliverables
 3. Pharmacy list/detail: `city`/`province`/`is24h` filters, `workingHours`, `lat`/`lng` external map link, `tel:` click-to-call.
 4. `lastConfirmedAt` is rendered as a Jalali relative date ("آخرین تأیید: ۳ روز پیش").
 5. An explicit "این بخش صرفاً اطلاعاتی است؛ قیمت و موجودی ندارد" note on both medicine and pharmacy pages.
+6. Public clinic list/detail from `GET /clinics` and `GET /clinics/:id`: searchable province/city filters, 24-hour indicator, verified badge, address, hours, phone, and external map link. No appointment booking or admin CRUD.
+7. Product, medicine, pharmacy and clinic filters use keyboard-accessible searchable dropdowns. Province/city inputs offer predefined suggestions and permit free text; selecting filters keeps URL state shareable.
 
 **Acceptance criteria**
 - The disclaimer rendered on the medicine detail page is identical to the API value (evidence: side-by-side check or test).
 - Persian search works with `ی/ي` and `ک/ك` variants (evidence: manual searches with both spellings).
 - No price/stock field is rendered anywhere in this section.
+- Clinic list/detail match the public API contract. Searchable dropdowns work by click, typing and keyboard at 360 px and desktop widths; no live API acceptance is claimed while the backend is unavailable.
 - `lint`/`typecheck`/`build`/`test` green.
 
 ### F11 — Quality, performance & delivery
@@ -436,6 +439,8 @@ The table records findings against the earlier backend baseline. Backend commits
 
 **Current source recheck (2026-09-26, `528912a`):** `Product.minPrice` now exists in the schema, backend dependency versions and `package-lock.json` are present, and the payment callback now includes `orderId`; the older SCHEMA-001, BE-REQ-02 and BE-REQ-12 descriptions below are historical. No backend build or live endpoint was run from this frontend task, so these items are not marked fully accepted. `ProductQueryDto` still is not bound to `GET /products`, and `OrderQueryDto.status` exists but is not bound to `GET /orders`. BE-REQ-14 is a new source-confirmed catalog filter bug. A focused GitHub Issue was attempted, but the connected GitHub integration returned 403 (`Resource not accessible by integration`); this row preserves the report until an account with Issues write access can submit it.
 
+**Incoming backend recheck (2026-09-27, `origin/main` `6c189ea`):** `ef2584d` adds the Prisma `Clinic` model and public `GET /clinics`, `GET /clinics/:id` plus admin CRUD. The other incoming commits remove an empty backend README/test files and redundant `frontend/.gitignore`; none ticks README §16 / `backend/docs/TEST_CHECKLIST.md`. At the time of this source check, clinics were outside the earlier MVP scope; the owner subsequently added the public clinic directory/detail to frontend F10 on 2026-09-27. Source review found two clinic API defects: the admin list/detail call public service methods that exclude inactive clinics, and the `is24h` query is passed as a string to a Prisma Boolean filter without conversion. The public/admin clinic handlers also lack runtime DTOs; acceptance requires a running backend test. A higher-priority identity mismatch exists across private endpoints: `JwtStrategy.validate()` returns `{ id, role }` but `@CurrentUser('sub')` reads `request.user.sub`, so service `userId` can be `undefined`; Prisma omits undefined filters in multi-row queries, potentially exposing cross-user addresses, pets, and orders. No backend file was changed or acceptance box ticked: `/api/v1/health` still refuses connections locally. The native GitHub integration returned 403, but browser sign-in subsequently allowed filing issues #3–#6. A requested standard security scan did not return a report, so this is a focused source review, not a clean security audit.
+
 | ID | Type | What we need | Evidence (read from `main`) | Needed before | Status |
 |---|---|---|---|---|---|
 | SCHEMA-001 | change | Resolve the `Product.minPrice` mismatch: either add the field (with migration + backfill) or remove its usages. **It is not a theoretical risk: the build fails** (`TS2353` in `prisma/seed.ts:145/161/177` and `product-variants.service.ts:24`) | `npx tsc --noEmit` (Prisma Client 6.19.3, TS 5.9.3) + `prisma/schema.prisma` has no `minPrice`; also recorded in `backend/docs/SCHEMA_CHANGE_REQUESTS.md` | F5 acceptance / any backend run | OPEN — waiting for the backend owner |
@@ -451,7 +456,9 @@ The table records findings against the earlier backend baseline. Backend commits
 | BE-REQ-11 | change | Fix the remaining compile errors before any integration test: `medicines.service.ts(83,103)` (`lastConfirmedAt` is not part of `PharmacySelect`; `medicine.pharmacies` does not exist on the selected type), `orders.service.ts(133)` (`product.isActive` select has no `name`), `auth.controller.ts(9)` (`Throttle` must be imported from `@nestjs/throttler`), `main.ts(37,57)` (`useStaticAssets` needs `NestExpressApplication`), `upload.controller.ts(30)` + `upload.service.ts(39)` (`Express.Multer` needs `@types/multer`), `redis.service.ts(12,14)`, `jwt.strategy.ts(14)`, `auth.module.ts(17)`, `auth.service.ts(186,196)`, `pagination-query.dto.ts(22,26)`, `all-exceptions.filter.ts(30)` | full output of `npx tsc --noEmit -p tsconfig.json` (24+ errors, grouped above) | before the live API is needed (F0 smoke test onward) | OPEN |
 | BE-REQ-12 | change | Pin dependency versions in `backend/package.json` and commit `package-lock.json`. Empty version strings currently resolve to majors that cannot run this code: `prisma` → `8.0.0-rc.15` (a Platform CLI with **no `generate` command**), `@prisma/client` → `7.10.0`, `@nestjs/core` → `12.0.4`, `typescript` → `6.0.3` (errors on the repo's `baseUrl`) | `npm view prisma dist-tags` → `latest: 8.0.0-rc.15`; installed versions read from `node_modules/*/package.json`; `TS5101 Option 'baseUrl' is deprecated` | before any backend run | OPEN |
 | BE-REQ-13 | env | Provide a runnable database for local development: Docker is absent on this machine and WSL Ubuntu 26.04 has neither PostgreSQL nor Redis; choose Docker Desktop, packages inside WSL, or a hosted dev database, then hand over `DATABASE_URL`/`REDIS_URL` | `docker` not in `PATH`; `wsl -d Ubuntu -u root` → `NO-PSQL`, `NO-REDIS`, no `/etc/postgresql`; `prisma/migrations/` contains only `.gitkeep` | F0 acceptance | OPEN |
-| BE-REQ-14 | bug | Make `tagIds=1,2` require each selected `SUITABLE_FOR` tag, while allowing unrelated extra tags on the product | `products.service.ts` currently uses `tags.every({ tagId: { in: ids }, kind: 'SUITABLE_FOR' })`; this can match a product with no tags or only one selected tag, and exclude one with additional tags | F5 catalog filter acceptance | OPEN — issue submission blocked by GitHub integration 403; source-level finding, no live API test |
+| BE-REQ-14 | bug | Make `tagIds=1,2` require each selected `SUITABLE_FOR` tag, while allowing unrelated extra tags on the product | `products.service.ts` currently uses `tags.every({ tagId: { in: ids }, kind: 'SUITABLE_FOR' })`; this can match a product with no tags or only one selected tag, and exclude one with additional tags | F5 catalog filter acceptance | OPEN — GitHub [issue #4](https://github.com/MohammadAky/Dr.Gupet/issues/4); source-level finding, no live API test |
+| BE-REQ-15 | security bug | Ensure the authenticated user's id reaches every private service and ownership filter; add a regression test with two users | `jwt.strategy.ts` returns `{ id, role }`, while `current-user.decorator.ts` and private controllers expect `sub`; `addresses.service.ts`, `pets.service.ts`, and `orders.service.ts` use `where: { userId }`. Prisma omits `undefined` filters. | All private F2–F9 flows; before any live release | CRITICAL / OPEN — GitHub [issue #3](https://github.com/MohammadAky/Dr.Gupet/issues/3); backend offline; notify backend owner before deployment |
+| BE-REQ-16 | bug | Parse and validate `is24h` for public clinic/pharmacy filters; make admin clinic list/detail include inactive records | Clinic/pharmacy controllers use `PaginationQueryDto & any`, services pass the raw query to Boolean Prisma filters; admin clinic reads call public methods constrained by `isActive: true` | F10 public directory acceptance | OPEN — GitHub [issue #5](https://github.com/MohammadAky/Dr.Gupet/issues/5) for filters and [issue #6](https://github.com/MohammadAky/Dr.Gupet/issues/6) for admin visibility; no live API test |
 
 **Rule for the frontend:** never fix a `BE-REQ` by changing `backend/`, and never mask a failing endpoint in the UI. If an endpoint is broken, the phase must record the failure and ship the documented fallback (see F5 note on price sorting).
 
@@ -611,15 +618,15 @@ npm run build && npm run preview
 |---|---|---|---|---|
 | F0 | Bootstrap & foundations | FE | ◐ | Local `main` refreshed to `origin/main` `528912a`; incoming committed frontend conflict markers resolved locally. Lint, typecheck, build, Prettier and 96 tests/17 files pass. Vazirmatn static assets load from `/fonts/vazirmatn/`; owner approved the current preview on 2026-09-26. Live `/health` success/CORS remains unavailable because port 3000 refuses connections. |
 | F1 | Design system & app shell | FE | ◐ | Brand shell, responsive header/footer/bottom navigation, global toast and UI gallery; owner approved the current visual preview on 2026-09-25, while complete accessibility acceptance remains open |
-| F2 | Authentication & session | FE | ☐ | — |
-| F3 | Profile & addresses | FE | ☐ | — |
+| F2 | Authentication & session | FE | ◐ | Owner-requested localhost/Vite-only login preview reaches `/profile` without OTP; real OTP/session acceptance remains unverified. |
+| F3 | Profile & addresses | FE | ◐ | Local profile dashboard layout and account links are previewable; private API and CRUD acceptance need a live backend. |
 | F4 | Pets | FE | ☐ | — |
-| F5 | Catalog (home, list, detail) | FE | ☐ | — |
+| F5 | Catalog (home, list, detail) | FE | ◐ | Searchable pet type, brand, age, size and sort dropdowns work locally; catalog API and BE-REQ-14 acceptance remain open. |
 | F6 | Recommendations | FE | ☐ | — |
 | F7 | Favorites | FE | ☐ | — |
 | F8 | Cart & coupons | FE | ☐ | — |
 | F9 | Checkout, payments & orders | FE | ☐ | — |
-| F10 | Medicines & pharmacies | FE | ☐ | — |
+| F10 | Medicines, pharmacies & clinics | FE | ◐ | Owner added clinics to MVP on 2026-09-27. Local UI and searchable filters are in progress; backend and visual acceptance remain open. |
 | F11 | Quality, performance & delivery | FE | ☐ | — |
 
 Legend: ☐ acceptance not yet verified (existing code may be present) · ◐ in progress · ☑ done (evidence linked) · ⚠ done with an open caveat (list it).
@@ -647,6 +654,10 @@ Legend: ☐ acceptance not yet verified (existing code may be present) · ◐ in
 | 2026-09-25 | F1 keyboard traversal | local browser evidence after `8198c32` | At 360 px, gallery traversal reached 43 controls by Tab with visible focus; the remaining radio-group option was focused and selected by ArrowDown. Enter opened the dialog; Escape closed it and restored trigger focus. Real screen-reader use and 200% zoom are still unverified. | frontend AI session |
 | 2026-09-26 | F0 reconciliation and Firefox font errors | uncommitted local `main` from `528912a` | Resolved incoming committed frontend conflict markers, kept the OTP phone out of URLs, copied unchanged Vazirmatn 5.3.0 WOFF2/WOFF assets and CSS ranges to stable public paths after the owner's Firefox sanitizer report. All 27 WOFF2 files in the installed package parsed successfully; local font HTTP response is 200 with `font/woff2`. Lint, typecheck, build, Prettier and 96 tests/17 files pass. Backend at `localhost:3000` is offline, so API requests and live CORS remain unverified. Current preview/Firefox recheck awaits owner review; no commit or push. | frontend AI session |
 | 2026-09-26 | Backend contract source recheck | local `main` from `528912a` | Owner approved the current frontend preview and authorized commit/push. Read-only audit found that several old #2 blockers have source changes but live acceptance is missing; newly found `tagIds` logic error is tracked as BE-REQ-14. Attempt to create a separate GitHub Bug Issue returned integration 403; no backend file was changed. | frontend AI session |
+| 2026-09-27 | Incoming backend Clinics module review | `origin/main` `6c189ea`; local frontend commit `0b30dbb` | Fetched and inspected incoming commits. Clinics CRUD and model are present in source, but clinics remain outside MVP FE scope and backend S1–S9 acceptance is unverified. Found admin inactive-record visibility and `is24h` query defects; no validated auth bypass in the new routes. Local backend health connection refused; standard security scan returned no report. Issue creation needs GitHub Issues write access/sign-in. Existing approved frontend commit was rebased onto current `origin/main` and awaits push authentication. | frontend AI session |
+| 2026-09-27 | Owner scope expansion and security review | local work after `0b30dbb` | Owner explicitly added public clinics to frontend MVP and requested searchable filters and a local login preview. The backend identity mismatch (BE-REQ-15) was traced through controllers and multi-row Prisma ownership queries; this supersedes the earlier limited clinic-route auth review. Frontend changes remain uncommitted pending preview and approval. | frontend owner + AI session |
+| 2026-09-27 | Backend bug reports | GitHub issues #3–#6 | Browser sign-in allowed issue creation after native integration 403. Filed and read back #3 (JWT identity/privacy), #4 (product tag filter), #5 (`is24h` parsing), and #6 (inactive clinic admin reads). These are source-level findings; no live backend API test or backend edit occurred. | frontend AI session |
+| 2026-09-27 | Local frontend preview | uncommitted after `0b30dbb` | Added public clinic routes/list/detail, location suggestions and searchable product/medicine filters, and a localhost-only account preview. Browser confirmed catalog dropdown selection updates `?lifeStage=ADULT`, direct demo login opens `/profile`, and the profile has no document overflow at 360 px. Lint, typecheck, build, Prettier and 96 tests/17 files pass (`--no-isolate` after one test-worker startup timeout; focused failed-to-start file passed separately). Backend health still refuses connection; clinic cards/data and private operations are not live-verified. Owner review of this new preview is pending. | frontend AI session |
 
 ### 12.3 Frontend regression checklist (used from F5 onward, mandatory in F11)
 

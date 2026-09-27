@@ -144,6 +144,7 @@ export function Header({
           <NavLink to="/products">محصولات</NavLink>
           <NavLink to="/medicines">اطلاعات داروها</NavLink>
           <NavLink to="/pharmacies">داروخانه‌ها</NavLink>
+          <NavLink to="/clinics">کلینیک‌ها</NavLink>
           {status === 'authed' && <NavLink to="/recommendations">پیشنهادهای من</NavLink>}
           {status === 'authed' && <NavLink to="/favorites">علاقه‌مندی‌ها</NavLink>}
           {status === 'authed' && <NavLink to="/orders">سفارش‌ها</NavLink>}

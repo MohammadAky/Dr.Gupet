@@ -6,6 +6,7 @@ import { queryKeys } from '../api/query-keys';
 import { api } from '../api/endpoints';
 import { Pagination } from '../components/Pagination';
 import { ProductCardView } from '../components/ProductCardView';
+import { SearchableFilter } from '../components/SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { parseProductFilters, serializeProductFilters } from '../features/catalog/filters';
 import { toEnDigits } from '../lib/format';
@@ -65,81 +66,75 @@ export function ProductsPage() {
     <section>
       <h1>محصولات</h1>
 
-      <form ref={searchFormRef} onSubmit={submitSearch}>
+      <form className="catalog-search" ref={searchFormRef} onSubmit={submitSearch}>
         <label htmlFor="q">جستجو</label>
         <input id="q" name="q" key={filters.q ?? ''} defaultValue={filters.q ?? ''} />
-        <button type="submit">جستجو</button>
+        <button type="submit" className="filter-apply">
+          جستجو
+        </button>
       </form>
 
-      <div className="filters">
-        <label htmlFor="petType">نوع حیوان</label>
-        <select
-          id="petType"
-          value={filters.petTypeId ?? ''}
-          onChange={(event) =>
-            patch({ petTypeId: event.target.value ? Number(event.target.value) : undefined })
-          }
-        >
-          <option value="">همه</option>
-          {petTypes.data?.map((type) => (
-            <option key={type.id} value={type.id}>
-              {type.name}
-            </option>
-          ))}
-        </select>
+      <div className="filters filter-panel">
+        <div className="filter-panel__grid">
+          <SearchableFilter
+            label="نوع حیوان"
+            value={String(filters.petTypeId ?? '')}
+            options={[
+              { value: '', label: 'همهٔ حیوانات' },
+              ...(petTypes.data ?? []).map((type) => ({
+                value: String(type.id),
+                label: type.name,
+              })),
+            ]}
+            onSelect={(value) => patch({ petTypeId: value ? Number(value) : undefined })}
+          />
+          <SearchableFilter
+            label="برند"
+            value={String(filters.brandId ?? '')}
+            options={[
+              { value: '', label: 'همهٔ برندها' },
+              ...(brands.data ?? []).map((brand) => ({
+                value: String(brand.id),
+                label: brand.name,
+              })),
+            ]}
+            onSelect={(value) => patch({ brandId: value ? Number(value) : undefined })}
+          />
+          <SearchableFilter
+            label="سن"
+            value={filters.lifeStage ?? ''}
+            options={[
+              { value: '', label: 'همهٔ سن‌ها' },
+              { value: 'PUPPY_KITTEN', label: 'توله/بچه گربه' },
+              { value: 'ADULT', label: 'بالغ' },
+              { value: 'SENIOR', label: 'سالمند' },
+            ]}
+            onSelect={(value) => patch({ lifeStage: value || undefined })}
+          />
+          <SearchableFilter
+            label="سایز"
+            value={filters.sizeClass ?? ''}
+            options={[
+              { value: '', label: 'همهٔ سایزها' },
+              { value: 'SMALL', label: 'کوچک' },
+              { value: 'MEDIUM', label: 'متوسط' },
+              { value: 'LARGE', label: 'بزرگ' },
+            ]}
+            onSelect={(value) => patch({ sizeClass: value || undefined })}
+          />
+          <SearchableFilter
+            label="مرتب‌سازی"
+            value={filters.sort ?? 'newest'}
+            options={[
+              { value: 'newest', label: 'جدیدترین' },
+              { value: 'price_asc', label: 'ارزان‌ترین' },
+              { value: 'price_desc', label: 'گران‌ترین' },
+            ]}
+            onSelect={(value) => patch({ sort: value })}
+          />
+        </div>
 
-        <label htmlFor="brand">برند</label>
-        <select
-          id="brand"
-          value={filters.brandId ?? ''}
-          onChange={(event) =>
-            patch({ brandId: event.target.value ? Number(event.target.value) : undefined })
-          }
-        >
-          <option value="">همه</option>
-          {brands.data?.map((brand) => (
-            <option key={brand.id} value={brand.id}>
-              {brand.name}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="lifeStage">سن</label>
-        <select
-          id="lifeStage"
-          value={filters.lifeStage ?? ''}
-          onChange={(event) => patch({ lifeStage: event.target.value || undefined })}
-        >
-          <option value="">همه</option>
-          <option value="PUPPY_KITTEN">توله/بچه گربه</option>
-          <option value="ADULT">بالغ</option>
-          <option value="SENIOR">سالمند</option>
-        </select>
-
-        <label htmlFor="sizeClass">سایز</label>
-        <select
-          id="sizeClass"
-          value={filters.sizeClass ?? ''}
-          onChange={(event) => patch({ sizeClass: event.target.value || undefined })}
-        >
-          <option value="">همه</option>
-          <option value="SMALL">کوچک</option>
-          <option value="MEDIUM">متوسط</option>
-          <option value="LARGE">بزرگ</option>
-        </select>
-
-        <label htmlFor="sort">مرتب‌سازی</label>
-        <select
-          id="sort"
-          value={filters.sort ?? 'newest'}
-          onChange={(event) => patch({ sort: event.target.value })}
-        >
-          <option value="newest">جدیدترین</option>
-          <option value="price_asc">ارزان‌ترین</option>
-          <option value="price_desc">گران‌ترین</option>
-        </select>
-
-        <label>
+        <label className="filter-check">
           <input
             type="checkbox"
             checked={filters.inStock === true}
@@ -148,7 +143,7 @@ export function ProductsPage() {
           فقط موجود
         </label>
 
-        <form ref={priceFormRef} onSubmit={submitPrices}>
+        <form className="price-filter" ref={priceFormRef} onSubmit={submitPrices}>
           <label htmlFor="minPrice">از قیمت</label>
           <input
             id="minPrice"
@@ -165,10 +160,12 @@ export function ProductsPage() {
             key={`max-${filters.maxPrice ?? ''}`}
             defaultValue={filters.maxPrice ?? ''}
           />
-          <button type="submit">اعمال قیمت</button>
+          <button type="submit" className="filter-apply">
+            اعمال قیمت
+          </button>
         </form>
 
-        <button type="button" onClick={clearFilters}>
+        <button type="button" className="filter-clear" onClick={clearFilters}>
           پاک‌کردن فیلترها
         </button>
       </div>

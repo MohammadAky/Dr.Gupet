@@ -87,6 +87,20 @@
 - **Why:** The owner's Firefox screenshot showed font sanitizer errors while the local dependency install was being replaced. Fixed public asset URLs avoid partially installed package paths and give the browser fresh URLs after the interrupted install.
 - **Consequences:** The existing SIL OFL notice remains at `public/licenses/Vazirmatn-OFL.txt`. Font assets must be updated together with the CSS and license when the package version changes. This does not resolve API requests when the backend is offline.
 
+## DEC-014: Public clinic directory and searchable filters
+
+- **Status:** OWNER-DIRECTED FOR LOCAL REVIEW
+- **Date:** 2026-09-27
+- **Decision:** Add public clinic list/detail to the frontend MVP using the backend's existing `GET /clinics` endpoints. Keep booking and admin CRUD out of this frontend scope. Use a reusable, keyboard-accessible searchable dropdown for catalog and directory filters, with free-text city/province entry and local suggestions. No new dependency.
+- **Consequences:** Roadmap F10 now includes clinics. Backend `is24h` parsing and admin visibility issues remain with the backend owner. Frontend visual and live API acceptance are separate.
+
+## DEC-015: Local account preview while OTP is unavailable
+
+- **Status:** OWNER-DIRECTED FOR LOCAL REVIEW
+- **Date:** 2026-09-27
+- **Decision:** On `localhost` / `127.0.0.1` in Vite development only, entering any nonempty phone text opens a temporary account preview without requesting or verifying an OTP. Keep the real OTP path in production builds. The preview creates no token, is not persisted across reloads, and is visibly marked as a demo.
+- **Consequences:** The account shell and profile layout can be reviewed without SMS. Private API operations still require a real backend session and must not be represented as working in the preview. Remove or revisit this temporary mode when the owner provides the SMS integration.
+
 ## Open owner and release decisions
 
 
