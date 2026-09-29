@@ -5,7 +5,7 @@ description: Design and review the Persian RTL Dr. Gupet frontend using its vers
 
 # Dr. Gupet frontend design
 
-Use this skill for visual changes in `frontend/`. Read `Roadmap-Frontend.md` for phase scope and acceptance, `frontend/docs/DECISIONS.md` for accepted implementation boundaries, and `frontend/docs/DESIGN_SYSTEM.md` for the current visual specification. `frontend/docs/INSTRUCTIONS.md` and `IMPLEMENT_FRONTEND.md` govern collaboration and evidence. The design guidance here never authorizes backend changes or a premature commit/push.
+Use this skill for visual changes in `frontend/`. Read the root `README.md` «مسیر توسعه» for phase scope and status, `frontend/docs/DECISIONS.md` for accepted implementation boundaries, and `frontend/docs/DESIGN_SYSTEM.md` for the current visual specification. `AGENTS.md` and `frontend/README.md` govern collaboration and evidence. The design guidance here never authorizes backend changes or a premature commit/push.
 
 ## Design workflow
 

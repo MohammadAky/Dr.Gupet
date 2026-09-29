@@ -1,769 +1,238 @@
-# Pet System — Backend (MVP v1)
+# Dr. Gupet — دکتر گوپت
 
-> **خلاصه فارسی (برای انسان‌ها):** این README نقشه‌ی راه ساخت بکند MVP است، طوری نوشته شده که یک مدل هوش مصنوعی ضعیف‌تر هم بتواند فاز به فاز و بدون حدس زدن جلو برود. متن فنی عمداً انگلیسی است تا مدل‌ها دقیق‌تر اجرا کنند؛ پیام‌های کاربرنما (خطاها و ...) فارسی هستند. اگر نسخه فارسی کامل خواستید، از همین فایل ترجمه می‌شود.
+> پلتفرم فروش و سلامت حیوانات خانگی — غذای خشک، پروفایل پت، پیشنهاد هوشمند محصول، اطلاعات دارو/داروخانه و فهرست کلینیک‌ها.
+>
+> مخزن: [MohammadAky/Dr.Gupet](https://github.com/MohammadAky/Dr.Gupet) · شاخه: `main`
 
----
-
-## 0. How to use this document
-
-This README is the **single source of truth** for building the backend.
-
-- If you are an **AI agent**: read sections 1–7 completely before writing any code. Then work on **one phase at a time** (section 8). Never skip ahead.
-- If you are a **human**: use section 14 (prompt template) to hand one phase at a time to an AI model, then review the result against the phase's *Acceptance criteria*.
-
-The project skeleton already exists: **almost every file is an empty placeholder**. Your job is to **fill the existing files**, not to invent a new structure.
+**خلاصه فارسی:** این README دروازهٔ ورود به پروژه است: معرفی محصول، استک فنی، راه‌اندازی، قراردادهای کلیدی و **مسیر توسعه** (وضعیت فازها و گام‌های بعدی). مرجع فنی کامل بک‌اند در [`backend/README.md`](backend/README.md) و راهنمای فرانت‌اند در [`frontend/README.md`](frontend/README.md) است.
 
 ---
 
-## 1. Product scope (MVP v1)
+## ۱. معرفی محصول
 
-A pet platform whose first release is centered on **selling dry pet food** (mainly dog and cat).
+Dr. Gupet یک فروشگاه اینترنتیِ ویژهٔ حیوانات خانگی (عمدتاً سگ و گربه) با قابلیت‌های سلامت‌محور است. محور اصلی MVP اول، **فروش غذای خشک** است؛ در کنار آن، صاحب حیوان می‌تواند پت‌هایش را ثبت کند، بر اساس پروفایل هر پت پیشنهاد محصول بگیرد، سفارش و پرداخت آنلاین انجام دهد و از اطلاعات دارو، داروخانه و کلینیک‌ها به‌صورت اطلاع‌رسانی بهره ببرد.
 
-**In scope**
+نسخهٔ فعلی فقط **پنل کاربر (User)** را شامل می‌شود. داده‌های کاتالوگ (برند، محصول، داروخانه، دارو) از طریق seed و ابزار ادمین وارد می‌شوند، نه API اختصاصی ادمین.
 
-| Area | What the MVP does |
+## ۲. امکانات MVP
+
+| حوزه | قابلیت |
 |---|---|
-| Auth | Phone number + OTP login (no passwords) |
-| Profile | Edit profile, manage addresses |
-| Pets | User registers pets (type, breed, birth date, gender, neutered, weight, allergies, diet needs) |
-| Shop | Browse/filter/search products, product detail with weight variants, favorites |
-| Recommendations | "Products suitable for my pet" based on the pet's profile |
-| Cart & checkout | Cart, coupon, order, online payment, order tracking |
-| Medicines | **Information only**: list medicines, and show which pharmacies carry each medicine. **No price, no stock, no ordering.** |
+| احراز هویت | ورود با شماره موبایل + OTP (بدون رمز عبور)، JWT با access/refresh |
+| پروفایل | ویرایش پروفایل، مدیریت آدرس‌ها (حداکثر ۱۰ آدرس، آدرس پیش‌فرض) |
+| پت‌ها | ثبت و مدیریت حیوان خانگی (نوع، نژاد، تولد، جنسیت، عقیم‌بودن، وزن، آلرژی‌ها، نیازهای غذایی) |
+| فروشگاه | مرور، فیلتر و جستجوی محصولات؛ جزئیات محصول با واریانت‌های وزنی؛ علاقه‌مندی‌ها |
+| پیشنهاد | «محصولات مناسب پت من» بر اساس پروفایل پت |
+| سبد و سفارش | سبد خرید، کد تخفیف، ثبت سفارش، پرداخت آنلاین، پیگیری سفارش |
+| دارو و داروخانه | **فقط اطلاع‌رسانی:** فهرست داروها و داروخانه‌های حاضر — بدون قیمت، موجودی و سفارش |
+| کلینیک‌ها | فهرست عمومی کلینیک‌ها + جستجو/فیلتر (نوبت‌دهی خارج از MVP) |
 
-**Only the USER panel API is built now.** Catalog data (brands, products, pharmacies, medicines) is entered by admins through the seed script / an off-the-shelf admin tool (see Phase 14), **not** through custom admin endpoints.
+**خارج از MVP (ساخته نشود):** دامپزشک/نوبت‌دهی، پرونده پزشکی و واکسیناسیون، نسخه، پانسیون، مربی، سرپرستی، گفتگو، اشتراک، نظرات، بلاگ، استعلام هویت، موجودی/قیمت داروخانه.
 
-**Out of scope for MVP (do NOT build, do NOT add tables for):**
-vets, clinics, appointments, medical records, vaccinations, prescriptions, boarding, pet sitters, trainers, adoption, chat/messages, subscriptions, reviews/reports, refunds, blog, identity verification, pharmacy inventory/prices.
+## ۳. استک فنی
 
----
-
-## 2. Tech stack
-
-| Concern | Choice |
+| بخش | انتخاب |
 |---|---|
-| Framework | NestJS (TypeScript, strict mode) |
-| Database | PostgreSQL 16 |
-| ORM | Prisma |
-| Cache / OTP / refresh tokens | Redis 7 via `ioredis` |
-| Auth | JWT (access + refresh) with `@nestjs/jwt` and `passport-jwt` |
-| Validation | `class-validator` + `class-transformer` |
-| API docs | `@nestjs/swagger` (served at `/docs`, disabled in production) |
-| Rate limiting | `@nestjs/throttler` |
-| Scheduled jobs | `@nestjs/schedule` |
-| Security | `helmet`, CORS whitelist |
-| Tests | Jest + Supertest |
+| بک‌اند | NestJS 10 (TypeScript strict)، PostgreSQL 16، Prisma 5، Redis 7 (OTP/کش/refresh)، JWT، Swagger در `/docs`، helmet، throttler |
+| پرداخت | درگاه Zarinpal + درایور `mock` برای توسعه |
+| پیامک | درایور `console` برای توسعه + درایورهای kavenegar / smsir |
+| فرانت‌اند | React 19 + Vite، TypeScript strict، React Router 7، TanStack Query 5، Zod، Tailwind 4، Vitest |
+| رابط کاربری | فارسی/راست‌چین (RTL)، فونت وزیرمتن (Self-hosted)، تاریخ جلالی در نمایش |
+| زیرساخت | Docker Compose (Postgres + Redis)، Dockerfile چندمرحله‌ای بک‌اند |
 
-**Dependency rule:** install packages with `npm install <name>` **without version numbers** and commit the lockfile. Do not invent version numbers. Do not add libraries that are not listed here without a written reason in `docs/DECISIONS.md`.
-
----
-
-## 3. Golden rules for AI agents (read carefully)
-
-1. **Do not modify `prisma/schema.prisma`** unless the task explicitly says so. If you believe the schema needs a change, STOP and write the request in `docs/SCHEMA_CHANGE_REQUESTS.md` (what, why, impact), then continue with the rest of the task.
-2. **Only fill the files that already exist.** If you truly need a new file, keep it inside the same module folder and mention it in your final summary.
-3. **One phase at a time.** Do not begin phase N+1 until phase N's *Acceptance criteria* pass.
-4. After every phase run: `npm run build`, `npm run lint`, `npm test`. All must pass. Fix errors; do not silence them with `any`, `@ts-ignore` or `eslint-disable`.
-5. **Controllers are thin.** They only: validate input (DTO), call one service method, return the result. All business logic lives in services.
-6. **Only `PrismaService` talks to the database.** Never create a second Prisma client.
-7. **Never trust the client for money.** Prices, totals, discounts and shipping are always computed on the server from database values.
-8. **Money is an integer** in a single unit (Toman). Never use `float`/`Decimal` for money. Never divide money without `Math.round`.
-9. **Ownership check on every user-owned resource:** always include `userId` in the `where` clause. If not found or not owned, return `404` (not `403`).
-10. **Soft delete:** `User` and `Pet` have `deletedAt`. Every query on them must filter `deletedAt: null`.
-11. **Do not leak internals:** never return `role`/`status` of other users, stack traces, Prisma error messages, or raw DB rows with unneeded fields. Use `select` or response DTOs.
-12. **Language:** code, identifiers, comments and API field names are English. **User-facing error `message` strings are Persian.** Every error also carries a stable English `code` (see 6.3).
-13. **No secrets in code.** Everything comes from environment variables validated at startup (`env.validation.ts`).
-14. **If something is ambiguous**, choose the simplest option consistent with this README and leave a comment `// TODO(decision): ...`. Do not ask for clarification in the middle of code, and do not invent extra features.
-15. **Write tests for logic that handles money, stock, coupons, OTP and recommendations.** These are the risky parts.
-
----
-
-## 4. Repository layout
+## ۴. ساختار مخزن
 
 ```text
-backend/
-├── prisma/
-│   ├── schema.prisma          # DO NOT EDIT (see rule 1)
-│   ├── seed.ts                # idempotent seed (upsert by slug/unique fields)
-│   └── migrations/
-├── src/
-│   ├── main.ts
-│   ├── app.module.ts
-│   ├── config/                # app, jwt, redis, sms, payment configs + env.validation.ts
-│   ├── common/
-│   │   ├── decorators/        # @CurrentUser, @Roles, @Public
-│   │   ├── guards/            # JwtAuthGuard (global), RolesGuard
-│   │   ├── filters/           # AllExceptionsFilter, PrismaExceptionFilter
-│   │   ├── interceptors/      # TransformResponseInterceptor
-│   │   ├── dto/               # PaginationQueryDto, PaginatedResponseDto
-│   │   ├── utils/             # money, slugify, order-number, phone
-│   │   ├── constants/         # business constants (limits, thresholds)
-│   │   └── interfaces/        # JwtPayload
-│   ├── prisma/                # PrismaModule (global), PrismaService
-│   ├── redis/                 # RedisModule (global), RedisService
-│   ├── sms/                   # SmsService (driver: console | real provider)
-│   ├── upload/                # image upload
-│   ├── health/                # GET /health
-│   ├── admin/                 # placeholder for admin tooling (Phase 14)
-│   └── modules/
-│       ├── auth/              # OTP + JWT
-│       ├── users/
-│       ├── addresses/
-│       ├── pet-types/
-│       ├── breeds/
-│       ├── pets/
-│       ├── tags/
-│       ├── brands/
-│       ├── categories/
-│       ├── products/          # + product-variants.service, products-recommendation.service
-│       ├── favorites/
-│       ├── cart/
-│       ├── coupons/
-│       ├── orders/            # + order-stock.service
-│       ├── payments/          # + gateways/, payments.callback.controller
-│       ├── medicines/
-│       └── pharmacies/
-└── test/
+Dr.Gupet/
+├── README.md                # همین فایل: معرفی، راه‌اندازی، مسیر توسعه
+├── AGENTS.md                # راهنمای همکاری برای ایجنت‌های هوش مصنوعی
+├── backend/                 # API (NestJS + Prisma)
+│   ├── README.md            # مرجع فنی بک‌اند: قراردادها، قواعد کسب‌وکار، API
+│   ├── docs/                # CHANGELOG، چک‌لیست تست، درخواست‌های تغییر اسکیما
+│   ├── prisma/              # schema.prisma + seed.ts + migrations
+│   └── src/                 # ماژول‌های auth, users, pets, products, orders, ...
+└── frontend/                # وب‌اپ کاربر (React + Vite)
+    ├── README.md            # راهنمای اجرا و بررسی فرانت‌اند
+    ├── docs/                # DECISIONS (تصمیم‌های فنی)، DESIGN_SYSTEM (برند و دارایی‌ها)
+    └── src/                 # صفحات، کامپوننت‌ها، api client، استایل‌ها
 ```
 
-Each feature module has: `<name>.module.ts`, `<name>.controller.ts`, `<name>.service.ts`, and a `dto/` folder.
+## ۵. راه‌اندازی سریع
 
----
+**پیش‌نیازها:** Node.js 20+، npm، Docker (برای Postgres و Redis).
 
-## 5. Domain model cheat-sheet
+### ۵.۱ بک‌اند
 
-The authoritative definition is `prisma/schema.prisma`. This is a quick map so you do not have to guess relationships.
-
-```text
-User 1─* Address
-User 1─* Pet ──* PetTag *──1 Tag(type: ALLERGEN | DIET)
-Pet *─1 PetType ; Pet *─0..1 Breed ; Breed *─1 PetType
-User 1─1 Cart 1─* CartItem *─1 ProductVariant
-User 1─* Favorite *─1 Product
-Brand 1─* Product *─1 ProductCategory ; Product *─1 PetType
-Product 1─* ProductVariant   (one row per weight: price, compareAtPrice, stock, sku)
-Product 1─* ProductImage
-Product *─* Tag via ProductTag(kind: CONTAINS | SUITABLE_FOR)
-User 1─* Order 1─* OrderItem *─1 ProductVariant   (OrderItem is a SNAPSHOT)
-Order 1─* Payment
-Order 0..1─1 CouponRedemption *─1 Coupon
-Medicine *─* PetType ; Medicine *─* Pharmacy via PharmacyMedicine(note, lastConfirmedAt)
+```bash
+cd backend
+docker compose up -d              # PostgreSQL 16 + Redis 7
+npm ci
+cp .env.example .env              # مقادیر را برای محیط خود تنظیم کنید
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed               # داده‌های نمونه (idempotent)
+npm run start:dev                 # API روی http://localhost:3000/api/v1
 ```
 
-Key modelling decisions (do not "improve" these):
+- Swagger: `http://localhost:3000/docs` (فقط در محیط غیر production)
+- Health: `GET /api/v1/health`
+- ثبت‌نام ادمین از `ADMIN_SEED_PHONE` در `.env` انجام می‌شود.
 
-- **Product vs ProductVariant:** name, brand, category, life stage, etc. live on `Product`. **Weight, price, stock and SKU live on `ProductVariant`.** Cart and orders reference variants.
-- **Tags:** one `Tag` table with `type`. `ALLERGEN` tags describe ingredients pets may react to; `DIET` tags describe needs (grain-free, weight control, ...). On products, `ProductTag.kind = CONTAINS` is only valid for `ALLERGEN` tags and `SUITABLE_FOR` only for `DIET` tags — **enforced in the service layer**, not by the database.
-- **Cart never stores prices.** Totals are computed from current variant prices.
-- **OrderItem and `Order.addressSnapshot` are snapshots.** Later edits to products or addresses must not change past orders.
-- **Delivery data lives on `Order`** (`shippingMethod`, `trackingCode`, `shippedAt`, `deliveredAt`).
-- **Pharmacy ↔ Medicine has no price or stock.** Only "this pharmacy reportedly carries this medicine" plus `lastConfirmedAt`.
+متغیرهای محیطی کامل در [`backend/README.md`](backend/README.md#۵-محیط-اجرایی) و نمونهٔ آن در `backend/.env.example` مستند شده‌اند. رمز، توکن و کلید هرگز در کد یا مخزن قرار نمی‌گیرند.
 
----
+### ۵.۲ فرانت‌اند
 
-## 6. Global conventions
-
-### 6.1 API basics
-
-- Global prefix: `/api/v1`. Swagger at `/docs` (only when `NODE_ENV !== 'production'`).
-- Plural, kebab-case resource names: `/pet-types`, `/cart/items`.
-- Dates are ISO-8601 UTC strings. Jalali conversion is the frontend's job.
-- Auth: `Authorization: Bearer <accessToken>`. **All routes require auth by default** (global `JwtAuthGuard`). Public routes are marked with `@Public()`.
-
-### 6.2 Response envelope
-
-Success:
-
-```json
-{ "success": true, "data": { }, "meta": { "page": 1, "limit": 20, "total": 134, "totalPages": 7 } }
+```bash
+cd frontend
+npm ci
+cp .env.example .env              # VITE_API_BASE_URL=http://localhost:3000/api/v1
+npm run dev                       # http://localhost:5173
 ```
 
-`meta` is present only for paginated lists.
+جزئیات (پورت‌ها، پیش‌نمایش production، نکات حریم خصوصی) در [`frontend/README.md`](frontend/README.md).
 
-Error:
+### ۵.۳ بررسی‌ها و تست
 
-```json
-{ "success": false, "statusCode": 400, "code": "VALIDATION_ERROR", "message": "اطلاعات ارسالی معتبر نیست", "details": [ { "field": "phone", "message": "..." } ] }
+```bash
+# بک‌اند
+cd backend && npm run build && npm run lint && npm test && npm run test:e2e
+
+# فرانت‌اند
+cd frontend && npm run lint && npm run typecheck && npm run build && npm test
 ```
 
-Implement with `TransformResponseInterceptor` (success) and `AllExceptionsFilter` + `PrismaExceptionFilter` (errors; map Prisma `P2002` → 409 `CONFLICT`, `P2025` → 404 `NOT_FOUND`).
+چک‌لیست تست دستی/پذیرش API در [`backend/docs/TEST_CHECKLIST.md`](backend/docs/TEST_CHECKLIST.md) است.
 
-### 6.3 Error codes
+## ۶. قراردادهای کلیدی
 
-`VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `LIMIT_REACHED`, `OTP_INVALID`, `OTP_EXPIRED`, `OTP_RATE_LIMITED`, `USER_BLOCKED`, `VARIANT_UNAVAILABLE`, `OUT_OF_STOCK`, `CART_EMPTY`, `COUPON_INVALID`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_AMOUNT`, `ORDER_INVALID_STATE`, `PAYMENT_FAILED`, `INTERNAL_ERROR`.
+- **پوشش پاسخ (Envelope):** موفق → `{ "success": true, "data": ... }` (با `meta` صفحه‌بندی برای لیست‌ها)؛ خطا → `{ "success": false, "statusCode": 400, "code": "...", "message": "..." }`.
+- **پیام خطا فارسی، کد خطا انگلیسی و پایدار** (مثل `OTP_INVALID`، `OUT_OF_STOCK`). فهرست کامل کدها در [`backend/README.md`](backend/README.md).
+- **پول:** مبلغ همیشه **تومان و عدد صحیح**؛ هرگز float؛ محاسبهٔ مبلغ فقط سمت سرور از دیتابیس.
+- **مالکیت:** همهٔ کوئری‌های دادهٔ کاربر باید `userId` داشته باشند؛ نبود یا عدم مالکیت → `404` (نه `403`).
+- **حذف نرم:** کوئری‌ای روی `User` و `Pet` باید `deletedAt: null` داشته باشد.
+- **زبان:** شناسه‌ها و کد انگلیسی؛ متن‌های کاربرنما فارسی؛ تاریخ‌ها در API میلادی/ISO و تبدیل جلالی وظیفهٔ فرانت‌اند.
+- **متن فارسی:** نرمال‌سازی `ي→ی`، `ك→ک` و ارقام فارسی/عربی در جستجو و شماره موبایل (`09XXXXXXXXX`).
+- **فرانت‌اند:** همهٔ فراخوانی‌های شبکه فقط از `frontend/src/api/client.ts`؛ توکن دسترسی فقط در حافظهٔ RAM؛ RTL با CSS logical properties.
 
-Create a small `AppException(code, message, statusCode)` helper in `common/` and use it everywhere instead of bare `HttpException`.
+## ۷. نمای API (پیشوند `/api/v1`)
 
-### 6.4 Pagination
+| Method | Path | Auth | Method | Path | Auth |
+|---|---|---|---|---|---|
+| GET | `/health` | عمومی | GET/DELETE | `/cart` | کاربر |
+| POST | `/auth/otp/request` | عمومی | POST | `/cart/items` | کاربر |
+| POST | `/auth/otp/verify` | عمومی | PATCH/DELETE | `/cart/items/:id` | کاربر |
+| POST | `/auth/refresh` | عمومی | POST | `/coupons/validate` | کاربر |
+| POST | `/auth/logout` | کاربر | POST/GET | `/orders` | کاربر |
+| GET/PATCH | `/users/me` | کاربر | GET | `/orders/:id` | کاربر |
+| GET/POST | `/addresses` | کاربر | POST | `/orders/:id/cancel` | کاربر |
+| PATCH/DELETE | `/addresses/:id` | کاربر | POST | `/payments/start` | کاربر |
+| PATCH | `/addresses/:id/default` | کاربر | GET | `/payments/callback` | عمومی |
+| POST | `/upload/image` | کاربر | GET | `/medicines`, `/medicines/:id` | عمومی |
+| GET | `/pet-types`, `/pet-types/:id/breeds`, `/tags` | عمومی | GET | `/pharmacies`, `/pharmacies/:id` | عمومی |
+| GET/POST | `/pets` | کاربر | GET | `/clinics`, `/clinics/:id` | عمومی |
+| GET/PATCH/DELETE | `/pets/:id` | کاربر | GET | `/brands`, `/categories` | عمومی |
+| PUT | `/pets/:id/tags` | کاربر | GET | `/products`, `/products/:slug` | عمومی |
+| GET | `/favorites` | کاربر | GET | `/products/recommendations` | کاربر |
+| PUT/DELETE | `/favorites/:productId` | کاربر | | | |
 
-`PaginationQueryDto`: `page` (default 1, min 1), `limit` (default 20, min 1, **max 50**). Use `skip = (page-1)*limit`, `take = limit`. Always run `count` and `findMany` in parallel (`Promise.all`).
+قراردادهای کامل پاسخ، قواعد کسب‌وکار (تسویهٔ سفارش، کوپن، پرداخت، پیشنهاد) و مدل دامنه در [`backend/README.md`](backend/README.md) آمده است.
 
-### 6.5 Validation
+## ۸. مسیر توسعه
 
-Global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`. Every DTO field has `class-validator` decorators and `@ApiProperty`.
+> وضعیت‌ها بر اساس آخرین بازبینی (۲۰۲۶-۰۹-۲۷) ثبت شده‌اند. نمادها: ✅ پیاده‌سازی‌شده · 🚧 در جریان (پذیرش نهایی باز) · ⬜ در صف.
 
-### 6.6 Persian text & phone handling (important for Iran)
+### ۸.۱ بک‌اند — فازهای ۰ تا ۱۵ (MVP v1)
 
-- `phone.util.ts`: normalize input to `09XXXXXXXXX`. Accept Persian/Arabic digits (`۰-۹`, `٠-٩`), `+98`, `0098`, `98` prefixes, and spaces/dashes. Validate with `/^09\d{9}$/` after normalization.
-- Normalize Arabic letters in **search input and when saving names**: `ي → ی`, `ك → ک`, and strip zero-width/tatweel characters. Put this in `common/utils/` (e.g. `normalizeFa()`), reuse it for product/medicine/pharmacy search.
-- `slugify.util.ts`: keep Persian letters, replace whitespace with `-`, remove punctuation, lower-case Latin letters. Slugs are stored, unique, and never regenerated after creation.
-
-### 6.7 Money
-
-- Unit: **Toman**, stored as `Int`.
-- `money.util.ts` exposes `tomanToRial()` and `rialToToman()` (payment gateways may need Rial). Only the payment gateway layer calls these.
-
-### 6.8 Naming & style
-
-- Files: `kebab-case.ts`. Classes: `PascalCase`. DTO classes end with `Dto`. Enums come from `@prisma/client` — do not redefine them.
-- One responsibility per service method; keep methods under ~40 lines; extract helpers.
-
----
-
-## 7. Environment & bootstrap
-
-### 7.1 Environment variables (`.env.example`)
-
-```dotenv
-NODE_ENV=development
-PORT=3000
-PUBLIC_BASE_URL=http://localhost:3000
-CORS_ORIGINS=http://localhost:5173
-
-DATABASE_URL=postgresql://pet:pet@localhost:5432/pet_db?schema=public
-REDIS_URL=redis://localhost:6379
-
-JWT_ACCESS_SECRET=change-me-access
-JWT_REFRESH_SECRET=change-me-refresh
-JWT_ACCESS_TTL=15m
-JWT_REFRESH_TTL=30d
-
-OTP_TTL_SECONDS=120
-OTP_RESEND_COOLDOWN_SECONDS=60
-OTP_MAX_PER_HOUR=5
-OTP_MAX_VERIFY_ATTEMPTS=5
-OTP_DEV_CODE=12345            # honored ONLY when NODE_ENV != production
-
-SMS_DRIVER=console            # console | kavenegar | smsir
-SMS_API_KEY=
-
-PAYMENT_DRIVER=mock           # mock | zarinpal
-ZARINPAL_MERCHANT_ID=
-ZARINPAL_SANDBOX=true
-PAYMENT_CALLBACK_URL=http://localhost:3000/api/v1/payments/callback
-FRONTEND_PAYMENT_RESULT_URL=http://localhost:5173/payment/result
-
-UPLOAD_DIR=./uploads
-UPLOAD_MAX_MB=5
-
-SHIPPING_FLAT_COST=50000
-FREE_SHIPPING_THRESHOLD=1500000
-ORDER_EXPIRE_MINUTES=30
-
-ADMIN_SEED_PHONE=09120000000
-```
-
-`env.validation.ts` must fail fast at startup when a required variable is missing or invalid.
-
-### 7.2 Local services
-
-`docker-compose.yml` runs `postgres:16` (db `pet_db`, user/password `pet`) and `redis:7`. Start with `docker compose up -d`.
-
-### 7.3 npm scripts
-
-`build`, `start`, `start:dev`, `start:prod`, `lint`, `test`, `test:e2e`, `prisma:generate`, `prisma:migrate` (`prisma migrate dev`), `prisma:seed`. Follow the installed Prisma version's official docs for how to register the seed command.
-
----
-
-## 8. Development phases
-
-Each phase lists **Goal → Files → Tasks → Endpoints → Acceptance criteria**. Extend `prisma/seed.ts` incrementally at the end of every data-related phase so the app is testable by hand.
-
-### Phase 0 — Bootstrap
-
-**Goal:** an empty NestJS app that boots and connects to nothing yet.
-
-**Files:** `package.json`, `tsconfig*.json`, `nest-cli.json`, `eslint.config.mjs`, `.prettierrc`, `.gitignore`, `.env.example`, `docker-compose.yml`, `src/main.ts`, `src/app.module.ts`, `src/config/*`, `src/health/*`.
-
-**Tasks**
-1. Install dependencies listed in section 2.
-2. `ConfigModule` global, load `config/*.ts`, validate with `env.validation.ts`.
-3. `main.ts`: prefix `api/v1`, global `ValidationPipe`, `helmet`, CORS from `CORS_ORIGINS`, Swagger (non-production), `enableShutdownHooks()`, static serving of `UPLOAD_DIR` at `/uploads`.
-4. `HealthController`: `GET /health` → `{ status: "ok" }` (`@Public`).
-
-**Acceptance:** `npm run start:dev` boots; `GET /api/v1/health` returns success envelope (after Phase 1's interceptor exists); lint/build pass.
-
-### Phase 1 — Infrastructure & common code
-
-**Goal:** everything other modules depend on.
-
-**Files:** `src/prisma/*`, `src/redis/*`, `src/common/**`, `src/app.module.ts`.
-
-**Tasks**
-1. `PrismaModule` (`@Global`), `PrismaService` (connect on init, disconnect on destroy).
-2. `RedisModule` (`@Global`), `RedisService` wrapping `ioredis` with `get/set(ttl)/del/incr/expire/ttl/exists`.
-3. Decorators: `@Public()`, `@Roles(...roles)`, `@CurrentUser()` (returns `{ id, role }`).
-4. Guards: `JwtAuthGuard` (registered globally via `APP_GUARD`, skips `@Public`), `RolesGuard`.
-5. `TransformResponseInterceptor`, `AllExceptionsFilter`, `PrismaExceptionFilter`, `AppException`.
-6. `PaginationQueryDto`, `PaginatedResponseDto`, helper `buildMeta(page, limit, total)`.
-7. Utils: `phone`, `slugify`, `money`, `order-number` (format `PT-YYMMDD-XXXXXX`, 6 random uppercase alphanumerics; retry on unique conflict), `normalizeFa`.
-8. `common/constants/index.ts`: put **all** business constants here (see 9.6).
-9. Register `PrismaModule`, `RedisModule`, `ThrottlerModule` (default 100 req/min/IP), `ScheduleModule` in `AppModule`.
-
-**Acceptance:** unit tests for `phone`, `slugify`, `normalizeFa`, `order-number`; unknown route returns the error envelope; Prisma connects to the docker DB after `prisma migrate dev --name init`.
-
-### Phase 2 — Auth (OTP + JWT)
-
-**Goal:** phone-based login.
-
-**Files:** `src/modules/auth/**`, `src/sms/*`, `src/config/jwt.config.ts`, `sms.config.ts`.
-
-**OTP rules (stored in Redis, never in Postgres)**
-- Generate a 5-digit numeric code with `crypto.randomInt`. In non-production with `OTP_DEV_CODE` set, use that fixed code.
-- Store **a hash** (HMAC-SHA256 with `JWT_ACCESS_SECRET` as key) under `otp:<phone>` with TTL `OTP_TTL_SECONDS`.
-- Cooldown key `otp:cooldown:<phone>` (TTL `OTP_RESEND_COOLDOWN_SECONDS`); hourly counter `otp:count:<phone>` (TTL 3600, max `OTP_MAX_PER_HOUR`). Violations → `OTP_RATE_LIMITED` (429).
-- Attempts counter `otp:attempts:<phone>`; after `OTP_MAX_VERIFY_ATTEMPTS` failures delete the OTP. Wrong code → `OTP_INVALID`; missing/expired → `OTP_EXPIRED`.
-- Compare hashes with `crypto.timingSafeEqual`.
-- On success delete all `otp:*` keys for that phone.
-
-**Token rules**
-- Access token payload: `{ sub: userId, role }`, TTL `JWT_ACCESS_TTL`.
-- Refresh token payload: `{ sub, jti }`, signed with `JWT_REFRESH_SECRET`, TTL `JWT_REFRESH_TTL`. Store `refresh:<userId>:<jti>` in Redis (value = `1`, TTL = refresh TTL). **No refresh-token table in Postgres.**
-- Refresh = verify signature, check Redis key exists, **rotate** (delete old jti, issue new pair).
-- Logout = delete the jti key.
-- `JwtStrategy.validate` loads the user (`deletedAt: null`); if `status = BLOCKED` → `USER_BLOCKED` (403).
-
-**SmsService:** interface `sendOtp(phone, code)` and `sendText(phone, text)`. Implement the `console` driver (logs to stdout, dev only). Leave real providers (`kavenegar`, `smsir`) as a separate class behind the same interface; picking the driver via `SMS_DRIVER`. Never log OTP codes when `NODE_ENV=production`.
-
-**Endpoints**
-
-| Method | Path | Auth | Body → Result |
-|---|---|---|---|
-| POST | `/auth/otp/request` | Public | `{ phone }` → `{ expiresIn }` |
-| POST | `/auth/otp/verify` | Public | `{ phone, code }` → `{ accessToken, refreshToken, user, isNewUser }` |
-| POST | `/auth/refresh` | Public | `{ refreshToken }` → `{ accessToken, refreshToken }` |
-| POST | `/auth/logout` | User | `{ refreshToken }` → `{ ok: true }` |
-
-`verify` **upserts** the user by phone, sets `isPhoneVerified = true`, and creates an empty `Cart` for new users. Apply a stricter throttle (e.g. 10/min) to the two OTP endpoints.
-
-**Acceptance:** unit tests for OtpService (cooldown, hourly cap, wrong code, attempts cap, expiry); e2e: request → verify → call a protected route → refresh → logout → refresh fails.
-
-### Phase 3 — Users & addresses
-
-**Files:** `src/modules/users/**`, `src/modules/addresses/**`.
-
-| Method | Path | Notes |
+| فاز | عنوان | وضعیت |
 |---|---|---|
-| GET | `/users/me` | current profile |
-| PATCH | `/users/me` | `firstName`, `lastName`, `avatar` only. `phone` and `role` are **not** editable |
-| GET | `/addresses` | list mine, default first |
-| POST | `/addresses` | max `MAX_ADDRESSES_PER_USER`; the first one becomes default |
-| PATCH | `/addresses/:id` | ownership check |
-| PATCH | `/addresses/:id/default` | set default; unset others **in one transaction** |
-| DELETE | `/addresses/:id` | if it was default, promote the most recent remaining address |
+| 0 | Bootstrap (NestJS، Docker، اعتبارسنجی env) | ✅ |
+| 1 | زیرساخت و کد مشترک (Prisma، Redis، Guardها، Filterها) | ✅ |
+| 2 | احراز هویت (OTP + JWT) | ✅ |
+| 3 | کاربران و آدرس‌ها | ✅ |
+| 4 | آپلود و داده‌های مرجع (pet-types، breeds، tags) | ✅ |
+| 5 | پت‌ها | ✅ |
+| 6 | کاتالوگ (برند، دسته، محصول و واریانت‌ها) | ✅ |
+| 7 | پیشنهاد محصول | ✅ |
+| 8 | علاقه‌مندی‌ها | ✅ |
+| 9 | سبد خرید | ✅ |
+| 10 | کوپن‌ها | ✅ |
+| 11 | سفارش و تسویه | ✅ |
+| 12 | پرداخت (Zarinpal + mock) | ✅ |
+| 13 | دارو و داروخانه (فقط اطلاع‌رسانی) | ✅ |
+| 14 | Seed و ابزار ادمین | ✅ |
+| 15 | Hardening و تحویل (Dockerfile، تست E2E) | ✅ |
+| + | ماژول کلینیک‌ها (اضافه‌شده پس از MVP) | ✅ |
 
-**Acceptance:** cannot touch another user's address (404); exactly one default address at all times; tests for default logic.
+همهٔ فازها پیاده‌سازی شده‌اند؛ **پذیرش زنده (Live acceptance) و رفع باگ‌های ثبت‌شده در Issues باز است** — به «گام‌های بعدی» مراجعه کنید.
 
-### Phase 4 — Upload & reference data
+### ۸.۲ فرانت‌اند — فازهای F0 تا F11
 
-**Files:** `src/upload/**`, `src/modules/pet-types/**`, `src/modules/breeds/**`, `src/modules/tags/**`.
+| فاز | عنوان | وضعیت |
+|---|---|---|
+| F0 | Bootstrap و بنیادها (Vite، مسیرها، API client) | 🚧 |
+| F1 | سیستم طراحی و شِل برنامه (هدر، فوتر، ناوبری موبایل) | 🚧 |
+| F2 | احراز هویت و نشست (OTP، refresh، خروج) | 🚧 |
+| F3 | پروفایل و آدرس‌ها | 🚧 |
+| F4 | پت‌ها | ⬜ |
+| F5 | کاتالوگ (خانه، لیست، جزئیات) | 🚧 |
+| F6 | پیشنهادها | ⬜ |
+| F7 | علاقه‌مندی‌ها | ⬜ |
+| F8 | سبد خرید و کوپن‌ها | ⬜ |
+| F9 | تسویه، پرداخت و سفارش‌ها | ⬜ |
+| F10 | دارو، داروخانه و کلینیک‌ها (فقط اطلاع‌رسانی) | 🚧 |
+| F11 | کیفیت، کارایی و تحویل | ⬜ |
 
-**Upload:** `POST /upload/image` (User, `multipart/form-data`, field `file`). Accept `image/jpeg|png|webp` only, max `UPLOAD_MAX_MB`, verify the real file type (magic bytes, not just the extension), store under `UPLOAD_DIR` with a random filename, return `{ url }` (`PUBLIC_BASE_URL/uploads/...`). Hide storage behind an `UploadService` so it can move to S3/MinIO later. In DTOs that accept image URLs, validate that the URL starts with `PUBLIC_BASE_URL`.
+فازهای 🚧 کد قابل استفاده دارند اما پذیرش نهایی‌شان (به‌ویژه با بک‌اند زنده) تأیید نشده است. مسیرهای اصلی (خانه، محصولات، دارو، داروخانه، کلینیک، ورود، سبد مهمان) قابل پیش‌نمایش محلی هستند.
 
-**Reference data (all read-only, `@Public`)**
+### ۸.۳ گام‌های بعدی (اولویت‌دار)
 
-| Method | Path |
+1. **راه‌اندازی بک‌اند زنده** و اجرای پذیرش دستی [`backend/docs/TEST_CHECKLIST.md`](backend/docs/TEST_CHECKLIST.md) + تست‌های E2E.
+2. **رفع ایسیوهای باز** ([#3](https://github.com/MohammadAky/Dr.Gupet/issues/3) تا [#6](https://github.com/MohammadAky/Dr.Gupet/issues/6)): ناهماهنگی هویت JWT، فیلتر تگ محصول، پارس `is24h`، خواندن رکوردهای غیرفعال کلینیک در ادمین.
+3. **تکمیل فازهای فرانت‌اند:** F4 و F6–F9 و F11 از صفر؛ بستن پذیرش F0–F3، F5 و F10 با شاهد (تست زنده + بازبینی مالک).
+4. **دسترس‌پذیری:** بازبینی کامل صفحه‌خوان، زوم ۲۰۰٪، reduced-motion و کنتراست (تکمیل F1/F11).
+5. **آماده‌سازی انتشار عمومی:** افشای حریم خصوصی پایدار (هویت اپراتور، کوکی‌های backend/درگاه پرداخت، مدت نگهداری، حقوق کاربر)، تأیید حق انتشار لوگو، محیط استقرار و CORS/callback واقعی.
+
+### ۸.۴ بعد از MVP (آینده)
+
+پنل ادمین اختصاصی · دامپزشک/کلینیک/نوبت‌دهی · پرونده پزشکی و واکسیناسیون · نسخه · پنل داروخانه با موجودی و قیمت · پانسیون · سرپرستی و مربی · گفتگو · نظرات و گزارش · بلاگ · اشتراک · بازگشت وجه. معماری فعلی (`role` روی `User` و کلید `userId`) افزودن این ماژول‌ها را بدون بازنویسی ممکن می‌کند.
+
+## ۹. مستندات
+
+| فایل | موضوع |
 |---|---|
-| GET | `/pet-types` (active only) |
-| GET | `/pet-types/:id/breeds` |
-| GET | `/tags?type=ALLERGEN\|DIET` |
-
-Seed: pet types (dog `سگ`, cat `گربه`), ~10 breeds each, allergen tags (chicken, beef, fish, lamb, wheat/gluten, corn, soy, dairy, egg), diet tags (grain-free, weight-control, urinary-care, sensitive-digestion, hypoallergenic, skin-and-coat, joint-care, dental-care), each with Persian `name`.
-
-**Acceptance:** upload rejects a renamed `.exe`; tag endpoint filters by type.
-
-### Phase 5 — Pets
-
-**Files:** `src/modules/pets/**`.
-
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/pets` | mine, with type, breed, tags |
-| POST | `/pets` | max `MAX_PETS_PER_USER`; `breedId` must belong to the same `petTypeId` |
-| GET | `/pets/:id` | ownership check |
-| PATCH | `/pets/:id` | partial update |
-| PUT | `/pets/:id/tags` | body `{ allergenTagIds: number[], dietTagIds: number[] }`; **replace** the full set in a transaction; validate every id exists with the right `TagType` |
-| DELETE | `/pets/:id` | soft delete (`deletedAt`) |
-
-Validation: `birthDate` cannot be in the future; `weightKg` between 0.1 and 200. Expose a computed `lifeStage` in responses (see 9.5).
-
-**Acceptance:** tests for breed/type mismatch, tag replacement, ownership, soft delete.
-
-### Phase 6 — Catalog (brands, categories, products)
-
-**Files:** `src/modules/brands/**`, `categories/**`, `products/**` (except recommendation).
-
-**Endpoints (all `@Public`, read-only)**
-
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/brands` | active only |
-| GET | `/categories` | tree (parent → children), optional `petTypeId` |
-| GET | `/products` | list — see query params below |
-| GET | `/products/:slug` | detail with all active variants, images, brand, category, tags |
-
-`GET /products` query params: `page`, `limit`, `q` (name search, normalized with `normalizeFa`, case-insensitive `contains`), `petTypeId`, `categorySlug` (include child categories), `brandId`, `lifeStage`, `sizeClass`, `tagIds` (comma-separated; product must have **all** given `SUITABLE_FOR` tags), `minPrice`, `maxPrice` (match if **any** active variant is in range), `inStock` (any active variant with `stock > 0`), `sort` = `newest` (default) | `price_asc` | `price_desc`.
-
-List item shape (product card): `{ id, name, slug, brand: {id,name}, image, minPrice, compareAtPrice?, inStock, lifeStage, sizeClass }`.
-
-Rules:
-- Only `Product.isActive = true` **and** at least one active variant. Inactive variants are never returned.
-- **Price sorting uses `Product.minPrice`** (denormalized). `ProductVariantsService.recalculateMinPrice(productId)` sets it to the cheapest **active** variant price; call it after any variant create/update/deactivate and from the seed.
-- Never expose `stock` numbers to clients; expose only `inStock: boolean` (and optionally `lowStock` when `stock <= LOW_STOCK_THRESHOLD`).
-- Select only needed fields; avoid N+1 queries (use `include`/`select` on the first query).
-
-**Acceptance:** filter/sort tests; inactive products/variants never leak; pagination `meta` correct; response for a product with 3 variants lists them ordered by `weightGram`.
-
-### Phase 7 — Recommendations
-
-**Files:** `src/modules/products/products-recommendation.service.ts` (+ route in `products.controller.ts`).
-
-`GET /products/recommendations?petId=<id>&page&limit` (User). The pet must belong to the caller. Algorithm in section 9.5. Return the same product-card shape plus `matchedTags: string[]`.
-
-**Acceptance:** unit tests with fixtures: allergen exclusion, life stage matching, neuter rule, size rule, ranking by number of matching diet tags.
-
-### Phase 8 — Favorites
-
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/favorites` | paginated product cards |
-| PUT | `/favorites/:productId` | idempotent add |
-| DELETE | `/favorites/:productId` | idempotent remove |
-
-Adding a non-existent/inactive product → 404.
-
-### Phase 9 — Cart
-
-**Files:** `src/modules/cart/**`.
-
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/cart` | computed view (below) |
-| POST | `/cart/items` | `{ variantId, quantity }`; if the variant is already in the cart, **increase** quantity |
-| PATCH | `/cart/items/:id` | `{ quantity }` (1..`MAX_CART_ITEM_QTY`) |
-| DELETE | `/cart/items/:id` | remove one |
-| DELETE | `/cart` | clear |
-
-Rules:
-- Variant and its product must be active; otherwise `VARIANT_UNAVAILABLE`.
-- Quantity cannot exceed available `stock` → `OUT_OF_STOCK`.
-- `GET /cart` returns each item with **current** `unitPrice`, `total`, `available: boolean`, `stockProblem?: 'OUT_OF_STOCK' | 'INSUFFICIENT'`, plus `itemsTotal`. Do **not** silently delete unavailable items; flag them so the UI can show a warning.
-- Create the cart lazily if missing.
-
-**Acceptance:** tests for merge-on-add, stock cap, price change reflected immediately.
-
-### Phase 10 — Coupons
-
-**Files:** `src/modules/coupons/**`.
-
-`POST /coupons/validate` `{ code }` (User) → validates against the **current cart** and returns `{ code, discountAmount, finalAmount }` (preview only; nothing is recorded).
-
-`CouponsService.evaluate(code, userId, itemsTotal, tx?)` is the single reusable validation function used by both this endpoint and checkout. Rules in 9.3.
-
-**Acceptance:** unit tests for every failure code and both coupon types, including `maxDiscount` and `discount <= itemsTotal`.
-
-### Phase 11 — Orders & checkout
-
-**Files:** `src/modules/orders/**` (including `order-stock.service.ts`).
-
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/orders` | `{ addressId, couponCode?, note? }` — checkout from the current cart |
-| GET | `/orders` | mine, newest first, paginated |
-| GET | `/orders/:id` | mine, with items and latest payment status |
-| POST | `/orders/:id/cancel` | only while `PENDING_PAYMENT` |
-
-Checkout algorithm and status flow: **section 9.1 and 9.2**. Also implement the scheduled job (`@Cron` every 5 minutes) that cancels `PENDING_PAYMENT` orders older than `ORDER_EXPIRE_MINUTES`, restores stock, and deletes their `CouponRedemption`.
-
-**Acceptance:** tests for: happy path; empty cart; insufficient stock rolls back everything; coupon applied and recorded; two concurrent checkouts for the last unit → exactly one succeeds; cancel restores stock; expiry job.
-
-### Phase 12 — Payments
-
-**Files:** `src/modules/payments/**`.
-
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/payments/start` | User | `{ orderId }` → `{ paymentUrl }` |
-| GET | `/payments/callback` | Public | gateway redirects here (query: `Authority`, `Status` for Zarinpal) |
-
-Flow and idempotency rules: **section 9.4**. Implement `PaymentGateway` interface (`request`, `verify`) with two drivers chosen by `PAYMENT_DRIVER`:
-- `mock`: `request` returns a URL to the mock page/callback that always succeeds; used for local dev and tests.
-- `zarinpal`: uses the official REST API (sandbox when `ZARINPAL_SANDBOX=true`). **Read the current official Zarinpal documentation** for the exact endpoints, amount unit (Rial vs Toman) and status codes; do not rely on memory. Convert units only inside this gateway class.
-
-**Acceptance:** e2e with the mock driver: start → callback OK → order becomes `PAID`; callback called twice → still one successful payment, no double side effects; failed payment leaves order `PENDING_PAYMENT`; user cannot pay another user's order.
-
-### Phase 13 — Medicines & pharmacies (information only)
-
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/medicines` | Public | `q`, `petTypeId`, `requiresPrescription`, pagination |
-| GET | `/medicines/:id` | Public | detail + `pharmacies` list (query `city` optional) + `disclaimer` |
-| GET | `/pharmacies` | Public | `city`, `province`, `is24h`, pagination |
-| GET | `/pharmacies/:id` | Public | detail |
-
-Rules:
-- Only `isActive = true` rows. Prefer `isVerified` pharmacies first, then `is24h`, then nearest `lastConfirmedAt`.
-- Always include this constant in medicine detail responses: `disclaimer: "این اطلاعات صرفاً جهت آگاهی است. پیش از مصرف هرگونه دارو با دامپزشک مشورت کنید و موجودی را از داروخانه استعلام بگیرید."`
-- Show `lastConfirmedAt` per pharmacy so the UI can say "last confirmed on ...".
-- Do **not** add dosage, price or stock fields anywhere.
-
-**Acceptance:** search by Persian name works with `ي/ی` variants; pharmacy list filters by city.
-
-### Phase 14 — Seed data & admin tooling
-
-1. `prisma/seed.ts` must be **idempotent** (use `upsert` by `slug` / unique fields; safe to run many times). It creates: reference data, sample brands, categories (dog dry food, cat dry food, ...), 10+ sample products with 2–3 variants each and tags, a sample coupon, sample pharmacies/medicines (clearly fake placeholders), and an admin user (`ADMIN_SEED_PHONE`, role `ADMIN`). It must call `recalculateMinPrice` for every product.
-2. `src/admin/`: wire an off-the-shelf admin UI (AdminJS or similar) **protected by an `ADMIN` login**, mounted under `/admin`, so non-developers can add products, variants, pharmacies and medicines. Do not hand-write CRUD endpoints for these in the MVP. Record the chosen tool in `docs/DECISIONS.md`.
-
-### Phase 15 — Hardening, docs & delivery
-
-- Throttle tuning; make sure Swagger is disabled in production.
-- E2E flow test: OTP login → create address → create pet → set tags → recommendations → add to cart → coupon → checkout → pay (mock) → order `PAID`.
-- `Dockerfile` (multi-stage) and the production start command running `prisma migrate deploy`.
-- Update this README's "Status" table (section 16) as phases finish.
-
----
-
-## 9. Business rules reference
-
-### 9.1 Checkout algorithm (`POST /orders`)
-
-Everything from step 3 to step 9 runs in **one Prisma transaction** (`$transaction`, default isolation is fine because stock decrement is conditional).
-
-1. Load the user's cart with items → variants → products. If empty → `CART_EMPTY`.
-2. Load the address; must belong to the user (else 404). Build `addressSnapshot` (all address fields + receiver info, as JSON).
-3. For every item: variant and product must be active (`VARIANT_UNAVAILABLE`).
-4. `itemsTotal = Σ variant.price × quantity` (server-side).
-5. If `couponCode`: run `CouponsService.evaluate(...)` (fail with its error code).
-6. `shippingCost = itemsTotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_COST` (computed on the amount **after** coupon is not required; use `itemsTotal` before discount, keep this consistent and documented in code).
-7. `finalAmount = itemsTotal − discountAmount + shippingCost` (never negative).
-8. **Decrement stock atomically** for each variant via `OrderStockService.reserve(tx, items)`:
-   `updateMany({ where: { id, stock: { gte: qty } }, data: { stock: { decrement: qty } } })` — if `count === 0` → throw `OUT_OF_STOCK` (transaction rolls back).
-9. Create `Order` (`status = PENDING_PAYMENT`, generated `orderNumber`), `OrderItem` rows (snapshot of `productName`, `weightGram`, `unitPrice`, `quantity`, `total`), `CouponRedemption` (if coupon), then clear the cart items.
-
-`OrderStockService` also exposes `release(tx, orderItems)` (increment stock back) used by cancel/expiry.
-
-### 9.2 Order status flow
-
-```text
-PENDING_PAYMENT ──pay ok──▶ PAID ──▶ PROCESSING ──▶ SHIPPED ──▶ DELIVERED
-      │                       │
-   cancel/expire           (admin only, manual refund outside the system in MVP)
-      ▼
-   CANCELED
-```
-
-- Users may cancel **only** `PENDING_PAYMENT` orders.
-- Status changes after `PAID` are made by admins (through the admin tool) — the user API never changes them.
-- Every transition goes through a single `OrderStateMachine`/helper that rejects illegal jumps with `ORDER_INVALID_STATE`.
-
-### 9.3 Coupon rules
-
-Fail in this order (each with its own code):
-1. Coupon not found or `isActive = false` → `COUPON_INVALID`
-2. `startAt` in the future or `endAt` in the past → `COUPON_EXPIRED`
-3. `itemsTotal < minOrderAmount` → `COUPON_MIN_AMOUNT`
-4. Total redemptions `>= totalLimit` → `COUPON_LIMIT_REACHED`
-5. This user's redemptions `>= perUserLimit` → `COUPON_LIMIT_REACHED`
-
-Discount: `PERCENT` → `Math.floor(itemsTotal × value / 100)`, capped by `maxDiscount` if set. `FIXED` → `value`. Finally `discountAmount = min(discount, itemsTotal)`.
-
-Concurrency: the limit checks in checkout must run inside the transaction; a duplicate use race is acceptable to be caught by re-counting inside the transaction before insert.
-
-### 9.4 Payment flow
-
-1. `POST /payments/start`: order must belong to the user and be `PENDING_PAYMENT`. Create `Payment(status=INITIATED, amount=order.finalAmount, gateway=<driver>)`, call `gateway.request(...)`, save `gatewayRef` (authority), return `{ paymentUrl }`.
-2. The user pays on the gateway, which redirects to `GET /payments/callback`.
-3. Callback finds the `Payment` by `gatewayRef`. **Idempotent:** if it is already `SUCCESS`, just redirect again to the frontend result page.
-4. If the gateway reports failure/cancel → mark `FAILED`; order stays `PENDING_PAYMENT` (user may retry until it expires).
-5. If OK → call `gateway.verify(...)` (server-to-server). Only if verify succeeds, in **one transaction**: `Payment.status = SUCCESS`, `paidAt = now`, `Order.status = PAID`. The verify amount must equal `order.finalAmount`.
-6. Redirect the browser to `FRONTEND_PAYMENT_RESULT_URL?orderNumber=...&status=success|failed`.
-7. Optionally send an SMS "order received" via `SmsService` (failures must never break the payment flow).
-
-Never mark an order paid based only on the callback query string.
-
-### 9.5 Recommendation algorithm
-
-Input: a pet (owned by the caller). Compute:
-
-- **lifeStage** from `birthDate` (constants in `common/constants`): `< 12 months → PUPPY_KITTEN`, `>= 84 months (7 years) → SENIOR`, otherwise `ADULT`. If `birthDate` is missing, skip the life-stage filter.
-- **sizeClass** (dogs only, i.e. pet type slug `dog`) from `weightKg`: `< 10 → SMALL`, `10–25 → MEDIUM`, `> 25 → LARGE`. Missing weight or non-dog → skip the size filter.
-
-Filter products where all hold:
-1. `isActive`, has at least one in-stock active variant, `petTypeId = pet.petTypeId`.
-2. `lifeStage IN (computedStage, ALL)` (if computed).
-3. `sizeClass IN (computedSize, ALL)` (if computed).
-4. If pet is **not** neutered → `neuterSuitability = ANY`; if neutered → `ANY` or `NEUTERED_ONLY`.
-5. **No `CONTAINS` tag** that matches any of the pet's `ALLERGEN` tags.
-
-Rank by the number of the pet's `DIET` tags that appear as the product's `SUITABLE_FOR` tags (descending), then `newest`. Return `matchedTags` (names of the matched diet tags). These rules are heuristics, not veterinary advice; keep the constants easy to tweak.
-
-### 9.6 Constants (put in `common/constants/index.ts`)
-
-`MAX_ADDRESSES_PER_USER = 10`, `MAX_PETS_PER_USER = 10`, `MAX_CART_ITEM_QTY = 20`, `LOW_STOCK_THRESHOLD = 5`, `PUPPY_KITTEN_MAX_MONTHS = 12`, `SENIOR_MIN_MONTHS = 84`, `DOG_SMALL_MAX_KG = 10`, `DOG_MEDIUM_MAX_KG = 25`, `DEFAULT_PAGE_LIMIT = 20`, `MAX_PAGE_LIMIT = 50`, `MEDICINE_DISCLAIMER`.
-
----
-
-## 10. API summary
-
-| Method | Path | Auth |
-|---|---|---|
-| GET | `/health` | Public |
-| POST | `/auth/otp/request` | Public |
-| POST | `/auth/otp/verify` | Public |
-| POST | `/auth/refresh` | Public |
-| POST | `/auth/logout` | User |
-| GET/PATCH | `/users/me` | User |
-| GET/POST | `/addresses` | User |
-| PATCH/DELETE | `/addresses/:id` | User |
-| PATCH | `/addresses/:id/default` | User |
-| POST | `/upload/image` | User |
-| GET | `/pet-types`, `/pet-types/:id/breeds`, `/tags` | Public |
-| GET/POST | `/pets` | User |
-| GET/PATCH/DELETE | `/pets/:id` | User |
-| PUT | `/pets/:id/tags` | User |
-| GET | `/brands`, `/categories` | Public |
-| GET | `/products`, `/products/:slug` | Public |
-| GET | `/products/recommendations` | User |
-| GET | `/favorites` | User |
-| PUT/DELETE | `/favorites/:productId` | User |
-| GET/DELETE | `/cart` | User |
-| POST | `/cart/items` | User |
-| PATCH/DELETE | `/cart/items/:id` | User |
-| POST | `/coupons/validate` | User |
-| POST/GET | `/orders` | User |
-| GET | `/orders/:id` | User |
-| POST | `/orders/:id/cancel` | User |
-| POST | `/payments/start` | User |
-| GET | `/payments/callback` | Public |
-| GET | `/medicines`, `/medicines/:id` | Public |
-| GET | `/pharmacies`, `/pharmacies/:id` | Public |
-
-**Route order warning:** in `ProductsController`, declare `GET /products/recommendations` **before** `GET /products/:slug`, otherwise `recommendations` is treated as a slug.
-
----
-
-## 11. Testing strategy
-
-- **Unit tests (Jest)** for: OtpService, CouponsService, OrderStockService, checkout price computation, recommendation service, `phone`/`slugify`/`normalizeFa` utils.
-- **E2E tests (Supertest)** against a real Postgres + Redis (docker compose) with a dedicated test database; reset data between test files. Use `PAYMENT_DRIVER=mock` and `SMS_DRIVER=console`.
-- Must-have scenarios: full purchase flow; ownership isolation between two users; concurrent last-unit checkout; coupon limits; payment callback idempotency; unauthorized/blocked access.
-- Aim to cover every error code in 6.3 at least once.
-
----
-
-## 12. Common pitfalls (check before finishing a phase)
-
-- [ ] Money computed with floats or trusted from the request body.
-- [ ] Missing `userId` in a `where` on user-owned data.
-- [ ] Missing `deletedAt: null` on `User`/`Pet` queries.
-- [ ] Stock decremented with read-then-write instead of a conditional `updateMany`.
-- [ ] Order marked paid without server-side `verify`.
-- [ ] `stock` numbers or inactive variants leaked in public responses.
-- [ ] `GET /products/recommendations` declared after `GET /products/:slug`.
-- [ ] Search that ignores `ي/ک` vs `ی/ک` Persian character variants, or Persian digits in phone numbers.
-- [ ] OTP stored in plain text, or OTP dev code active in production.
-- [ ] Business logic inside controllers; Prisma errors returned raw to clients.
-- [ ] Unbounded list endpoints (no `limit` cap) or N+1 queries.
-- [ ] New libraries or schema changes made without recording a decision.
-
----
-
-## 13. Definition of Done (per phase)
-
-1. All endpoints of the phase work as specified, with Swagger annotations.
-2. DTOs validated; errors use the standard envelope and codes.
-3. Ownership/role rules enforced.
-4. Unit and/or e2e tests for the phase's risky logic exist and pass.
-5. `npm run build`, `npm run lint`, `npm test` are green.
-6. `seed.ts` extended where relevant and still idempotent.
-7. A short summary is written: what was implemented, files touched, any `TODO(decision)` items and any schema change requests.
-
----
-
-## 14. Prompt template for handing a phase to an AI model
-
-```text
-You are implementing PHASE <N> — <NAME> of the Pet System backend.
-
-Context:
-- Read README.md sections 1–7 and the "Phase <N>" section, plus any business
-  rules it references (section 9).
-- The repository skeleton already exists; most files are empty placeholders.
-  Fill the existing files. Do NOT restructure folders.
-- Do NOT edit prisma/schema.prisma. If you think it must change, write the
-  request to docs/SCHEMA_CHANGE_REQUESTS.md and continue.
-
-Scope:
-- Implement only the endpoints/files listed for this phase.
-- Do not implement anything from later phases.
-- Follow the Golden rules (section 3) and Common pitfalls (section 12).
-
-Deliver:
-1. The code for the listed files.
-2. Tests required by the phase's Acceptance criteria.
-3. Extend prisma/seed.ts if the phase says so (idempotent).
-4. Run: npm run build && npm run lint && npm test — fix all errors.
-5. Finish with a summary: files changed, decisions made (TODO(decision)),
-   and anything that could not be completed.
-```
-
----
-
-## 15. Roadmap (after MVP — do not build now)
-
-Admin panel (custom), vets/clinics/appointments, medical records & vaccinations, pharmacy panel with inventory, boarding, pet sitters, trainers, adoption, chat, reviews, blog, subscriptions, refunds. The current design (role on `User`, everything keyed by `userId`) allows adding these as new modules and tables without rewriting existing ones.
-
----
-
-## 16. Status
-
-| Phase | Name | Status |
-|---|---|---|
-| 0 | Bootstrap | ☐ |
-| 1 | Infrastructure & common | ☐ |
-| 2 | Auth (OTP + JWT) | ☐ |
-| 3 | Users & addresses | ☐ |
-| 4 | Upload & reference data | ☐ |
-| 5 | Pets | ☐ |
-| 6 | Catalog | ☐ |
-| 7 | Recommendations | ☐ |
-| 8 | Favorites | ☐ |
-| 9 | Cart | ☐ |
-| 10 | Coupons | ☐ |
-| 11 | Orders & checkout | ☐ |
-| 12 | Payments | ☐ |
-| 13 | Medicines & pharmacies | ☐ |
-| 14 | Seed & admin tooling | ☐ |
-| 15 | Hardening & delivery | ☐ |
-
----
-
-## 17. Glossary (Persian ↔ English)
-
-| فارسی | English | Notes |
+| [`backend/README.md`](backend/README.md) | مرجع فنی بک‌اند: قراردادها، مدل دامنه، قواعد کسب‌وکار، متغیرهای محیطی |
+| [`backend/docs/CHANGELOG.md`](backend/docs/CHANGELOG.md) | تاریخچهٔ تغییرات فازهای بک‌اند |
+| [`backend/docs/TEST_CHECKLIST.md`](backend/docs/TEST_CHECKLIST.md) | چک‌لیست تست دستی و پذیرش API |
+| [`backend/docs/SCHEMA_CHANGE_REQUESTS.md`](backend/docs/SCHEMA_CHANGE_REQUESTS.md) | ثبت درخواست‌های تغییر اسکیمای دیتابیس |
+| [`frontend/README.md`](frontend/README.md) | راهنمای اجرا، بررسی و نکات فرانت‌اند |
+| [`frontend/docs/DECISIONS.md`](frontend/docs/DECISIONS.md) | تصمیم‌های فنی پذیرفته‌شده (DEC-001 تا DEC-015) |
+| [`frontend/docs/DESIGN_SYSTEM.md`](frontend/docs/DESIGN_SYSTEM.md) | سیستم طراحی، برند و اثبات منبع دارایی‌ها |
+| [`AGENTS.md`](AGENTS.md) | قواعد همکاری برای ایجنت‌های هوش مصنوعی |
+
+## ۱۰. واژه‌نامه (فارسی ↔ انگلیسی)
+
+| فارسی | English | یادداشت |
 |---|---|---|
 | پت / حیوان خانگی | Pet | |
 | نوع پت | PetType | سگ، گربه |
-| نژاد | Breed | optional on a pet |
-| غذای خشک | Dry food | main product of MVP |
-| واریانت / وزن محصول | ProductVariant | one row per weight |
-| برچسب آلرژن | ALLERGEN tag | ingredient a pet may react to |
-| برچسب رژیمی | DIET tag | grain-free, weight control, ... |
+| نژاد | Breed | اختیاری روی پت |
+| غذای خشک | Dry food | محصول اصلی MVP |
+| واریانت / وزن محصول | ProductVariant | یک ردیف برای هر وزن |
+| برچسب آلرژن | ALLERGEN tag | ماده‌ای که پت ممکن است حساسیت داشته باشد |
+| برچسب رژیمی | DIET tag | بدون غله، کنترل وزن و … |
 | عقیم | Neutered/spayed | `isNeutered` |
 | مرحله زندگی | LifeStage | توله/بچه‌گربه، بالغ، مسن |
 | کد تخفیف | Coupon | |
 | سبد خرید | Cart | |
 | سفارش | Order | |
-| درگاه پرداخت | Payment gateway | Zarinpal in MVP |
-| داروخانه | Pharmacy | info-only in MVP |
-| دارو | Medicine | info-only in MVP |
+| درگاه پرداخت | Payment gateway | Zarinpal در MVP |
+| داروخانه | Pharmacy | فقط اطلاع‌رسانی در MVP |
+| دارو | Medicine | فقط اطلاع‌رسانی در MVP |
+| کلینیک | Clinic | فهرست عمومی |
+
+## ۱۱. مجوز و حقوق
+
+- کد این مخزن مالکیت [MohammadAky](https://github.com/MohammadAky) است (`UNLICENSED` مگر ذکر خلاف).
+- فونت وزیرمتن با مجوز SIL OFL 1.1 توزیع می‌شود (متن مجوز در `frontend/public/licenses/Vazirmatn-OFL.txt`).
+- تصاویر پرترهٔ سگ و گربه عکس‌های استوک Unsplash (اثر Victor G و EJ Li) با مجوز Unsplash هستند و مالکیت انحصاری Dr. Gupet محسوب نمی‌شوند.
+- فهرست کامل منبع و مجوز دارایی‌ها در [`frontend/docs/DESIGN_SYSTEM.md`](frontend/docs/DESIGN_SYSTEM.md) نگهداری می‌شود.

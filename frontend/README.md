@@ -1,42 +1,40 @@
-# Dr. Gupet frontend
+# فرانت‌اند Dr. Gupet
 
-Persian RTL customer site for the MVP described in the root `README.md`. The frontend implementation follows `Roadmap-Frontend.md` and `docs/DECISIONS.md`. Shared agent guidance is in the root `AGENTS.md`; the design system and current asset provenance are in `docs/DESIGN_SYSTEM.md`.
+وب‌اپ فارسی/راست‌چین مشتری برای MVP توصیف‌شده در [`README.md`](../README.md) ریشه. مسیر توسعه (فازهای F0–F11) در README ریشه است؛ تصمیم‌های فنی در [`docs/DECISIONS.md`](docs/DECISIONS.md) و سیستم طراحی/دارایی‌ها در [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md). راهنمای مشترک ایجنت‌ها در [`AGENTS.md`](../AGENTS.md).
 
-## Local setup
+## راه‌اندازی محلی
 
-Use Node.js and npm compatible with the checked-in lockfile. The current development machine has Node 24 and npm 11; the repository does not yet prove a complete clean-clone matrix. In the VS Code PowerShell terminal:
+Node.js 20+ و npm سازگار با `package-lock.json` (روی سیستم توسعه فعلی: Node 24 و npm 11).
 
-```powershell
-cd D:\Dr.Gupet\frontend
-npm.cmd ci
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-npm.cmd run dev -- --host 127.0.0.1
+```bash
+cd frontend
+npm ci
+cp .env.example .env      # ویندوز: Copy-Item .env.example .env
+npm run dev               # http://localhost:5173
 ```
 
-Open `http://127.0.0.1:5173/`. `VITE_API_BASE_URL` in `.env.example` points to `http://localhost:3000/api/v1`; `src/lib/env.ts` requires it at startup. Vite is configured for port 5173. Never put a secret in a `VITE_*` variable: those values are public in the browser bundle. Do not commit `.env`.
+`VITE_API_BASE_URL` در `.env.example` برابر `http://localhost:3000/api/v1` است و `src/lib/env.ts` در startup آن را الزامی می‌کند. Vite روی پورت 5173 تنظیم شده است. هرگز رمز/توکن را در متغیر `VITE_*` قرار ندهید (این مقادیر در باندل مرورگر عمومی‌اند) و `.env` را commit نکنید.
 
-Run `npm.cmd ci` with the dev server stopped. It replaces `node_modules` while running, so an open Vite session can briefly show missing modules or stale font errors until the install finishes and the page is reloaded.
+اگر `npm ci` را هنگام اجرای dev server بزنید، `node_modules` حین اجرا جایگزین می‌شود و ممکن است تا پایان نصب، خطای ماژول/فونت ببینید — نصب را با dev server متوقف انجام دهید و صفحه را رفرش کنید.
 
-The backend is a separate owner's responsibility. It is unavailable in this local design pass, so product/API data and the home `/health` status may show error or empty states. This is not evidence of a successful end-to-end transaction. Do not change `backend/` to make the preview work; report backend requirements in the Roadmap's `BE-REQ-*` list.
+بک‌اند مسئولیت جدا دارد؛ اگر در دسترس نباشد، داده‌های محصول/`health` ممکن است حالت خطا یا خالی نشان دهند. برای رفع مشکل، `backend/` را تغییر ندهید.
 
-## Checks and preview
+## بررسی‌ها و پیش‌نمایش
 
-```powershell
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd run build
-npm.cmd test -- --maxWorkers=1 --no-file-parallelism
-npm.cmd run preview
+```bash
+npm run lint
+npm run typecheck
+npm run build
+npm test                  # Vitest؛ جایگزین تست با بک‌اند زنده نیست
+npm run preview           # سرو build تولیدی (پورت 5173؛ ابتدا dev را ببندید)
 ```
 
-Run the checks from `frontend/`. `npm run preview` serves a prior build on port 5173; stop the dev server first if it occupies that port. The test command uses Vitest and does not replace live-backend verification. Check the active phase's specific criteria in Roadmap §6 and record results in §12 only after execution.
+مسیرهای خانه، محصولات، احراز هویت، پروفایل، پت‌ها، سبد، تسویه، سفارش، دارو و داروخانه در کد موجودند؛ برخی به API در حال اجرا و نشست واردشده نیاز دارند. وجود کامپوننت به معنی پذیرش بصری آن مسیر نیست.
 
-The home, product, auth, profile, pet, cart, checkout, order, medicine, and pharmacy routes exist in this worktree. Some require a running API and signed-in session. The visual pass currently emphasizes the shell, home, and shared presentation; do not infer visual acceptance for every route from the presence of its component.
+نکته: مسیر توسعهٔ `/dev/ui` (گالری کامپوننت‌ها) فقط در حالت development در دسترس است و در build تولیدی 404 می‌شود.
 
-## Design, storage, and rights
+## طراحی، ذخیره‌سازی و حقوق
 
-The app serves unchanged Vazirmatn files copied from `@fontsource/vazirmatn` 5.3.0 through `public/fonts/vazirmatn/`; green `#122F12` and gold `#D49F28` tokens are defined in `src/styles/tokens.css`. The exact local image files, sources, photographers, and license terms are recorded in `docs/DESIGN_SYSTEM.md`. The dog and cat portraits are Unsplash-licensed stock photography; they are not exclusive Dr. Gupet-owned artwork. The user-provided logo is at `public/brand/logo.jpg`.
-
-The frontend stores a refresh token in `localStorage`, a pending payment-order reference in `sessionStorage`, and the first-visit notice response in `localStorage`. The English Accept/Deny notice follows DEC-011; neither choice enables tracking. No analytics or advertising vendor script is currently wired into the frontend. Browser/network verification of server or payment-gateway cookies remains outstanding.
-
-The owner removed the `/privacy` page from this local preview. A public release still requires persistent privacy disclosures, the operator's legal identity, contact route, data retention details, and review against the actual backend/payment behavior. Copyright text may apply only to original Dr. Gupet material; the stock photos and font keep their own licenses. Local preview must be approved by the owner before any commit, push, or publication.
+- اپ فایل‌های تغییرنیافتهٔ Vazirmatn 5.3.0 را از `public/fonts/vazirmatn/` سرو می‌کند؛ توکن‌های سبز `#122F12` و طلایی `#D49F28` در `src/styles/tokens.css` تعریف شده‌اند. منبع دقیق تصاویر، عکاسان و مجوزها در [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) ثبت است؛ پرتره‌های سگ و گربه عکس استوک Unsplash‌اند، نه اثر انحصاری Dr. Gupet. لوگوی ارائه‌شدهٔ مالک در `public/brand/logo.jpg` است.
+- فرانت‌اند refresh token را در `localStorage`، ارجاع سفارش پرداخت در جریان را در `sessionStorage` و پاسخ اعلان اولین بازدید را در `localStorage` نگه می‌دارد. اعلان انگلیسی Accept/Deny مطابق DEC-011 است و هیچ‌کدام ردیابی را فعال نمی‌کنند؛ در حال حاضر هیچ اسکریپت تحلیلی/تبلیغاتی به فرانت وصل نیست.
+- مالک صفحهٔ `/privacy` را از این پیش‌نمایش حذف کرده است. انتشار عمومی همچنان به افشای پایدار حریم خصوصی، هویت قانونی اپراتور، مسیر تماس، جزئیات نگهداری داده و بازبینی رفتار واقعی backend/درگاه پرداخت نیاز دارد. متن کپی‌رایت فقط شامل مطالب اصلی Dr. Gupet است؛ تصاویر استوک و فونت مجوزهای خودشان را دارند.

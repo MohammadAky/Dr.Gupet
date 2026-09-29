@@ -1,6 +1,6 @@
 # Pet System Backend - Test Checklist
 
-بر اساس فایل evaluation.md
+چک‌لیست تست دستی و پذیرش API بک‌اند — اجرا با `docker compose up -d` و `BASE=http://localhost:3000/api/v1`.
 
 ---
 

@@ -1,28 +1,43 @@
 # =====================================================================
-# Dr.Gupet — root .gitignore
+# Dr.Gupet — root .gitignore (monorepo: backend/ + frontend/)
 # =====================================================================
 
 # --- Dependencies ---
 node_modules/
 .yarn/
 .pnp.*
+.pnpm-store/
 
 # --- Builds & compiled output ---
 dist/
 build/
 out/
+release/
 *.tsbuildinfo
 
 # --- Testing & coverage ---
 coverage/
 .nyc_output/
+test-results/
+junit/
+playwright-report/
+blob-report/
+playwright/.cache/
+.vitest/
 
-# --- Environment & secrets (keep .env.example tracked) ---
+# --- Environment & secrets (keep *.example tracked) ---
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+*.crt
+*.cer
+secrets/
+credentials/
+.netrc
 
 # --- Logs ---
 logs/
@@ -32,25 +47,42 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.pid
+*.pid.lock
+*.seed
 
-# --- Runtime data (user uploads, caches) ---
+# --- Runtime data (user uploads, caches, temp) ---
 uploads/
 .cache/
+.tmp/
+.temp/
+temp/
+tmp/
+*.tmp
+*.temp
+*.bak
 
 # --- Local databases / docker volumes ---
 pgdata/
 docker-data/
+postgres-data/
+redis-data/
 *.sqlite
 *.sqlite3
 *.db
+*.db-journal
 
 # --- OS files ---
 .DS_Store
+.DS_Store?
 ._*
-Thumbs.db
+.Spotlight-V100
+.Trashes
 ehthumbs.db
+Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+.fuse_hidden*
 
 # --- Editors / IDEs ---
 .idea/
@@ -58,3 +90,31 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 *.swp
 *.swo
+*.swn
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.code-workspace
+
+# --- Tooling caches ---
+.eslintcache
+.stylelintcache
+.prettiercache
+.parcel-cache/
+.vite/
+.turbo/
+.svelte-kit/
+.nuxt/
+.next/
+.output/
+.nox/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.dart_tool/
+.gradle/
+target/

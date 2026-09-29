@@ -1,6 +1,6 @@
 # Dr. Gupet visual system — initial approved direction
 
-This is the frontend visual contract for the current design pass. The owner supplied the logo and two exact colors. Other values below are implementation defaults for local preview and can be refined after visual review; they are not claims about a pre-existing brand manual. Build within `Roadmap-Frontend.md` F1 and preserve DEC-002's functional boundaries.
+This is the frontend visual contract for the current design pass. The owner supplied the logo and two exact colors. Other values below are implementation defaults for local preview and can be refined after visual review; they are not claims about a pre-existing brand manual. Build within the frontend development path (root `README.md` «مسیر توسعه») and preserve DEC-002's functional boundaries.
 
 ## Brand inputs and references
 
