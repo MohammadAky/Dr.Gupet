@@ -34,10 +34,7 @@ export class PetsController {
   @Post()
   @ApiOperation({ summary: 'Create new pet' })
   @ApiResponse({ status: 201, description: 'Pet created' })
-  async create(
-    @CurrentUser('sub') userId: number,
-    @Body() dto: CreatePetDto,
-  ) {
+  async create(@CurrentUser('sub') userId: number, @Body() dto: CreatePetDto) {
     return this.petsService.create(userId, dto);
   }
 
@@ -45,10 +42,7 @@ export class PetsController {
   @ApiOperation({ summary: 'Get pet by ID' })
   @ApiResponse({ status: 200, description: 'Pet returned' })
   @ApiResponse({ status: 404, description: 'Pet not found' })
-  async findOne(
-    @CurrentUser('sub') userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async findOne(@CurrentUser('sub') userId: number, @Param('id', ParseIntPipe) id: number) {
     return this.petsService.findOne(userId, id);
   }
 
@@ -81,10 +75,7 @@ export class PetsController {
   @ApiOperation({ summary: 'Delete pet (soft delete)' })
   @ApiResponse({ status: 200, description: 'Pet deleted' })
   @ApiResponse({ status: 404, description: 'Pet not found' })
-  async remove(
-    @CurrentUser('sub') userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async remove(@CurrentUser('sub') userId: number, @Param('id', ParseIntPipe) id: number) {
     return this.petsService.remove(userId, id);
   }
 }

@@ -10,20 +10,36 @@ export class ProductsService {
   /**
    * Find products with filtering, search, sorting, pagination
    */
-  async findAll(query: PaginationQueryDto & {
-    q?: string;
-    petTypeId?: number;
-    categorySlug?: string;
-    brandId?: number;
-    lifeStage?: string;
-    sizeClass?: string;
-    tagIds?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    inStock?: boolean;
-    sort?: string;
-  }) {
-    const { page = 1, limit = 20, q, petTypeId, categorySlug, brandId, lifeStage, sizeClass, tagIds, minPrice, maxPrice, inStock, sort } = query;
+  async findAll(
+    query: PaginationQueryDto & {
+      q?: string;
+      petTypeId?: number;
+      categorySlug?: string;
+      brandId?: number;
+      lifeStage?: string;
+      sizeClass?: string;
+      tagIds?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      inStock?: boolean;
+      sort?: string;
+    },
+  ) {
+    const {
+      page = 1,
+      limit = 20,
+      q,
+      petTypeId,
+      categorySlug,
+      brandId,
+      lifeStage,
+      sizeClass,
+      tagIds,
+      minPrice,
+      maxPrice,
+      inStock,
+      sort,
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {

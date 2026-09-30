@@ -34,7 +34,7 @@ async function bootstrap() {
   );
 
   // Static file serving for uploads
-  const uploadDir = configService.get<string>('app.uploadDir');
+  const uploadDir = configService.get<string>('app.uploadDir') ?? './uploads';
   app.useStaticAssets(uploadDir, { prefix: '/uploads' });
 
   // Swagger documentation (disabled in production)
@@ -54,7 +54,7 @@ async function bootstrap() {
   // Enable shutdown hooks
   app.enableShutdownHooks();
 
-  const port = configService.get<number>('app.port');
+  const port = configService.get<number>('app.port') ?? 3000;
   await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }

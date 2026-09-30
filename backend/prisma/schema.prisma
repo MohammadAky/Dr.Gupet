@@ -301,6 +301,8 @@ model Order {
   trackingCode    String?
   shippedAt       DateTime?
   deliveredAt     DateTime?
+  refundedAt      DateTime?
+  refundNote      String?
   note            String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -340,6 +342,31 @@ model Payment {
 }
 
 // ---------------------------------------------------------------------
+// پنل ادمین
+// ---------------------------------------------------------------------
+
+model AdminAuditLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int
+  action    String
+  entity    String
+  entityId  String?
+  summary   String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([adminId])
+  @@index([createdAt])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
 // دارو و داروخانه
 // ---------------------------------------------------------------------
 
@@ -356,7 +383,7 @@ model Medicine {
   isActive             Boolean @default(true)
 
   pharmacies PharmacyMedicine[]
-  petTypes   MedicinePetType[]
+  petTypes   PetType[]
 }
 
 model Pharmacy {
@@ -407,15 +434,4 @@ model PharmacyMedicine {
   medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
 
   @@id([pharmacyId, medicineId])
-}
-
-// Explicit many-to-many for Medicine <-> PetType (SQLite doesn't support implicit)
-model MedicinePetType {
-  medicineId Int
-  petTypeId  Int
-
-  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
-  petType  PetType  @relation(fields: [petTypeId], references: [id], onDelete: Cascade)
-
-  @@id([medicineId, petTypeId])
 }

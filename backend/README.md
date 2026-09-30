@@ -230,7 +230,29 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 - سناریوهای حتمی: جریان کامل خرید؛ جداسازی مالکیت بین دو کاربر؛ همزمانی آخرین موجودی؛ سقف‌های کوپن؛ idempotency کال‌بک پرداخت؛ دسترسی غیرمجاز/مسدود.
 - چک‌لیست تست دستی و پذیرش: [`docs/TEST_CHECKLIST.md`](docs/TEST_CHECKLIST.md).
 
-## ۸. تله‌های رایج (پیش از پایان هر تغییر)
+## ۸. API پنل ادمین
+
+همهٔ مسیرهای زیر پیشوند `admin/` دارند، فقط با نقش `ADMIN` (Guard سراسری + `@Roles('ADMIN')`) در دسترس‌اند و هر تغییر در `AdminAuditLog` ثبت می‌شود. جزئیات در Swagger (تگ‌های `Admin - *`).
+
+| گروه | مسیرها |
+|---|---|
+| هسته | `GET /admin/me`، `GET /admin/dashboard` (KPI/نمودار/سفارش‌های اخیر/پرفروش‌ها) |
+| گزارش‌ها | `GET /admin/reports/{sales, top-products, low-stock, users, coupons}` + نسخه‌های `.csv` |
+| تنظیمات | `GET /admin/settings`، `PUT /admin/settings`، `DELETE /admin/settings/:key` (کلیدهای مجاز: `SHIPPING_FLAT_COST`، `FREE_SHIPPING_THRESHOLD`، `ORDER_EXPIRE_MINUTES` — مقدار جدول بر env مقدم است) |
+| لاگ تغییرات | `GET /admin/audit-logs` (فیلتر entity/action/adminId) |
+| کاربران | `GET/POST/PATCH/DELETE /admin/users...` + `PATCH /admin/users/:id/restore` (جستجو، نقش/وضعیت، حذف نرم) |
+| کاتالوگ | `admin/products` (+ `:id/variants`، `variants/:id`، `:id/images`، `images/:id`، `:id/tags`)، `admin/brands`، `admin/categories`، `admin/pet-types`، `admin/breeds`، `admin/tags` |
+| سفارش‌ها | `GET/POST/PATCH /admin/orders...` — `:id/transition` (PAID→PROCESSING→SHIPPED→DELIVERED)، `:id/tracking`، `:id/cancel` (برگشت موجودی)، `:id/refund` (نشانه‌گذاری استرداد) |
+| پرداخت‌ها | `GET /admin/payments...` — `:id/reconcile` (verify مجدد درگاه)، `:id/mark-failed` |
+| کوپن‌ها | CRUD `/admin/coupons` + آمار مصرف (حذف کوپن استفاده‌شده → غیرفعال‌سازی) |
+| دارو/داروخانه | CRUD `/admin/medicines`، CRUD `/admin/pharmacies` + `POST/DELETE /admin/pharmacies/:id/medicines/:medicineId` |
+| کلینیک‌ها | CRUD `/admin/clinics` (لیست کامل شامل غیرفعال) |
+
+نکته‌های رفتاری: حذف محصول/واریانت/برند/دسته‌ای که در سفارش یا محتوا استفاده شده، به‌جای حذف فیزیکی، غیرفعال‌سازی برمی‌گرداند؛ `minPrice` محصول پس از هر تغییر واریانت بازمحاسبه می‌شود؛ تگ‌های `CONTAINS` فقط ALLERGEN و `SUITABLE_FOR` فقط DIET پذیرفته می‌شوند.
+
+---
+
+## ۹. تله‌های رایج (پیش از پایان هر تغییر)
 
 - [ ] محاسبهٔ پول با float یا اعتماد به body درخواست.
 - [ ] نبود `userId` در `where` داده‌های کاربری.
@@ -245,10 +267,10 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 - [ ] لیست‌های بدون سقف `limit` یا کوئری‌های N+1.
 - [ ] کتابخانه/تغییر اسکیمای جدید بدون ثبت تصمیم.
 
-## ۹. تغییر اسکیما
+## ۱۰. تغییر اسکیما
 
 `prisma/schema.prisma` را بدون درخواست ثبت‌شده تغییر ندهید. هر نیاز، ابتدا در [`docs/SCHEMA_CHANGE_REQUESTS.md`](docs/SCHEMA_CHANGE_REQUESTS.md) (چه، چرا، تأثیر) ثبت و سپس ادامه داده می‌شود. وابستگی‌ها با `npm install <name>` (بدون شمارهٔ نسخه) و commit کردن lockfile نصب می‌شوند.
 
-## ۱۰. تاریخچه
+## ۱۱. تاریخچه
 
 تغییرات فاز به فاز: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). واژه‌نامهٔ فارسی/انگلیسی و جدول کامل مسیرهای API در [`README.md`](../README.md) ریشه.

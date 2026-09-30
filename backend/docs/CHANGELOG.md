@@ -1,5 +1,24 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Admin panel backend (2026-09-30)
+
+### Added
+- **Admin core (`src/admin/`):** global `AdminModule` with `AuditService`/`AuditController` (`GET /admin/audit-logs`), `SettingsService`/`SettingsController` (runtime settings with env fallback), `DashboardService`/`DashboardController` (`GET /admin/me`, `GET /admin/dashboard` KPIs/charts), `ReportsService`/`ReportsController` (sales, top products, low stock, user growth, coupon performance + CSV exports via `@RawResponse()`).
+- **Admin CRUD endpoints** (all `@Roles('ADMIN')`, all mutations audited): `admin/users`, `admin/products` (products/variants/images/tags with automatic `minPrice` recalculation), `admin/brands`, `admin/categories`, `admin/pet-types`, `admin/breeds`, `admin/tags`, `admin/orders` (state machine `PAID→PROCESSING→SHIPPED→DELIVERED`, tracking, cancel+stock release, refund marker), `admin/payments` (list/detail/reconcile/mark-failed), `admin/coupons` (CRUD + usage stats), `admin/medicines`, `admin/pharmacies` (+ medicine link/unlink with `lastConfirmedAt`), `admin/clinics` (extended with full list incl. inactive).
+- **Prisma:** `AdminAuditLog`, `Setting` models; `Order.refundedAt`/`Order.refundNote`.
+- **Tests:** `jest.config.js` + unit tests for the order state machine and coupon rules (14 tests).
+
+### Fixed
+- `Medicine ↔ PetType` relation rewritten as a direct many-to-many (removed broken `MedicinePetType` join) — `prisma validate`/`generate` now pass (ADMIN-002).
+- `is24h` query param parsing (`'true'`/`'false'` strings) in pharmacies and clinics (issue #5).
+- Admin clinic list now includes inactive records (issue #6).
+- TS strict errors in `pagination-query.dto.ts`, `all-exceptions.filter.ts`, `main.ts`, `redis.service.ts`; unused imports across modules.
+- Lint toolchain: flat config now matches installed packages (`typescript-eslint` v8 + ESLint 10); `no-explicit-any` downgraded to warn (documented debt); sources formatted with Prettier.
+
+### Changed
+- `package.json` ranges reconciled with the registry (`@nestjs/jwt ^10.2.0`, `@nestjs/swagger ^7.4.2`, `@nestjs/throttler ^5.2.0` — its `throttlers[]` API is what the code already used, `@nestjs/schedule ^4.0.2`, `helmet ^7.2.0`, `passport ^0.7.0`, `@types/passport-jwt ^4.0.0`); broken `package-lock.json` (empty root ranges, majors out of sync) regenerated.
+- Checkout and order-expiry now read `SHIPPING_FLAT_COST`, `FREE_SHIPPING_THRESHOLD`, `ORDER_EXPIRE_MINUTES` from the `Setting` table with env fallback.
+
 ## [Unreleased] - Phase 0-15 Implementation Complete
 
 ### Added

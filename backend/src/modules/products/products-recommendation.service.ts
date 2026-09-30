@@ -14,12 +14,7 @@ export class ProductsRecommendationService {
   /**
    * Get product recommendations for a pet
    */
-  async findForPet(
-    userId: number,
-    petId: number,
-    page: number = 1,
-    limit: number = 20,
-  ) {
+  async findForPet(userId: number, petId: number, page: number = 1, limit: number = 20) {
     // Verify pet belongs to user
     const pet = await this.prisma.pet.findUnique({
       where: { id: petId, deletedAt: null },
@@ -49,9 +44,7 @@ export class ProductsRecommendationService {
       .map((pt) => pt.tag.id);
 
     // Get pet's diet tag IDs
-    const dietTagIds = pet.tags
-      .filter((pt) => pt.tag.type === 'DIET')
-      .map((pt) => pt.tag.id);
+    const dietTagIds = pet.tags.filter((pt) => pt.tag.type === 'DIET').map((pt) => pt.tag.id);
 
     // Build where clause
     const where: any = {
@@ -123,9 +116,7 @@ export class ProductsRecommendationService {
     // Calculate match score and transform
     const items = products.map((product) => {
       const productDietTagIds = product.tags.map((pt) => pt.tag.id);
-      const matchedDietTagIds = dietTagIds.filter((id) =>
-        productDietTagIds.includes(id),
-      );
+      const matchedDietTagIds = dietTagIds.filter((id) => productDietTagIds.includes(id));
       const matchedTags = product.tags
         .filter((pt) => matchedDietTagIds.includes(pt.tag.id))
         .map((pt) => pt.tag.name);
@@ -173,8 +164,7 @@ export class ProductsRecommendationService {
     const now = new Date();
     const birth = new Date(birthDate);
     const monthsDiff =
-      (now.getFullYear() - birth.getFullYear()) * 12 +
-      (now.getMonth() - birth.getMonth());
+      (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
 
     if (monthsDiff < PUPPY_KITTEN_MAX_MONTHS) return 'PUPPY_KITTEN';
     if (monthsDiff >= SENIOR_MIN_MONTHS) return 'SENIOR';

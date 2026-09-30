@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, IsPhoneNumber } from 'class-validator';
+import { IsString, IsOptional, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateAddressDto {
@@ -41,7 +41,7 @@ export class CreateAddressDto {
   @IsOptional()
   lat?: number;
 
-  @ApiPropertyOptional({ example: 51.3890 })
+  @ApiPropertyOptional({ example: 51.389 })
   @IsOptional()
   lng?: number;
 }

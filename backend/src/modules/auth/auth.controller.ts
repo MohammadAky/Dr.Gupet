@@ -48,10 +48,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout (invalidate refresh token)' })
   @ApiResponse({ status: 200, description: 'Logged out' })
-  async logout(
-    @CurrentUser('sub') userId: number,
-    @Body() dto: RefreshTokenDto,
-  ) {
+  async logout(@CurrentUser('sub') userId: number, @Body() dto: RefreshTokenDto) {
     return this.authService.logout(userId, dto.refreshToken);
   }
 }

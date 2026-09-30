@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AppException } from '../../common/filters/all-exceptions.filter';
+import { slugify } from '../../common/utils/slugify.util';
 
 @Injectable()
 export class TagsService {
@@ -21,5 +23,74 @@ export class TagsService {
       },
       orderBy: { name: 'asc' },
     });
+  }
+
+  // -------------------------------------------------------------------
+  // Admin
+  // -------------------------------------------------------------------
+
+  async findAllAdmin(type?: string) {
+    const where = type ? { type } : {};
+
+    return this.prisma.tag.findMany({
+      where,
+      include: {
+        _count: { select: { productTags: true, petTags: true } },
+      },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async create(data: { name: string; slug?: string; type: string }) {
+    if (!['ALLERGEN', 'DIET'].includes(data.type)) {
+      throw new AppException('VALIDATION_ERROR', 'نوع تگ باید ALLERGEN یا DIET باشد', 400);
+    }
+
+    const slug = slugify(data.slug || data.name);
+    const exists = await this.prisma.tag.findFirst({
+      where: { OR: [{ slug }, { name: data.name, type: data.type }] },
+    });
+    if (exists) {
+      throw new AppException('CONFLICT', 'تگ با این نام یا slug وجود دارد', 409);
+    }
+
+    return this.prisma.tag.create({
+      data: { name: data.name, slug, type: data.type },
+    });
+  }
+
+  async update(id: number, data: Partial<{ name: string }>) {
+    const tag = await this.prisma.tag.findUnique({ where: { id } });
+    if (!tag) {
+      throw new NotFoundException('تگ یافت نشد');
+    }
+
+    return this.prisma.tag.update({ where: { id }, data });
+  }
+
+  /**
+   * Delete tag: refuse when referenced (deleting would silently strip
+   * product/pet tags due to cascade rules).
+   */
+  async remove(id: number) {
+    const tag = await this.prisma.tag.findUnique({
+      where: { id },
+      include: { _count: { select: { productTags: true, petTags: true } } },
+    });
+    if (!tag) {
+      throw new NotFoundException('تگ یافت نشد');
+    }
+
+    const used = tag._count.productTags + tag._count.petTags;
+    if (used > 0) {
+      throw new AppException(
+        'CONFLICT',
+        'این تگ در محصولات یا پت‌ها استفاده شده است و قابل حذف نیست',
+        409,
+      );
+    }
+
+    await this.prisma.tag.delete({ where: { id } });
+    return { deleted: true };
   }
 }

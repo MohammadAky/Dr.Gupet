@@ -11,7 +11,7 @@ export function normalizePhone(input: string): string | null {
     .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632));
 
   // Remove spaces, dashes, parentheses, plus
-  normalized = normalized.replace(/[\s\-\(\)\+]/g, '');
+  normalized = normalized.replace(/[\s\-()+]/g, '');
 
   // Handle various prefixes
   if (normalized.startsWith('0098')) {

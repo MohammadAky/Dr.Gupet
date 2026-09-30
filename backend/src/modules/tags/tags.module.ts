@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TagsController } from './tags.controller';
+import { AdminTagsController } from './admin-tags.controller';
 import { TagsService } from './tags.service';
 
 @Module({
-  controllers: [TagsController],
+  controllers: [TagsController, AdminTagsController],
   providers: [TagsService],
   exports: [TagsService],
 })

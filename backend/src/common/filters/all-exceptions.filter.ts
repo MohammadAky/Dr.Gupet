@@ -27,7 +27,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       code = exception.code;
       message = exception.message;
-      details = exception.getResponse()['details'];
+      details = (exception.getResponse() as { details?: unknown[] }).details;
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const response = exception.getResponse();

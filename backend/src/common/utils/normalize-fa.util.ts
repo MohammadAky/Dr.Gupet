@@ -10,6 +10,6 @@ export function normalizeFa(input: string): string {
   return input
     .replace(/ي/g, 'ی')
     .replace(/ك/g, 'ک')
-    .replace(/[‌‍‎‏]/g, '') // Zero-width characters
+    .replace(/\u200c|\u200d|\u200e|\u200f/g, '') // Zero-width characters
     .replace(/[ـ]/g, ''); // Tatweel/kashida
 }

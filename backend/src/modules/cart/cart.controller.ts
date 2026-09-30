@@ -33,10 +33,7 @@ export class CartController {
   @ApiOperation({ summary: 'Add item to cart' })
   @ApiResponse({ status: 201, description: 'Item added' })
   @ApiResponse({ status: 400, description: 'Variant unavailable or out of stock' })
-  async addItem(
-    @CurrentUser('sub') userId: number,
-    @Body() dto: AddCartItemDto,
-  ) {
+  async addItem(@CurrentUser('sub') userId: number, @Body() dto: AddCartItemDto) {
     return this.cartService.addItem(userId, dto.variantId, dto.quantity || 1);
   }
 
@@ -58,10 +55,7 @@ export class CartController {
   @ApiOperation({ summary: 'Remove item from cart' })
   @ApiResponse({ status: 200, description: 'Item removed' })
   @ApiResponse({ status: 404, description: 'Item not found' })
-  async removeItem(
-    @CurrentUser('sub') userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async removeItem(@CurrentUser('sub') userId: number, @Param('id', ParseIntPipe) id: number) {
     return this.cartService.removeItem(userId, id);
   }
 

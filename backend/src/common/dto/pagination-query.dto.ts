@@ -19,10 +19,10 @@ export class PaginationQueryDto {
   limit?: number = 20;
 
   get skip(): number {
-    return (this.page - 1) * this.limit;
+    return ((this.page ?? 1) - 1) * (this.limit ?? 20);
   }
 
   get take(): number {
-    return this.limit;
+    return this.limit ?? 20;
   }
 }

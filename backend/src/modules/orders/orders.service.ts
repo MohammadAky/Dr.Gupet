@@ -6,6 +6,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { OrderStockService } from './order-stock.service';
 import { generateOrderNumber } from '../../common/utils/order-number.util';
 import { AppException } from '../../common/filters/all-exceptions.filter';
+import { SettingsService } from '../../admin/settings/settings.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class OrdersService {
     private couponsService: CouponsService,
     private orderStockService: OrderStockService,
     private configService: ConfigService,
+    private settingsService: SettingsService,
   ) {}
 
   /**
@@ -65,10 +67,7 @@ export class OrdersService {
     }
 
     // 4. Calculate itemsTotal
-    const itemsTotal = cartItems.reduce(
-      (sum, item) => sum + item.variant.price * item.quantity,
-      0,
-    );
+    const itemsTotal = cartItems.reduce((sum, item) => sum + item.variant.price * item.quantity, 0);
 
     // 5. Validate coupon if provided
     let discountAmount = 0;
@@ -89,9 +88,15 @@ export class OrdersService {
       couponId = coupon?.id || null;
     }
 
-    // 6. Calculate shipping
-    const freeShippingThreshold = this.configService.get<number>('app.freeShippingThreshold') || 1500000;
-    const shippingFlatCost = this.configService.get<number>('app.shippingFlatCost') || 50000;
+    // 6. Calculate shipping (Setting table overrides env values)
+    const freeShippingThreshold = await this.settingsService.getNumber(
+      'FREE_SHIPPING_THRESHOLD',
+      this.configService.get<number>('app.freeShippingThreshold') || 1500000,
+    );
+    const shippingFlatCost = await this.settingsService.getNumber(
+      'SHIPPING_FLAT_COST',
+      this.configService.get<number>('app.shippingFlatCost') || 50000,
+    );
     const shippingCost = itemsTotal >= freeShippingThreshold ? 0 : shippingFlatCost;
 
     // 7. Calculate finalAmount
@@ -238,7 +243,11 @@ export class OrdersService {
     }
 
     if (order.status !== 'PENDING_PAYMENT') {
-      throw new AppException('ORDER_INVALID_STATE', 'فقط سفارش‌های در انتظار پرداخت قابل لغو هستند', 400);
+      throw new AppException(
+        'ORDER_INVALID_STATE',
+        'فقط سفارش‌های در انتظار پرداخت قابل لغو هستند',
+        400,
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -271,7 +280,10 @@ export class OrdersService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async expirePendingOrders() {
-    const expireMinutes = this.configService.get<number>('app.orderExpireMinutes') || 30;
+    const expireMinutes = await this.settingsService.getNumber(
+      'ORDER_EXPIRE_MINUTES',
+      this.configService.get<number>('app.orderExpireMinutes') || 30,
+    );
     const cutoff = new Date(Date.now() - expireMinutes * 60 * 1000);
 
     const expiredOrders = await this.prisma.order.findMany({

@@ -32,10 +32,7 @@ export class AddressesController {
   @Post()
   @ApiOperation({ summary: 'Create new address' })
   @ApiResponse({ status: 201, description: 'Address created' })
-  async create(
-    @CurrentUser('sub') userId: number,
-    @Body() dto: CreateAddressDto,
-  ) {
+  async create(@CurrentUser('sub') userId: number, @Body() dto: CreateAddressDto) {
     return this.addressesService.create(userId, dto);
   }
 
@@ -56,10 +53,7 @@ export class AddressesController {
   @ApiOperation({ summary: 'Set address as default' })
   @ApiResponse({ status: 200, description: 'Default address set' })
   @ApiResponse({ status: 404, description: 'Address not found' })
-  async setDefault(
-    @CurrentUser('sub') userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async setDefault(@CurrentUser('sub') userId: number, @Param('id', ParseIntPipe) id: number) {
     return this.addressesService.setDefault(userId, id);
   }
 
@@ -68,10 +62,7 @@ export class AddressesController {
   @ApiOperation({ summary: 'Delete address' })
   @ApiResponse({ status: 200, description: 'Address deleted' })
   @ApiResponse({ status: 404, description: 'Address not found' })
-  async remove(
-    @CurrentUser('sub') userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async remove(@CurrentUser('sub') userId: number, @Param('id', ParseIntPipe) id: number) {
     return this.addressesService.remove(userId, id);
   }
 }

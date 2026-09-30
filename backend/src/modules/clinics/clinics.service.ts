@@ -10,11 +10,13 @@ export class ClinicsService {
   /**
    * List clinics with filtering
    */
-  async findAll(query: PaginationQueryDto & {
-    city?: string;
-    province?: string;
-    is24h?: boolean;
-  }) {
+  async findAll(
+    query: PaginationQueryDto & {
+      city?: string;
+      province?: string;
+      is24h?: boolean | string;
+    },
+  ) {
     const { page = 1, limit = 20, city, province, is24h } = query;
     const skip = (page - 1) * limit;
 
@@ -29,7 +31,8 @@ export class ClinicsService {
     }
 
     if (is24h !== undefined) {
-      where.is24h = is24h;
+      // query params arrive as strings ('true'/'false')
+      where.is24h = is24h === true || is24h === 'true';
     }
 
     const [clinics, total] = await Promise.all([
@@ -47,11 +50,7 @@ export class ClinicsService {
         },
         skip,
         take: limit,
-        orderBy: [
-          { isVerified: 'desc' },
-          { is24h: 'desc' },
-          { name: 'asc' },
-        ],
+        orderBy: [{ isVerified: 'desc' }, { is24h: 'desc' }, { name: 'asc' }],
       }),
       this.prisma.clinic.count({ where }),
     ]);
@@ -120,19 +119,22 @@ export class ClinicsService {
   /**
    * Update clinic (admin only)
    */
-  async update(id: number, data: Partial<{
-    name: string;
-    province: string;
-    city: string;
-    address: string;
-    lat?: number;
-    lng?: number;
-    phone?: string;
-    workingHours?: string;
-    is24h?: boolean;
-    isVerified?: boolean;
-    isActive?: boolean;
-  }>) {
+  async update(
+    id: number,
+    data: Partial<{
+      name: string;
+      province: string;
+      city: string;
+      address: string;
+      lat?: number;
+      lng?: number;
+      phone?: string;
+      workingHours?: string;
+      is24h?: boolean;
+      isVerified?: boolean;
+      isActive?: boolean;
+    }>,
+  ) {
     const clinic = await this.prisma.clinic.findUnique({ where: { id } });
     if (!clinic) {
       throw new NotFoundException('کلینیک یافت نشد');
@@ -154,5 +156,59 @@ export class ClinicsService {
     }
 
     return this.prisma.clinic.delete({ where: { id } });
+  }
+
+  /**
+   * Clinic detail incl. inactive (admin only)
+   */
+  async findOneAdmin(id: number) {
+    const clinic = await this.prisma.clinic.findUnique({ where: { id } });
+    if (!clinic) {
+      throw new NotFoundException('کلینیک یافت نشد');
+    }
+    return clinic;
+  }
+
+  /**
+   * All clinics including inactive (admin only)
+   */
+  async findAllAdmin(query: {
+    page?: number;
+    limit?: number;
+    q?: string;
+    city?: string;
+    province?: string;
+    isActive?: boolean;
+    isVerified?: boolean;
+  }) {
+    const { page = 1, limit = 20, q, city, province, isActive, isVerified } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (isActive !== undefined) where.isActive = isActive;
+    if (isVerified !== undefined) where.isVerified = isVerified;
+    if (q) where.name = { contains: normalizeFa(q), mode: 'insensitive' };
+    if (city) where.city = { contains: normalizeFa(city), mode: 'insensitive' };
+    if (province) where.province = { contains: normalizeFa(province), mode: 'insensitive' };
+
+    const [clinics, total] = await Promise.all([
+      this.prisma.clinic.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.clinic.count({ where }),
+    ]);
+
+    return {
+      data: clinics,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }

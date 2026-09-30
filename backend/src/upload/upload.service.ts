@@ -24,7 +24,8 @@ export class UploadService {
   constructor(private configService: ConfigService) {
     this.uploadDir = this.configService.get<string>('app.uploadDir') || './uploads';
     this.maxMb = this.configService.get<number>('app.uploadMaxMb') || 5;
-    this.publicBaseUrl = this.configService.get<string>('app.publicBaseUrl') || 'http://localhost:3000';
+    this.publicBaseUrl =
+      this.configService.get<string>('app.publicBaseUrl') || 'http://localhost:3000';
 
     // Ensure upload directory exists
     if (!fs.existsSync(this.uploadDir)) {

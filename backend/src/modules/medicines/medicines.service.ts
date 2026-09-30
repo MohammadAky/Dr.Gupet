@@ -11,11 +11,13 @@ export class MedicinesService {
   /**
    * List medicines with filtering
    */
-  async findAll(query: PaginationQueryDto & {
-    q?: string;
-    petTypeId?: number;
-    requiresPrescription?: boolean;
-  }) {
+  async findAll(
+    query: PaginationQueryDto & {
+      q?: string;
+      petTypeId?: number;
+      requiresPrescription?: boolean;
+    },
+  ) {
     const { page = 1, limit = 20, q, petTypeId, requiresPrescription } = query;
     const skip = (page - 1) * limit;
 
@@ -105,5 +107,152 @@ export class MedicinesService {
         lastConfirmedAt: pm.lastConfirmedAt,
       })),
     };
+  }
+
+  // -------------------------------------------------------------------
+  // Admin
+  // -------------------------------------------------------------------
+
+  async findAllAdmin(query: { page?: number; limit?: number; q?: string; isActive?: boolean }) {
+    const { page = 1, limit = 20, q, isActive } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (isActive !== undefined) where.isActive = isActive;
+    if (q) {
+      where.OR = [
+        { name: { contains: normalizeFa(q), mode: 'insensitive' } },
+        { activeIngredient: { contains: normalizeFa(q), mode: 'insensitive' } },
+      ];
+    }
+
+    const [medicines, total] = await Promise.all([
+      this.prisma.medicine.findMany({
+        where,
+        include: {
+          petTypes: { select: { id: true, name: true } },
+          _count: { select: { pharmacies: true } },
+        },
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.medicine.count({ where }),
+    ]);
+
+    return {
+      data: medicines,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOneAdmin(id: number) {
+    const medicine = await this.prisma.medicine.findUnique({
+      where: { id },
+      include: {
+        petTypes: { select: { id: true, name: true } },
+        pharmacies: {
+          include: {
+            pharmacy: {
+              select: {
+                id: true,
+                name: true,
+                city: true,
+                is24h: true,
+                isVerified: true,
+                isActive: true,
+              },
+            },
+          },
+          orderBy: { lastConfirmedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!medicine) {
+      throw new NotFoundException('دارو یافت نشد');
+    }
+
+    return { ...medicine, disclaimer: MEDICINE_DISCLAIMER };
+  }
+
+  async create(data: {
+    name: string;
+    activeIngredient?: string;
+    type?: string;
+    brand?: string;
+    usage?: string;
+    notes?: string;
+    requiresPrescription?: boolean;
+    image?: string;
+    isActive?: boolean;
+    petTypeIds?: number[];
+  }) {
+    return this.prisma.medicine.create({
+      data: {
+        name: normalizeFa(data.name),
+        activeIngredient: data.activeIngredient,
+        type: data.type,
+        brand: data.brand,
+        usage: data.usage,
+        notes: data.notes,
+        requiresPrescription: data.requiresPrescription ?? false,
+        image: data.image,
+        isActive: data.isActive ?? true,
+        petTypes: data.petTypeIds?.length
+          ? { connect: data.petTypeIds.map((petTypeId) => ({ id: petTypeId })) }
+          : undefined,
+      },
+      include: { petTypes: { select: { id: true, name: true } } },
+    });
+  }
+
+  async update(
+    id: number,
+    data: Partial<{
+      name: string;
+      activeIngredient: string;
+      type: string;
+      brand: string;
+      usage: string;
+      notes: string;
+      requiresPrescription: boolean;
+      image: string;
+      isActive: boolean;
+      petTypeIds: number[];
+    }>,
+  ) {
+    const medicine = await this.prisma.medicine.findUnique({ where: { id } });
+    if (!medicine) {
+      throw new NotFoundException('دارو یافت نشد');
+    }
+
+    const { petTypeIds, ...rest } = data;
+    return this.prisma.medicine.update({
+      where: { id },
+      data: {
+        ...rest,
+        name: rest.name != null ? normalizeFa(rest.name) : undefined,
+        petTypes: petTypeIds
+          ? { set: petTypeIds.map((petTypeId) => ({ id: petTypeId })) }
+          : undefined,
+      },
+      include: { petTypes: { select: { id: true, name: true } } },
+    });
+  }
+
+  async remove(id: number) {
+    const medicine = await this.prisma.medicine.findUnique({ where: { id } });
+    if (!medicine) {
+      throw new NotFoundException('دارو یافت نشد');
+    }
+
+    await this.prisma.medicine.delete({ where: { id } });
+    return { deleted: true };
   }
 }

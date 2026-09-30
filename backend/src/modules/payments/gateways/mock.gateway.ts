@@ -1,5 +1,9 @@
-import { PaymentGateway, PaymentRequest, PaymentResponse, PaymentVerification } from './payment-gateway.interface';
-import { tomanToRial } from '../../../common/utils/money.util';
+import {
+  PaymentGateway,
+  PaymentRequest,
+  PaymentResponse,
+  PaymentVerification,
+} from './payment-gateway.interface';
 
 export class MockPaymentGateway implements PaymentGateway {
   async request(data: PaymentRequest): Promise<PaymentResponse> {

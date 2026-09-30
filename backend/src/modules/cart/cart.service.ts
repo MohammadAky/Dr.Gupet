@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAX_CART_ITEM_QTY } from '../../common/constants';
 import { AppException } from '../../common/filters/all-exceptions.filter';
@@ -133,11 +133,7 @@ export class CartService {
       const newQuantity = existingItem.quantity + quantity;
 
       if (newQuantity > MAX_CART_ITEM_QTY) {
-        throw new AppException(
-          'LIMIT_REACHED',
-          `حداکثر تعداد ${MAX_CART_ITEM_QTY} است`,
-          400,
-        );
+        throw new AppException('LIMIT_REACHED', `حداکثر تعداد ${MAX_CART_ITEM_QTY} است`, 400);
       }
 
       if (newQuantity > variant.stock) {
@@ -151,11 +147,7 @@ export class CartService {
     } else {
       // Create new item
       if (quantity > MAX_CART_ITEM_QTY) {
-        throw new AppException(
-          'LIMIT_REACHED',
-          `حداکثر تعداد ${MAX_CART_ITEM_QTY} است`,
-          400,
-        );
+        throw new AppException('LIMIT_REACHED', `حداکثر تعداد ${MAX_CART_ITEM_QTY} است`, 400);
       }
 
       await this.prisma.cartItem.create({

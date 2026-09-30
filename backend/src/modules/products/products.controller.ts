@@ -28,12 +28,7 @@ export class ProductsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.recommendationsService.findForPet(
-      userId,
-      Number(petId),
-      page || 1,
-      limit || 20,
-    );
+    return this.recommendationsService.findForPet(userId, Number(petId), page || 1, limit || 20);
   }
 
   @Public()

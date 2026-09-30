@@ -16,7 +16,7 @@ export function slugify(input: string): string {
     .replace(/[ٱ]/g, 'ا');
 
   // Remove zero-width characters and tatweel
-  slug = slug.replace(/[‌‍‎‏ـ]/g, '');
+  slug = slug.replace(/\u200c|\u200d|\u200e|\u200f|\u0640/g, '');
 
   // Replace punctuation and whitespace with single dash
   slug = slug

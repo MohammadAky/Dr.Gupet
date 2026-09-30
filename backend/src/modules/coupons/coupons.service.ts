@@ -20,12 +20,7 @@ export class CouponsService {
    * Evaluate coupon - single reusable validation function
    * Used by validate endpoint and checkout
    */
-  async evaluate(
-    code: string,
-    userId: number,
-    itemsTotal: number,
-    tx?: Prisma.TransactionClient,
-  ) {
+  async evaluate(code: string, userId: number, itemsTotal: number, tx?: Prisma.TransactionClient) {
     const client = tx || this.prisma;
 
     // 1. Find coupon
@@ -73,12 +68,16 @@ export class CouponsService {
       });
 
       if (userRedemptions >= coupon.perUserLimit) {
-        throw new AppException('COUPON_LIMIT_REACHED', 'شما قبلاً از این کد تخفیف استفاده کرده‌اید', 400);
+        throw new AppException(
+          'COUPON_LIMIT_REACHED',
+          'شما قبلاً از این کد تخفیف استفاده کرده‌اید',
+          400,
+        );
       }
     }
 
     // 6. Calculate discount
-    let discount = 0;
+    let discount: number;
 
     if (coupon.type === 'PERCENT') {
       discount = Math.floor((itemsTotal * coupon.value) / 100);

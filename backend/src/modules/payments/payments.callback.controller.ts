@@ -28,13 +28,12 @@ export class PaymentsCallbackController {
     const status = req.query.Status as string;
     const success = status === 'OK' || status === undefined;
 
-    const result = await this.paymentsService.handleCallback(
-      Number(paymentId),
-      success,
-    );
+    const result = await this.paymentsService.handleCallback(Number(paymentId), success);
 
     // Redirect to frontend result page
-    const frontendUrl = this.configService.get<string>('payment.frontendResultUrl') || 'http://localhost:5173/payment/result';
+    const frontendUrl =
+      this.configService.get<string>('payment.frontendResultUrl') ||
+      'http://localhost:5173/payment/result';
     const redirectUrl = `${frontendUrl}?orderId=${result.orderId}&orderNumber=${result.orderNumber}&status=${result.success ? 'success' : 'failed'}`;
 
     res.redirect(redirectUrl);
@@ -50,7 +49,9 @@ export class PaymentsCallbackController {
     @Res() res: Response,
   ) {
     // In dev mode, auto-redirect to callback with success
-    const callbackUrl = this.configService.get<string>('payment.callbackUrl') || 'http://localhost:3000/api/v1/payments/callback';
+    const callbackUrl =
+      this.configService.get<string>('payment.callbackUrl') ||
+      'http://localhost:3000/api/v1/payments/callback';
     res.redirect(`${callbackUrl}?paymentId=${paymentId}&Status=OK`);
   }
 }

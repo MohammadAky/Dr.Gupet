@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAX_PETS_PER_USER } from '../../common/constants';
 
@@ -192,7 +197,11 @@ export class PetsService {
   /**
    * Replace all tags for a pet (in a transaction)
    */
-  async setTags(userId: number, petId: number, data: { allergenTagIds: number[]; dietTagIds: number[] }) {
+  async setTags(
+    userId: number,
+    petId: number,
+    data: { allergenTagIds: number[]; dietTagIds: number[] },
+  ) {
     const pet = await this.prisma.pet.findUnique({
       where: { id: petId, deletedAt: null },
     });
@@ -275,8 +284,7 @@ export class PetsService {
     const now = new Date();
     const birth = new Date(birthDate);
     const monthsDiff =
-      (now.getFullYear() - birth.getFullYear()) * 12 +
-      (now.getMonth() - birth.getMonth());
+      (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
 
     if (monthsDiff < 12) return 'PUPPY_KITTEN';
     if (monthsDiff >= 84) return 'SENIOR';

@@ -103,10 +103,7 @@ export class PaymentsService {
     }
 
     // Verify with gateway (server-to-server)
-    const verifyResult = await this.gateway.verify(
-      payment.gatewayRef || '',
-      payment.amount,
-    );
+    const verifyResult = await this.gateway.verify(payment.gatewayRef || '', payment.amount);
 
     if (!verifyResult.success) {
       await this.prisma.payment.update({
@@ -144,7 +141,7 @@ export class PaymentsService {
           `پرداخت سفارش ${payment.order.orderNumber} با موفقیت انجام شد.`,
         );
       }
-    } catch (error) {
+    } catch {
       // SMS failure should not break payment flow
     }
 

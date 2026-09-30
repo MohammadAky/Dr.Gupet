@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
@@ -32,6 +32,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { MedicinesModule } from './modules/medicines/medicines.module';
 import { PharmaciesModule } from './modules/pharmacies/pharmacies.module';
 import { ClinicsModule } from './modules/clinics/clinics.module';
+import { AdminModule } from './admin/admin.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -50,8 +51,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     // Rate limiting
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: () => ({
         throttlers: [
           {
             ttl: 60000,
@@ -70,6 +70,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     SmsModule,
 
     // Feature modules
+    AdminModule,
     HealthModule,
     AuthModule,
     UsersModule,

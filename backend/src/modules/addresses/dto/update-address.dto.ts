@@ -47,7 +47,7 @@ export class UpdateAddressDto {
   @IsOptional()
   lat?: number;
 
-  @ApiPropertyOptional({ example: 51.3890 })
+  @ApiPropertyOptional({ example: 51.389 })
   @IsOptional()
   lng?: number;
 }

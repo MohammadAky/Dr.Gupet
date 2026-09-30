@@ -26,10 +26,7 @@ export class MedicinesController {
   @ApiQuery({ name: 'city', required: false })
   @ApiResponse({ status: 200, description: 'Medicine returned' })
   @ApiResponse({ status: 404, description: 'Medicine not found' })
-  async findOne(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('city') city?: string,
-  ) {
+  async findOne(@Param('id', ParseIntPipe) id: number, @Query('city') city?: string) {
     return this.medicinesService.findOne(id, city);
   }
 }

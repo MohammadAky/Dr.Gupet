@@ -1,4 +1,9 @@
-import { PaymentGateway, PaymentRequest, PaymentResponse, PaymentVerification } from './payment-gateway.interface';
+import {
+  PaymentGateway,
+  PaymentRequest,
+  PaymentResponse,
+  PaymentVerification,
+} from './payment-gateway.interface';
 import { tomanToRial } from '../../../common/utils/money.util';
 
 export class ZarinpalPaymentGateway implements PaymentGateway {

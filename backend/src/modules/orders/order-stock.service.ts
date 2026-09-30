@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 
@@ -8,10 +8,7 @@ export class OrderStockService {
    * Reserve stock atomically for order items
    * Throws OUT_OF_STOCK if any variant has insufficient stock
    */
-  async reserve(
-    tx: Prisma.TransactionClient,
-    items: { variantId: number; quantity: number }[],
-  ) {
+  async reserve(tx: Prisma.TransactionClient, items: { variantId: number; quantity: number }[]) {
     for (const item of items) {
       const result = await tx.productVariant.updateMany({
         where: {

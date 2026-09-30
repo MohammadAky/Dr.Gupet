@@ -18,10 +18,7 @@ export class CouponsController {
   @ApiOperation({ summary: 'Validate coupon and preview discount' })
   @ApiResponse({ status: 200, description: 'Coupon validated' })
   @ApiResponse({ status: 400, description: 'Invalid coupon' })
-  async validate(
-    @CurrentUser('sub') userId: number,
-    @Body() dto: ApplyCouponDto,
-  ) {
+  async validate(@CurrentUser('sub') userId: number, @Body() dto: ApplyCouponDto) {
     // Get cart total
     const cart = await this.cartService.getCart(userId);
     const itemsTotal = cart.itemsTotal;
