@@ -402,6 +402,7 @@ curl -s "$BASE/medicines/1"
 | فیلتر تگ: بدون تگ / یکی از دو تگ / هر دو تگ + تگ اضافه (حذف نشود) | `products.tag-filter.spec.ts` | #4 |
 | اعتبارسنجی query (is24h/inStock فقط true/false، طول متن، page/limit، کلید ناشناس → 400) | `query-dto.validation.spec.ts` | #5 |
 | ادمین کلینیک غیرفعال را می‌بیند (با صفحه‌بندی) / عمومی 404 / فعال‌سازی مجدد | `clinics.visibility.spec.ts` | #6 |
+| باکت‌های روزانه وابسته به منطقه زمانی (نیمه‌شب تهران/UTC، یک روز محلی = یک باکت، تطابق داشبورد و گزارش) | `day-bucket.spec.ts` + `reports-consistency.spec.ts` | #8 |
 
 ---
 

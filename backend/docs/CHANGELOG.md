@@ -2,6 +2,9 @@
 
 ## [Unreleased] - GitHub issue fixes (2026-10-01)
 
+### Fixed
+- **Timezone-aware daily buckets (issue #8):** `dayKey` no longer uses `toISOString()` (UTC). Reports and dashboard now share `src/common/day-bucket.ts` with an `tz` query param (IANA, default `Asia/Tehran`): bucket keys are local calendar days, `revenueToday` starts at **local** midnight, the 14-day charts walk local calendar days, and the default report range is 30 local days. Dashboard `revenueToday` is now guaranteed to equal report `byDay[today]` for the same `tz`. Invalid `tz` → `400`. Tests cover Asia/Tehran and UTC midnight boundaries and the old split-day scenario.
+
 ### Added
 - **Query DTOs (issue #5):** `ClinicQueryDto`, `PharmacyQueryDto` (new, wired into public controllers), `ProductQueryDto` now actually wired into `GET /products` (replacing `PaginationQueryDto & any`). `is24h`/`onDuty`/`inStock` accept **only** `true`/`false` (strict transform — anything else is `400`, including the old `'1'`/`coercion` paths); `q` capped at 100 chars; `page>=1`, `1<=limit<=50`; unknown keys rejected (`forbidNonWhitelisted`).
 - **Cart estimate (issue #2):** `GET /cart` now returns `estimate` (`itemsTotal`, `shippingCost`, `freeShippingThreshold` from `Settings` with env fallback, plus a note that checkout computes the final amount).

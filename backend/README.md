@@ -238,6 +238,7 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 |---|---|
 | هسته | `GET /admin/me`، `GET /admin/dashboard` (KPI/نمودار/سفارش‌های اخیر/پرفروش‌ها) |
 | گزارش‌ها | `GET /admin/reports/{sales, top-products, low-stock, users, coupons}` + نسخه‌های `.csv` |
+| منطقه زمانی | پارامتر `tz` (نام IANA، پیش‌فرض `Asia/Tehran`) در dashboard و گزارش‌ها — باکت‌های روزانه (`YYYY-MM-DD`) روزهای تقویمی همان منطقه‌اند، نه روزهای UTC (issue #8) |
 | تنظیمات | `GET /admin/settings`، `PUT /admin/settings`، `DELETE /admin/settings/:key` (کلیدهای مجاز: `SHIPPING_FLAT_COST`، `FREE_SHIPPING_THRESHOLD`، `ORDER_EXPIRE_MINUTES` — مقدار جدول بر env مقدم است) |
 | لاگ تغییرات | `GET /admin/audit-logs` (فیلتر entity/action/adminId) |
 | کاربران | `GET/POST/PATCH/DELETE /admin/users...` + `PATCH /admin/users/:id/restore` (جستجو، نقش/وضعیت، حذف نرم) |

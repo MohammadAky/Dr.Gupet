@@ -1,24 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LOW_STOCK_THRESHOLD } from '../../common/constants';
+import {
+  DEFAULT_TZ,
+  assertValidTz,
+  dayKey,
+  startOfLocalDay,
+  lastNLocalDayStarts,
+} from '../../common/day-bucket';
 
 const PAID_STATUSES = ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
-
-function dayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
 
 /**
  * Aggregated KPIs and charts for the admin dashboard.
  * Aggregation is done in JS over bounded windows — fine for MVP scale.
+ * Day buckets follow the `tz` contract (issue #8) — same boundary as reports.
  */
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getOverview() {
+  async getOverview(tzInput?: string) {
+    const tz = assertValidTz(tzInput ?? DEFAULT_TZ);
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStart = startOfLocalDay(now, tz);
     const window30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const window24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const window14d = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -86,23 +91,23 @@ export class DashboardService {
       }),
     ]);
 
-    // Daily series (last 14 days)
+    // Daily series (last 14 local calendar days in `tz`)
     const salesByDay = new Map<string, { revenue: number; orders: number }>();
     const signupByDay = new Map<string, number>();
-    for (let i = 13; i >= 0; i--) {
-      const key = dayKey(new Date(now.getTime() - i * 24 * 60 * 60 * 1000));
+    for (const dayStart of lastNLocalDayStarts(now, tz, 14)) {
+      const key = dayKey(dayStart, tz);
       salesByDay.set(key, { revenue: 0, orders: 0 });
       signupByDay.set(key, 0);
     }
     for (const order of salesOrders) {
-      const entry = salesByDay.get(dayKey(order.createdAt));
+      const entry = salesByDay.get(dayKey(order.createdAt, tz));
       if (entry) {
         entry.revenue += order.finalAmount;
         entry.orders += 1;
       }
     }
     for (const user of signups) {
-      const key = dayKey(user.createdAt);
+      const key = dayKey(user.createdAt, tz);
       if (signupByDay.has(key)) signupByDay.set(key, (signupByDay.get(key) || 0) + 1);
     }
 
@@ -112,6 +117,7 @@ export class DashboardService {
     }
 
     return {
+      tz,
       totals: {
         users: totalUsers,
         newUsers30d,

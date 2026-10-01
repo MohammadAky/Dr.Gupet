@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -41,7 +41,7 @@ export class DashboardController {
   @Get('dashboard')
   @ApiOperation({ summary: 'Dashboard KPIs and charts (admin only)' })
   @ApiResponse({ status: 200, description: 'Dashboard overview' })
-  async overview() {
-    return this.dashboardService.getOverview();
+  async overview(@Query('tz') tz?: string) {
+    return this.dashboardService.getOverview(tz);
   }
 }

@@ -1,24 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LOW_STOCK_THRESHOLD } from '../../common/constants';
+import {
+  assertValidTz,
+  dayKey as localDayKey,
+  startOfLocalDay,
+  previousLocalDayStart,
+} from '../../common/day-bucket';
 
 const PAID_STATUSES = ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
 
 export interface ReportRange {
   from?: string;
   to?: string;
+  /** IANA timezone for day buckets (default: Asia/Tehran). */
+  tz?: string;
 }
 
-function rangeDates(range: ReportRange): { start: Date; end: Date } {
+function rangeDates(range: ReportRange): { start: Date; end: Date; tz: string } {
+  const tz = assertValidTz(range.tz);
   const end = range.to ? new Date(range.to) : new Date();
-  const start = range.from
-    ? new Date(range.from)
-    : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-  return { start, end };
+  const start = range.from ? new Date(range.from) : startOfNDaysAgo(end, tz, 30);
+  return { start, end, tz };
 }
 
-function dayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+/** Start of the local day `n-1` days before `end`'s local day (n-day window). */
+function startOfNDaysAgo(end: Date, tz: string, n: number): Date {
+  let start = startOfLocalDay(end, tz);
+  for (let i = 1; i < n; i++) {
+    start = previousLocalDayStart(start, tz);
+  }
+  return start;
 }
 
 function toCsv(headers: string[], rows: (string | number)[][]): string {
@@ -35,7 +47,7 @@ export class ReportsService {
 
   /** Sales report: daily revenue/orders plus totals and status breakdown. */
   async sales(range: ReportRange) {
-    const { start, end } = rangeDates(range);
+    const { start, end, tz } = rangeDates(range);
 
     const [orders, byStatus] = await Promise.all([
       this.prisma.order.findMany({
@@ -53,7 +65,7 @@ export class ReportsService {
     let revenue = 0;
     let paidOrders = 0;
     for (const order of orders) {
-      const key = dayKey(order.createdAt);
+      const key = localDayKey(order.createdAt, tz);
       const entry = byDay.get(key) || { orders: 0, revenue: 0 };
       entry.orders += 1;
       if ((PAID_STATUSES as readonly string[]).includes(order.status)) {
@@ -67,6 +79,7 @@ export class ReportsService {
     return {
       from: start,
       to: end,
+      tz,
       totals: { orders: orders.length, paidOrders, revenue },
       byStatus: byStatus.map((row) => ({ status: row.status, count: row._count._all })),
       byDay: [...byDay.entries()]
@@ -113,7 +126,7 @@ export class ReportsService {
   }
 
   async userGrowth(range: ReportRange) {
-    const { start, end } = rangeDates(range);
+    const { start, end, tz } = rangeDates(range);
     const users = await this.prisma.user.findMany({
       where: { deletedAt: null, createdAt: { gte: start, lte: end } },
       select: { createdAt: true, role: true },
@@ -122,7 +135,7 @@ export class ReportsService {
     const byDay = new Map<string, number>();
     let admins = 0;
     for (const user of users) {
-      const key = dayKey(user.createdAt);
+      const key = localDayKey(user.createdAt, tz);
       byDay.set(key, (byDay.get(key) || 0) + 1);
       if (user.role === 'ADMIN') admins += 1;
     }
@@ -130,6 +143,7 @@ export class ReportsService {
     return {
       from: start,
       to: end,
+      tz,
       totals: { users: users.length, admins, customers: users.length - admins },
       byDay: [...byDay.entries()]
         .map(([date, count]) => ({ date, count }))
