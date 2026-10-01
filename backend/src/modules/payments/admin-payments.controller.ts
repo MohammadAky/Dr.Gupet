@@ -44,7 +44,7 @@ export class AdminPaymentsController {
   async reconcile(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.adminPaymentsService.reconcile(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Payment',
       entityId: id,
@@ -61,7 +61,7 @@ export class AdminPaymentsController {
   async markFailed(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const payment = await this.adminPaymentsService.markFailed(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Payment',
       entityId: id,

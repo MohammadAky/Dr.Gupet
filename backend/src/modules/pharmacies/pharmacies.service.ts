@@ -15,9 +15,10 @@ export class PharmaciesService {
       city?: string;
       province?: string;
       is24h?: boolean | string;
+      onDuty?: boolean | string;
     },
   ) {
-    const { page = 1, limit = 20, city, province, is24h } = query;
+    const { page = 1, limit = 20, city, province, is24h, onDuty } = query;
     const skip = (page - 1) * limit;
 
     const where: any = { isActive: true };
@@ -35,6 +36,10 @@ export class PharmaciesService {
       where.is24h = is24h === true || is24h === 'true';
     }
 
+    if (onDuty !== undefined) {
+      where.onDuty = onDuty === true || onDuty === 'true';
+    }
+
     const [pharmacies, total] = await Promise.all([
       this.prisma.pharmacy.findMany({
         where,
@@ -46,6 +51,7 @@ export class PharmaciesService {
           address: true,
           phone: true,
           is24h: true,
+          onDuty: true,
           isVerified: true,
         },
         skip,

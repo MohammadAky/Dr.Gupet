@@ -50,7 +50,7 @@ export class AdminClinicsController {
   ) {
     const clinic = await this.clinicsService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Clinic',
       entityId: clinic.id,
@@ -113,7 +113,7 @@ export class AdminClinicsController {
   ) {
     const clinic = await this.clinicsService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Clinic',
       entityId: id,
@@ -130,7 +130,7 @@ export class AdminClinicsController {
   async delete(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const clinic = await this.clinicsService.delete(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Clinic',
       entityId: id,

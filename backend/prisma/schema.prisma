@@ -397,6 +397,7 @@ model Pharmacy {
   phone        String?
   workingHours String?
   is24h        Boolean @default(false)
+  onDuty       Boolean @default(false)
   isVerified   Boolean @default(false)
   isActive     Boolean @default(true)
 

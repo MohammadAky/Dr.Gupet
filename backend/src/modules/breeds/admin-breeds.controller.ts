@@ -42,7 +42,7 @@ export class AdminBreedsController {
   ) {
     const breed = await this.breedsService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Breed',
       entityId: breed.id,
@@ -61,7 +61,7 @@ export class AdminBreedsController {
   ) {
     const breed = await this.breedsService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Breed',
       entityId: id,
@@ -76,7 +76,7 @@ export class AdminBreedsController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.breedsService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Breed',
       entityId: id,

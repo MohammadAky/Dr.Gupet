@@ -39,7 +39,7 @@ export class AdminTagsController {
   async create(@Body() body: { name: string; slug?: string; type: string }, @Req() req: any) {
     const tag = await this.tagsService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Tag',
       entityId: tag.id,
@@ -58,7 +58,7 @@ export class AdminTagsController {
   ) {
     const tag = await this.tagsService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Tag',
       entityId: id,
@@ -73,7 +73,7 @@ export class AdminTagsController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.tagsService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Tag',
       entityId: id,

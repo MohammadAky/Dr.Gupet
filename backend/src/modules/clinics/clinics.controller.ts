@@ -1,8 +1,8 @@
 import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ClinicsService } from './clinics.service';
+import { ClinicQueryDto } from './dto/clinic-query.dto';
 import { Public } from '../../common/decorators/public.decorator';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @ApiTags('Clinics')
 @Controller('clinics')
@@ -12,11 +12,9 @@ export class ClinicsController {
   @Public()
   @Get()
   @ApiOperation({ summary: 'List clinics' })
-  @ApiQuery({ name: 'city', required: false, description: 'Filter by city' })
-  @ApiQuery({ name: 'province', required: false, description: 'Filter by province' })
-  @ApiQuery({ name: 'is24h', required: false, description: 'Filter 24-hour clinics' })
   @ApiResponse({ status: 200, description: 'Clinics returned' })
-  async findAll(@Query() query: PaginationQueryDto & any) {
+  @ApiResponse({ status: 400, description: 'Invalid query (e.g. is24h not true/false)' })
+  async findAll(@Query() query: ClinicQueryDto) {
     return this.clinicsService.findAll(query);
   }
 

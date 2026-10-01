@@ -39,6 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new AppException('USER_BLOCKED', 'حساب کاربری شما مسدود شده است', 403);
     }
 
-    return { id: user.id, role: user.role };
+    // Single identity contract: request.user = { sub, role } (see JwtPayload)
+    return { sub: user.id, role: user.role };
   }
 }

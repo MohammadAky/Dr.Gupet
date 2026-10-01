@@ -12,8 +12,8 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { OrderQueryDto } from './dto/order-query.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -32,8 +32,8 @@ export class OrdersController {
   @Get()
   @ApiOperation({ summary: 'Get my orders' })
   @ApiResponse({ status: 200, description: 'Orders returned' })
-  async findAll(@CurrentUser('sub') userId: number, @Query() query: PaginationQueryDto) {
-    return this.ordersService.findAll(userId, query.page, query.limit);
+  async findAll(@CurrentUser('sub') userId: number, @Query() query: OrderQueryDto) {
+    return this.ordersService.findAll(userId, query.page, query.limit, query.status);
   }
 
   @Get(':id')

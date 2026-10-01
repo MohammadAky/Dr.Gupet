@@ -22,7 +22,7 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Admin user row' })
   async me(@Req() req: any) {
     const user = await this.prisma.user.findUnique({
-      where: { id: req.user.id, deletedAt: null },
+      where: { id: req.user.sub, deletedAt: null },
       select: {
         id: true,
         firstName: true,

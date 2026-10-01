@@ -1,11 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAX_CART_ITEM_QTY } from '../../common/constants';
 import { AppException } from '../../common/filters/all-exceptions.filter';
+import { SettingsService } from '../../admin/settings/settings.service';
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settingsService: SettingsService,
+    private configService: ConfigService,
+  ) {}
 
   /**
    * Get cart with computed totals
@@ -92,9 +98,26 @@ export class CartService {
 
     const itemsTotal = items.reduce((sum, item) => sum + item.total, 0);
 
+    // Estimated shipping — the server computes the authoritative amount at checkout
+    const freeShippingThreshold = await this.settingsService.getNumber(
+      'FREE_SHIPPING_THRESHOLD',
+      this.configService.get<number>('app.freeShippingThreshold') || 1500000,
+    );
+    const shippingFlatCost = await this.settingsService.getNumber(
+      'SHIPPING_FLAT_COST',
+      this.configService.get<number>('app.shippingFlatCost') || 50000,
+    );
+    const estimatedShipping = itemsTotal >= freeShippingThreshold ? 0 : shippingFlatCost;
+
     return {
       items,
       itemsTotal,
+      estimate: {
+        itemsTotal,
+        shippingCost: estimatedShipping,
+        freeShippingThreshold,
+        note: 'تخمین است؛ مبلغ قطعی هنگام ثبت سفارش محاسبه می‌شود',
+      },
     };
   }
 

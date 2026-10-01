@@ -2,9 +2,9 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { ProductsRecommendationService } from './products-recommendation.service';
+import { ProductQueryDto } from './dto/product-query.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -35,7 +35,8 @@ export class ProductsController {
   @Get()
   @ApiOperation({ summary: 'Get products with filtering' })
   @ApiResponse({ status: 200, description: 'Products returned' })
-  async findAll(@Query() query: PaginationQueryDto & any) {
+  @ApiResponse({ status: 400, description: 'Invalid query' })
+  async findAll(@Query() query: ProductQueryDto) {
     return this.productsService.findAll(query);
   }
 

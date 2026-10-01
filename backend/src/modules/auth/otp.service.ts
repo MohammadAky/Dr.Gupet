@@ -98,8 +98,14 @@ export class OtpService {
       throw new AppException('OTP_INVALID', 'کد تایید نادرست است', 401);
     }
 
-    // Success — delete all OTP keys for this phone
-    await this.redis.del(otpKey, attemptsKey);
+    // Success — atomically claim the OTP. DEL returns how many keys were
+    // removed: exactly one concurrent verification can win this claim.
+    const claimed = await this.redis.del(otpKey);
+    if (claimed === 0) {
+      // Another request already consumed this OTP.
+      throw new AppException('OTP_INVALID', 'کد تایید قبلاً استفاده شده است', 401);
+    }
+    await this.redis.del(attemptsKey);
 
     return true;
   }

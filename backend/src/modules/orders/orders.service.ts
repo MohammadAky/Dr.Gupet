@@ -164,14 +164,19 @@ export class OrdersService {
   }
 
   /**
-   * Get my orders (paginated)
+   * Get my orders (paginated, optional status filter)
    */
-  async findAll(userId: number, page: number = 1, limit: number = 20) {
+  async findAll(userId: number, page: number = 1, limit: number = 20, status?: string) {
     const skip = (page - 1) * limit;
+
+    const where: { userId: number; status?: string } = { userId };
+    if (status) {
+      where.status = status;
+    }
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
-        where: { userId },
+        where,
         include: {
           items: {
             select: {
@@ -193,7 +198,7 @@ export class OrdersService {
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.order.count({ where: { userId } }),
+      this.prisma.order.count({ where }),
     ]);
 
     return {

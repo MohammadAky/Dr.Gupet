@@ -85,16 +85,23 @@ export class ProductsService {
       where.sizeClass = { in: [sizeClass, 'ALL'] };
     }
 
-    // Filter by tags (product must have ALL given tags)
+    // Filter by tags: the product must contain EVERY selected tag
+    // (kind=SUITABLE_FOR). One `some` clause per tag enforces "has all";
+    // unrelated extra tags never exclude the product.
     if (tagIds) {
       const ids = tagIds.split(',').map(Number).filter(Boolean);
       if (ids.length > 0) {
-        where.tags = {
-          every: {
-            tagId: { in: ids },
-            kind: 'SUITABLE_FOR',
-          },
-        };
+        where.AND = [
+          ...(where.AND ?? []),
+          ...ids.map((tagId) => ({
+            tags: {
+              some: {
+                tagId,
+                kind: 'SUITABLE_FOR',
+              },
+            },
+          })),
+        ];
       }
     }
 
@@ -137,7 +144,7 @@ export class ProductsService {
           images: { take: 1, select: { url: true } },
           variants: {
             where: { isActive: true },
-            select: { price: true, stock: true },
+            select: { price: true, compareAtPrice: true, stock: true },
             orderBy: { price: 'asc' },
           },
         },
@@ -151,7 +158,12 @@ export class ProductsService {
     // Transform to product card shape
     const items = products.map((product) => {
       const activeVariants = product.variants;
-      const minPrice = activeVariants.length > 0 ? activeVariants[0].price : 0;
+      const cheapest = activeVariants[0];
+      const minPrice = cheapest ? cheapest.price : 0;
+      const compareAtPrice =
+        cheapest && cheapest.compareAtPrice && cheapest.compareAtPrice > cheapest.price
+          ? cheapest.compareAtPrice
+          : null;
       const inStock = activeVariants.some((v) => v.stock > 0);
 
       return {
@@ -161,6 +173,7 @@ export class ProductsService {
         brand: product.brand,
         image: product.images[0]?.url || null,
         minPrice,
+        compareAtPrice,
         inStock,
         lifeStage: product.lifeStage,
         sizeClass: product.sizeClass,

@@ -258,6 +258,7 @@ async function main() {
       address: 'خیابان ولیعصر، پلاک ۱۲۳',
       phone: '02112345678',
       is24h: true,
+      onDuty: true,
       isVerified: true,
     },
     {

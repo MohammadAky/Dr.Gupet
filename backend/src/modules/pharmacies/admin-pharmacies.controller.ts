@@ -74,7 +74,7 @@ export class AdminPharmaciesController {
   ) {
     const pharmacy = await this.pharmaciesService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Pharmacy',
       entityId: pharmacy.id,
@@ -106,7 +106,7 @@ export class AdminPharmaciesController {
   ) {
     const pharmacy = await this.pharmaciesService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Pharmacy',
       entityId: id,
@@ -121,7 +121,7 @@ export class AdminPharmaciesController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.pharmaciesService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Pharmacy',
       entityId: id,
@@ -143,7 +143,7 @@ export class AdminPharmaciesController {
   ) {
     const link = await this.pharmaciesService.linkMedicine(id, medicineId, body?.note);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'PharmacyMedicine',
       entityId: `${id}-${medicineId}`,
@@ -162,7 +162,7 @@ export class AdminPharmaciesController {
   ) {
     const result = await this.pharmaciesService.unlinkMedicine(id, medicineId);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'PharmacyMedicine',
       entityId: `${id}-${medicineId}`,

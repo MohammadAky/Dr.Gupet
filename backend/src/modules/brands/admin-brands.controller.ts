@@ -49,7 +49,7 @@ export class AdminBrandsController {
   ) {
     const brand = await this.brandsService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Brand',
       entityId: brand.id,
@@ -75,7 +75,7 @@ export class AdminBrandsController {
   ) {
     const brand = await this.brandsService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Brand',
       entityId: id,
@@ -90,7 +90,7 @@ export class AdminBrandsController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.brandsService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Brand',
       entityId: id,

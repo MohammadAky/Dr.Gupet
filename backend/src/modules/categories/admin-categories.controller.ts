@@ -50,7 +50,7 @@ export class AdminCategoriesController {
   ) {
     const category = await this.categoriesService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'ProductCategory',
       entityId: category.id,
@@ -76,7 +76,7 @@ export class AdminCategoriesController {
   ) {
     const category = await this.categoriesService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'ProductCategory',
       entityId: id,
@@ -91,7 +91,7 @@ export class AdminCategoriesController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.categoriesService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'ProductCategory',
       entityId: id,

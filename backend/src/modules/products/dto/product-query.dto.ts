@@ -1,12 +1,13 @@
-import { IsOptional, IsString, IsNumber, IsBoolean, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsBoolean, IsIn, MaxLength } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 export class ProductQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ description: 'Search by name' })
+  @ApiPropertyOptional({ description: 'Search by name', maxLength: 100 })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   q?: string;
 
   @ApiPropertyOptional({ description: 'Filter by pet type ID' })
@@ -53,9 +54,14 @@ export class ProductQueryDto extends PaginationQueryDto {
   @IsNumber()
   maxPrice?: number;
 
-  @ApiPropertyOptional({ description: 'In stock only' })
+  @ApiPropertyOptional({ description: 'In stock only', enum: ['true', 'false'] })
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true || value === '1')
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value; // anything else reaches @IsBoolean and is rejected with 400
+  })
   @IsBoolean()
   inStock?: boolean;
 

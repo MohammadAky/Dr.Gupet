@@ -1,5 +1,27 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - GitHub issue fixes (2026-10-01)
+
+### Added
+- **Query DTOs (issue #5):** `ClinicQueryDto`, `PharmacyQueryDto` (new, wired into public controllers), `ProductQueryDto` now actually wired into `GET /products` (replacing `PaginationQueryDto & any`). `is24h`/`onDuty`/`inStock` accept **only** `true`/`false` (strict transform — anything else is `400`, including the old `'1'`/`coercion` paths); `q` capped at 100 chars; `page>=1`, `1<=limit<=50`; unknown keys rejected (`forbidNonWhitelisted`).
+- **Cart estimate (issue #2):** `GET /cart` now returns `estimate` (`itemsTotal`, `shippingCost`, `freeShippingThreshold` from `Settings` with env fallback, plus a note that checkout computes the final amount).
+- **Orders status filter (issue #2):** `GET /orders?status=` (validated `OrderQueryDto`) filters within the caller's own orders.
+- **OTP cooldown (issue #2):** `POST /auth/request-otp` response now includes `cooldownSeconds` alongside `expiresIn`.
+- **Product card contract (issue #2):** `compareAtPrice` added to the product-card shape (from the cheapest active variant, only when > price).
+- **Tests (40 new):** concurrent OTP verify (exactly one success), concurrent refresh (one success/one 401), refresh rotation + logout, tag `tagIds` SUITABLE_FOR semantics (3 cases + kind guard), clinic/pharmacy/product/order query-DTO validation, clinic admin-vs-public visibility (inactive + pagination + reactivation), orders/addresses two-user isolation, JWT identity contract + `CurrentUser` guard. Total suite: 54 tests.
+
+### Fixed
+- **OTP/refresh race conditions (issue #7):** successful OTP verification now *atomically claims* the code (`DEL` result must be 1 — exactly one concurrent verification wins); refresh-token consumption likewise claims via `DEL` (rotation: one concurrent refresh wins, the other gets `401`). Wrong codes still do not consume the OTP (5-attempt flow intact).
+- **Identity leak (issue #3):** single identity contract `request.user = { sub, role }` (JwtStrategy), `@CurrentUser('sub')` across controllers; the decorator throws `401` *before any query* when the requested field is missing (the old `req.user.id` → `undefined` Prisma-filter leak is gone).
+- **Tag filter (issue #4):** `tagIds` now requires **every** selected `SUITABLE_FOR` tag (`AND` of `tags.some`) instead of `every` on the product's own tag list — a product with extra tags is no longer excluded.
+- **Pharmacies contract (issue #2):** `onDuty` filter supported (`PharmacyQueryDto` + service `where.onDuty`) and returned in list payloads; `Pharmacy.onDuty Boolean @default(false)` added to the schema (migration `pharmacy_on_duty`) to match the API contract.
+
+### Docs / evidence (issue #2)
+- First Prisma migration committed (`prisma/migrations/20261001095815_init` + `migration_lock.toml`) — SQLite via `DATABASE_URL="file:./dev.db"` (`.env.example`).
+- Local evidence run: `npx prisma migrate dev --name init` ✅ → `npm run prisma:seed` ✅ (13 seed groups) → boot ✅ → `GET /api/v1/health` → `{"success":true,"data":{"status":"ok"}}`; live validation evidence: `?inStock=maybe` and `?is24h=banana` → `400 VALIDATION_ERROR`.
+- **SCHEMA-001 decision:** already **RESOLVED** — `Product.minPrice` exists in `schema.prisma` and is recalculated on variant changes/seed (see `docs/SCHEMA_CHANGE_REQUESTS.md`); the separate `MedicinePetType` join-table fix (ADMIN-002) is likewise resolved as a Prisma implicit many-to-many. No open schema requests remain.
+- Redis is optional at boot (`RedisService` connects lazily and logs connection errors without blocking startup).
+
 ## [Unreleased] - Admin panel backend (2026-09-30)
 
 ### Added

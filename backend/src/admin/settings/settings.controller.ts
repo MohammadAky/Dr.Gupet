@@ -32,7 +32,7 @@ export class SettingsController {
   async set(@Body() dto: SetSettingDto, @Req() req: any) {
     const row = await this.settingsService.set(dto.key, dto.value);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Setting',
       entityId: dto.key,
@@ -52,7 +52,7 @@ export class SettingsController {
     }
     const result = await this.settingsService.remove(key);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Setting',
       entityId: key,

@@ -38,7 +38,7 @@ export class AdminPetTypesController {
   async create(@Body() body: { name: string; slug?: string; isActive?: boolean }, @Req() req: any) {
     const petType = await this.petTypesService.create(body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'PetType',
       entityId: petType.id,
@@ -57,7 +57,7 @@ export class AdminPetTypesController {
   ) {
     const petType = await this.petTypesService.update(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'PetType',
       entityId: id,
@@ -72,7 +72,7 @@ export class AdminPetTypesController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.petTypesService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'PetType',
       entityId: id,

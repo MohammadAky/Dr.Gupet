@@ -24,12 +24,13 @@ export class AuthService {
   /**
    * Request OTP for phone number
    */
-  async requestOtp(phone: string): Promise<{ expiresIn: number }> {
+  async requestOtp(phone: string): Promise<{ expiresIn: number; cooldownSeconds: number }> {
     const code = await this.otpService.generate(phone);
     await this.sms.sendOtp(phone, code);
 
     const ttl = this.configService.get<number>('otp.ttlSeconds') || 120;
-    return { expiresIn: ttl };
+    const cooldown = this.configService.get<number>('otp.resendCooldownSeconds') || 60;
+    return { expiresIn: ttl, cooldownSeconds: cooldown };
   }
 
   /**
@@ -130,16 +131,14 @@ export class AuthService {
       const jti = payload.jti;
       const userId = payload.sub;
 
-      // Check if refresh token exists in Redis
+      // Atomically consume the refresh token (rotation). DEL returns how many
+      // keys were removed: exactly one concurrent refresh can win this claim.
       const key = `refresh:${userId}:${jti}`;
-      const exists = await this.redis.exists(key);
+      const claimed = await this.redis.del(key);
 
-      if (!exists) {
+      if (claimed === 0) {
         throw new UnauthorizedException();
       }
-
-      // Delete old refresh token (rotation)
-      await this.redis.del(key);
 
       // Load user
       const user = await this.prisma.user.findUnique({

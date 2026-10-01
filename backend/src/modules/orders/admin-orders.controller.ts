@@ -74,7 +74,7 @@ export class AdminOrdersController {
   ) {
     const order = await this.adminOrdersService.transition(id, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'STATUS_CHANGE',
       entity: 'Order',
       entityId: id,
@@ -94,7 +94,7 @@ export class AdminOrdersController {
   ) {
     const order = await this.adminOrdersService.setTracking(id, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Order',
       entityId: id,
@@ -115,7 +115,7 @@ export class AdminOrdersController {
   ) {
     const order = await this.adminOrdersService.cancel(id, dto.reason);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'STATUS_CHANGE',
       entity: 'Order',
       entityId: id,
@@ -139,7 +139,7 @@ export class AdminOrdersController {
   ) {
     const order = await this.adminOrdersService.markRefunded(id, dto.refundNote);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Order',
       entityId: id,

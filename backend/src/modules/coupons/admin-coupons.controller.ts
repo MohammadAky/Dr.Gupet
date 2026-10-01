@@ -60,7 +60,7 @@ export class AdminCouponsController {
   async create(@Body() dto: CreateCouponDto, @Req() req: any) {
     const coupon = await this.adminCouponsService.create(dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Coupon',
       entityId: coupon.id,
@@ -81,7 +81,7 @@ export class AdminCouponsController {
   ) {
     const coupon = await this.adminCouponsService.update(id, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Coupon',
       entityId: id,
@@ -97,7 +97,7 @@ export class AdminCouponsController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.adminCouponsService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Coupon',
       entityId: id,

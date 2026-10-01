@@ -73,7 +73,7 @@ export class AdminProductsController {
   async create(@Body() dto: CreateProductDto, @Req() req: any) {
     const product = await this.adminProductsService.create(dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'Product',
       entityId: product.id,
@@ -93,7 +93,7 @@ export class AdminProductsController {
   ) {
     const product = await this.adminProductsService.update(id, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Product',
       entityId: id,
@@ -109,7 +109,7 @@ export class AdminProductsController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.adminProductsService.remove(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'Product',
       entityId: id,
@@ -131,7 +131,7 @@ export class AdminProductsController {
   ) {
     const variant = await this.adminProductsService.createVariant(id, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'ProductVariant',
       entityId: variant.id,
@@ -151,7 +151,7 @@ export class AdminProductsController {
   ) {
     const variant = await this.adminProductsService.updateVariant(variantId, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'ProductVariant',
       entityId: variantId,
@@ -167,7 +167,7 @@ export class AdminProductsController {
   async removeVariant(@Param('variantId', ParseIntPipe) variantId: number, @Req() req: any) {
     const result = await this.adminProductsService.removeVariant(variantId);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'ProductVariant',
       entityId: variantId,
@@ -189,7 +189,7 @@ export class AdminProductsController {
   ) {
     const image = await this.adminProductsService.addImage(id, dto.url, dto.sortOrder);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'CREATE',
       entity: 'ProductImage',
       entityId: image.id,
@@ -205,7 +205,7 @@ export class AdminProductsController {
   async removeImage(@Param('imageId', ParseIntPipe) imageId: number, @Req() req: any) {
     const result = await this.adminProductsService.removeImage(imageId);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'ProductImage',
       entityId: imageId,
@@ -228,7 +228,7 @@ export class AdminProductsController {
   ) {
     const product = await this.adminProductsService.setTags(id, dto);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'Product',
       entityId: id,

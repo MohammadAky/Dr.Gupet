@@ -66,7 +66,7 @@ export class AdminUsersController {
   ) {
     const user = await this.usersService.updateByAdmin(id, body);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'User',
       entityId: id,
@@ -83,7 +83,7 @@ export class AdminUsersController {
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const result = await this.usersService.softDeleteByAdmin(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'DELETE',
       entity: 'User',
       entityId: id,
@@ -100,7 +100,7 @@ export class AdminUsersController {
   async restore(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const user = await this.usersService.restoreByAdmin(id);
     await this.auditService.record({
-      adminId: req.user.id,
+      adminId: req.user.sub,
       action: 'UPDATE',
       entity: 'User',
       entityId: id,
