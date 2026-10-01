@@ -101,6 +101,27 @@
 - **Decision:** On `localhost` / `127.0.0.1` in Vite development only, entering any nonempty phone text opens a temporary account preview without requesting or verifying an OTP. Keep the real OTP path in production builds. The preview creates no token, is not persisted across reloads, and is visibly marked as a demo.
 - **Consequences:** The account shell and profile layout can be reviewed without SMS. Private API operations still require a real backend session and must not be represented as working in the preview. Remove or revisit this temporary mode when the owner provides the SMS integration.
 
+## DEC-016: Independent admin frontend and safe local preview
+
+- **Status:** OWNER AUTHORIZED COMMIT 2026-10-01; LIVE API ACCEPTANCE PENDING
+- **Date:** 2026-09-30
+- **Decision:** Build the new administration interface as an independent `admin/` React/Vite app, as specified in the root README. Its network calls live in its own central `admin/src/api/client.ts`; it uses the existing backend OTP endpoints and checks `GET /admin/me` before rendering private screens. Both admin tokens remain only in memory, so a reload requires login again. The visual preview uses explicit sample data only when Vite development runs on localhost and never sends admin writes.
+- **Consequences:** The customer app stays separate. The admin app uses the approved brand assets and design tokens from the customer frontend, with no new image rights. The development server proxies `/api` to avoid changing backend CORS; production needs a same-origin proxy or an explicitly allowed admin origin. A live backend and admin OTP session are required before acceptance of API functionality. Security tests must cover non-admin rejection, RAM-only tokens, disabled production demo, and no new cookies.
+
+## DEC-017: حالت روشن/تاریک و بازطراحی موکول‌شدهٔ سایت
+
+- **Status:** ADMIN THEME IMPLEMENTED; CUSTOMER REDESIGN DEFERRED BY OWNER
+- **Date:** 2026-10-01
+- **Decision:** کلید دایره‌ای ماه/خورشید در پنل ادمین ترجیح `light`/`dark` را فقط برای ظاهر در ذخیره‌سازی محلی نگه می‌دارد. بازطراحی سایت اصلی و تم آن در کار محلی باقی می‌مانند و به درخواست مالک در کامیت فوری فرانت ادمین گنجانده نمی‌شوند. منابع MotionSite، MotionSites AI و 21st.dev فقط برای الهام بررسی شدند؛ کد/تصویر ثالث وارد پروژه نشد. SkillSpector در فضای شخصی نصب شد؛ اسکن کامل مهارت‌های خارجی و نصب آن‌ها به زمان ادامهٔ بازطراحی موکول شد.
+- **Consequences:** هیچ وابستگی تازه یا اسکریپت خارجی برای تم پنل لازم نیست. قراردادهای ورود، توکن، کوکی، API و پول ثابت می‌مانند. سایت اصلی قبل از ارسال جداگانه به بازبینی بصری نیاز دارد.
+
+## DEC-018: بازه‌های گزارش فروش پنل ادمین
+
+- **Status:** IMPLEMENTED FOR LOCAL REVIEW; LIVE API ACCEPTANCE PENDING
+- **Date:** 2026-10-01
+- **Decision:** انتخاب «امروز»، ۷، ۱۴ یا ۳۰ روز اخیر فقط فروش و نمودار فروش را با `GET /admin/reports/sales` و محدودهٔ ISO مشخص تغییر می‌دهد. شاخص‌های وضعیت و تعداد کل کاربران از `GET /admin/dashboard` مستقل‌اند. نمونهٔ محلی هر بازه دادهٔ ساختگی جداگانه دارد. برای «امروز» نمودار یک ستون از مجموع بازه نشان می‌دهد.
+- **Consequences:** بک‌اند روزهای نمودار را با UTC گروه‌بندی می‌کند، در حالی که درخواست از نیمه‌شب محلی مرورگر آغاز می‌شود. جمع بازه درست است ولی تفکیک روزانه ممکن است با تقویم محلی هم‌مرز نباشد. اصلاح قرارداد timezone نیاز بک‌اند است؛ فرانت ادعای صحت روزانهٔ محلی یا آزمون زنده ندارد.
+
 ## Open owner and release decisions
 
 
