@@ -12,36 +12,58 @@ export const periodLabels: Record<SalesPeriod, string> = {
   "30d": "۳۰ روز اخیر",
 };
 
+export const REPORT_TIME_ZONE = "Asia/Tehran";
+const tehranParts = new Intl.DateTimeFormat("en-US", {
+  timeZone: REPORT_TIME_ZONE,
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit",
+  hourCycle: "h23",
+});
+
+function parts(date: Date) {
+  const values = Object.fromEntries(
+    tehranParts.formatToParts(date).filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)]),
+  );
+  const get = (key: string): number => {
+    const value = values[key];
+    if (!Number.isInteger(value)) throw new Error("زمان گزارش معتبر نیست.");
+    return value!;
+  };
+  return {
+    year: get("year"), month: get("month"), day: get("day"),
+    hour: get("hour"), minute: get("minute"), second: get("second"),
+  };
+}
+
+function tehranMidnight(now: Date, days: number): Date {
+  const current = parts(now);
+  const wanted = Date.UTC(current.year, current.month - 1, current.day - days + 1);
+  let utc = wanted;
+  // Convert a wall-clock midnight in the IANA zone to an instant. Iterating
+  // accounts for zone-offset rules without hard-coding Iran's current offset.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const seen = parts(new Date(utc));
+    const seenWall = Date.UTC(seen.year, seen.month - 1, seen.day,
+      seen.hour, seen.minute, seen.second);
+    utc += wanted - seenWall;
+  }
+  return new Date(utc);
+}
+
+export function tehranDayKey(date: Date): string {
+  const value = parts(date);
+  return [value.year, value.month, value.day].map((part, index) =>
+    String(part).padStart(index === 0 ? 4 : 2, "0")).join("-");
+}
+
 export function periodQuery(period: SalesPeriod, now = new Date()): string {
-  const from = new Date(now);
-  from.setHours(0, 0, 0, 0);
   const days = period === "today" ? 1 : Number.parseInt(period, 10);
-  from.setDate(from.getDate() - days + 1);
+  const from = tehranMidnight(now, days);
   const query = new URLSearchParams({
     from: from.toISOString(),
     to: now.toISOString(),
+    tz: REPORT_TIME_ZONE,
   });
   return `/admin/reports/sales?${query.toString()}`;
-}
-
-export function sampleSalesReport(period: SalesPeriod, now = new Date()): SalesReport {
-  const days = period === "today" ? 1 : Number.parseInt(period, 10);
-  const byDay = Array.from({ length: days }, (_, index) => {
-    const date = new Date(now);
-    date.setDate(date.getDate() - days + index + 1);
-    const orders = 5 + ((index * 7 + 3) % 14);
-    return {
-      date: date.toISOString().slice(0, 10),
-      orders,
-      revenue: orders * (480_000 + ((index * 3) % 5) * 65_000),
-    };
-  });
-  return {
-    totals: {
-      orders: byDay.reduce((sum, day) => sum + day.orders, 0),
-      paidOrders: byDay.reduce((sum, day) => sum + Math.max(0, day.orders - 2), 0),
-      revenue: byDay.reduce((sum, day) => sum + day.revenue, 0),
-    },
-    byDay,
-  };
 }

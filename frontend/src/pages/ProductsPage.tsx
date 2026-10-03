@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type FormEvent, useMemo, useRef } from 'react';
+import { type FormEvent, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
@@ -21,6 +21,17 @@ export function ProductsPage() {
 
   const searchFormRef = useRef<HTMLFormElement>(null);
   const priceFormRef = useRef<HTMLFormElement>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = [
+    filters.petTypeId,
+    filters.brandId,
+    filters.lifeStage,
+    filters.sizeClass,
+    filters.inStock,
+    filters.minPrice !== undefined,
+    filters.maxPrice !== undefined,
+    filters.sort && filters.sort !== 'newest',
+  ].filter(Boolean).length;
 
   const petTypes = useQuery({ queryKey: queryKeys.petTypes, queryFn: () => api.petTypes() });
   const brands = useQuery({ queryKey: queryKeys.brands, queryFn: () => shopApi.brands() });
@@ -74,7 +85,20 @@ export function ProductsPage() {
         </button>
       </form>
 
-      <div className="filters filter-panel">
+      <button
+        type="button"
+        className="catalog-filter-toggle"
+        aria-controls="catalog-filter-panel"
+        aria-expanded={filtersOpen}
+        onClick={() => setFiltersOpen((open) => !open)}
+      >
+        <span>فیلتر و مرتب‌سازی{activeFilterCount > 0 ? ` · ${activeFilterCount} مورد` : ''}</span>
+        <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
+      </button>
+      <div
+        id="catalog-filter-panel"
+        className={`filters filter-panel${filtersOpen ? '' : ' filters--collapsed'}`}
+      >
         <div className="filter-panel__grid">
           <SearchableFilter
             label="نوع حیوان"

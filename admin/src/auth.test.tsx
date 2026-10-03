@@ -50,7 +50,13 @@ function Harness() {
       >
         read
       </button>
-      <button onClick={auth.enterPreview}>preview</button>
+      <button onClick={() =>
+        void Promise.all([
+          auth.read<{ value: string }>("/admin/dashboard"),
+          auth.read<{ value: string }>("/admin/dashboard"),
+        ]).then((values) => setResult(values.map((item) => item.value).join(",")))
+          .catch((error: Error) => setResult(error.message))
+      }>parallel</button>
       <button onClick={auth.logout}>logout</button>
       <span data-testid="result">{result}</span>
     </div>
@@ -178,32 +184,63 @@ describe("admin identity and browser storage", () => {
     expect(document.cookie).toBe("");
   });
 
-  it("keeps local preview separate from the API and exits without reopening it", () => {
-    const fetchMock = vi.fn();
+  it("uses one refresh token for simultaneous expired requests", async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith("/auth/otp/verify"))
+        return response({ accessToken: "access-1", refreshToken: "refresh-1" });
+      if (url.endsWith("/admin/me"))
+        return response({ id: 1, role: "ADMIN", phone: "09120000000" });
+      if (url.endsWith("/auth/refresh"))
+        return response({ accessToken: "access-2", refreshToken: "refresh-2" });
+      if (url.endsWith("/admin/dashboard"))
+        return (init.headers as Record<string, string>).Authorization === "Bearer access-1"
+          ? response(null, 401) : response({ value: "ready" });
+      throw new Error("unexpected request");
+    });
     vi.stubGlobal("fetch", fetchMock);
-    window.history.replaceState(null, "", "/?demo=1");
-    render(
-      <AuthProvider>
-        <Harness />
-      </AuthProvider>,
-    );
-    fireEvent.click(screen.getByText("preview"));
-    expect(screen.getByTestId("mode").textContent).toBe("preview");
-    expect(window.location.search).toBe("");
-    fireEvent.click(screen.getByText("logout"));
-    expect(screen.getByTestId("mode").textContent).toBe("guest");
-    expect(fetchMock).not.toHaveBeenCalled();
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(screen.getByText("verify"));
+    await waitFor(() => expect(screen.getByTestId("mode").textContent).toBe("admin"));
+    fireEvent.click(screen.getByText("parallel"));
+    await waitFor(() => expect(screen.getByTestId("result").textContent).toBe("ready,ready"));
+    const calls = fetchMock.mock.calls;
+    expect(calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(1);
+    expect(calls.every(([, init]) => init.credentials === "omit")).toBe(true);
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);
     expect(document.cookie).toBe("");
   });
 
-  it("disables the preview flag outside development", async () => {
-    vi.stubEnv("DEV", false);
-    vi.resetModules();
-    const production = await import("./auth");
-    const productionData = await import("./dashboard-data");
-    expect(production.LOCAL_PREVIEW).toBe(false);
-    expect(productionData.sampleDashboard).toBeNull();
+  it("retries a delayed stale 401 with the rotated access token", async () => {
+    let releaseLate401: ((value: Response) => void) | undefined;
+    let oldReads = 0;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith("/auth/otp/verify"))
+        return response({ accessToken: "access-1", refreshToken: "refresh-1" });
+      if (url.endsWith("/admin/me"))
+        return response({ id: 1, role: "ADMIN", phone: "09120000000" });
+      if (url.endsWith("/auth/refresh"))
+        return response({ accessToken: "access-2", refreshToken: "refresh-2" });
+      if (url.endsWith("/admin/dashboard")) {
+        if ((init.headers as Record<string, string>).Authorization === "Bearer access-1") {
+          oldReads += 1;
+          if (oldReads === 2) return await new Promise<Response>((resolve) => { releaseLate401 = resolve; });
+          return response(null, 401);
+        }
+        return response({ value: "ready" });
+      }
+      throw new Error("unexpected request");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(screen.getByText("verify"));
+    await waitFor(() => expect(screen.getByTestId("mode").textContent).toBe("admin"));
+    fireEvent.click(screen.getByText("parallel"));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/admin/dashboard"))).toHaveLength(3));
+    releaseLate401?.(response(null, 401));
+    await waitFor(() => expect(screen.getByTestId("result").textContent).toBe("ready,ready"));
+    expect(screen.getByTestId("mode").textContent).toBe("admin");
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(1);
+    expect(document.cookie).toBe("");
   });
 });

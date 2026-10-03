@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import type { AuthStatus } from '../../auth/auth-provider';
 
-type NavIconName = 'home' | 'products' | 'cart' | 'account';
+type NavIconName = 'home' | 'products' | 'pharmacies' | 'account';
 
 function NavIcon({ name }: { name: NavIconName }) {
   const paths = {
@@ -19,11 +19,10 @@ function NavIcon({ name }: { name: NavIconName }) {
         <rect x="13" y="14" width="8" height="7" rx="1" />
       </>
     ),
-    cart: (
+    pharmacies: (
       <>
-        <path d="M3 5h2l2 11h11l3-8H6" />
-        <circle cx="9" cy="20" r="1" />
-        <circle cx="18" cy="20" r="1" />
+        <path d="M4 7h16v14H4zM3 7l2-4h14l2 4" />
+        <path d="M10 12h4m-2-2v4M7 21v-4h10v4" />
       </>
     ),
     account: (
@@ -50,17 +49,9 @@ function NavIcon({ name }: { name: NavIconName }) {
   );
 }
 
-export function MobileBottomNav({
-  status,
-  cartCount,
-  onNavigate,
-}: {
-  status: AuthStatus;
-  cartCount: number;
-  onNavigate: () => void;
-}) {
+export function MobileBottomNav({ status }: { status: AuthStatus }) {
   return (
-    <nav className="mobile-bottom-nav" aria-label="دسترسی سریع موبایل" onClick={onNavigate}>
+    <nav className="mobile-bottom-nav" aria-label="دسترسی سریع موبایل">
       <NavLink to="/" end>
         <NavIcon name="home" />
         <span>خانه</span>
@@ -69,14 +60,9 @@ export function MobileBottomNav({
         <NavIcon name="products" />
         <span>محصولات</span>
       </NavLink>
-      <NavLink to="/cart" aria-label={`سبد خرید، ${cartCount} کالا`}>
-        <NavIcon name="cart" />
-        <span>سبد خرید</span>
-        {cartCount > 0 && (
-          <b className="mobile-bottom-nav__count" aria-hidden="true">
-            {cartCount > 99 ? '۹۹+' : cartCount.toLocaleString('fa-IR')}
-          </b>
-        )}
+      <NavLink to="/pharmacies">
+        <NavIcon name="pharmacies" />
+        <span>داروخانه‌ها</span>
       </NavLink>
       <NavLink to={status === 'authed' ? '/profile' : '/login'}>
         <NavIcon name="account" />

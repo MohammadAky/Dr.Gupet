@@ -1,12 +1,20 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { AuthProvider, LOCAL_PREVIEW, useAuth } from "./auth";
+import { AuthProvider, useAuth } from "./auth";
 import { ApiError } from "./api/client";
-import { sampleDashboard, type DashboardData } from "./dashboard-data";
+import { Catalog } from "./Catalog";
+import { Care } from "./Care";
+import { Orders } from "./Orders";
+import { Users } from "./Users";
+import { Promotions } from "./Promotions";
+import { Operations } from "./Operations";
+import { Reports } from "./Reports";
+import { type DashboardData } from "./dashboard-data";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   periodLabels,
   periodQuery,
-  sampleSalesReport,
+  REPORT_TIME_ZONE,
+  tehranDayKey,
   type SalesPeriod,
   type SalesReport,
 } from "./period";
@@ -46,21 +54,12 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function Login() {
-  const { requestOtp, verifyOtp, enterPreview } = useAuth();
+  const { requestOtp, verifyOtp } = useAuth();
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (
-      LOCAL_PREVIEW &&
-      new URLSearchParams(window.location.search).get("demo") === "1"
-    ) {
-      enterPreview();
-    }
-  }, [enterPreview]);
 
   const normalizeDigits = (value: string) =>
     value
@@ -176,14 +175,6 @@ function Login() {
             </button>
           )}
         </form>
-        {LOCAL_PREVIEW && (
-          <div className="preview-entry">
-            <span>برای بازبینی طراحی بدون بک‌اند</span>
-            <button type="button" onClick={enterPreview}>
-              مشاهدهٔ پنل نمونه ←
-            </button>
-          </div>
-        )}
       </section>
       <div className="login-foot">
         دسترسی واقعی فقط برای حساب دارای نقش مدیر فعال است.
@@ -192,43 +183,57 @@ function Login() {
   );
 }
 
-function Sidebar() {
+type AdminSection = "overview" | "products" | "orders" | "people" | "promotions" |
+  "care" | "payments" | "reports" | "audit" | "settings";
+
+const navigation: Array<{
+  title: string;
+  items: Array<{ id: AdminSection; label: string; index: string }>;
+}> = [
+  { title: "مرکز فرمان", items: [
+    { id: "overview", label: "نمای کلی", index: "۰۱" },
+    { id: "products", label: "محصولات", index: "۰۲" },
+  ] },
+  { title: "مدیریت فروشگاه", items: [
+    { id: "orders", label: "سفارش‌ها", index: "۰۳" },
+    { id: "people", label: "کاربران", index: "۰۴" },
+    { id: "promotions", label: "کدهای تخفیف", index: "۰۵" },
+    { id: "care", label: "دارو و مراکز", index: "۰۶" },
+  ] },
+  { title: "پایش و تنظیمات", items: [
+    { id: "payments", label: "پرداخت‌ها", index: "۰۷" },
+    { id: "reports", label: "گزارش‌ها", index: "۰۸" },
+    { id: "audit", label: "لاگ تغییرات", index: "۰۹" },
+    { id: "settings", label: "تنظیمات", index: "۱۰" },
+  ] },
+];
+
+function Sidebar({ active, onSelect, open, onClose }: {
+  active: AdminSection;
+  onSelect: (value: AdminSection) => void;
+  open: boolean;
+  onClose: () => void;
+}) {
   return (
-    <aside className="sidebar">
+    <aside className={"sidebar" + (open ? " sidebar--open" : "")} id="admin-navigation">
+      <div className="sidebar-brand-row">
       <Brand compact />
-      <div className="sidebar-group">
-        <span className="sidebar-label">مرکز فرمان</span>
-        <span className="sidebar-active" aria-current="page">
-          <span className="sidebar-icon" aria-hidden="true">
-            ◫
-          </span>
-          نمای کلی
-        </span>
+        <button type="button" className="sidebar-close" onClick={onClose}
+          aria-label="بستن فهرست">×</button>
       </div>
-      <div className="sidebar-group sidebar-upcoming">
-        <span className="sidebar-label">مدیریت داده‌ها</span>
-        {["سفارش‌ها", "محصولات", "کاربران", "کدهای تخفیف", "دارو و مراکز"].map(
-          (item) => (
-            <span key={item}>
-              {item}
-              <small>فاز بعد</small>
-            </span>
-          ),
-        )}
-      </div>
-      <div className="sidebar-group sidebar-upcoming">
-        <span className="sidebar-label">پایش و تنظیمات</span>
-        {["گزارش‌ها", "لاگ تغییرات", "تنظیمات"].map((item) => (
-          <span key={item}>
-            {item}
-            <small>فاز بعد</small>
-          </span>
-        ))}
-      </div>
-      <p className="sidebar-note">
-        مسیرهای API این بخش‌ها در کد بک‌اند موجودند؛ رابط آن‌ها در فازهای بعدی
-        ساخته می‌شود.
-      </p>
+      <nav aria-label="بخش‌های مدیریت">
+        {navigation.map((group) => <div className="sidebar-group" key={group.title}>
+          <span className="sidebar-label">{group.title}</span>
+          {group.items.map((item) => <button type="button" key={item.id}
+            className={"sidebar-link" + (active === item.id ? " sidebar-link--active" : "")}
+            aria-current={active === item.id ? "page" : undefined}
+            onClick={() => onSelect(item.id)}>
+            <span className="sidebar-link__index" aria-hidden="true">{item.index}</span>
+            <span>{item.label}</span>
+          </button>)}
+        </div>)}
+      </nav>
+      <p className="sidebar-note">عملیات این پنل به داده و مجوز واقعی API نیاز دارد.</p>
     </aside>
   );
 }
@@ -295,7 +300,6 @@ function DashboardContent({
   reportLoading,
   reportError,
   onReportRetry,
-  preview,
 }: {
   data: DashboardData;
   report: SalesReport | null;
@@ -304,13 +308,10 @@ function DashboardContent({
   reportLoading: boolean;
   reportError: string;
   onReportRetry: () => void;
-  preview: boolean;
 }) {
   const { totals, recentOrders, topProducts } = data;
   const now = new Date();
-  const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 10);
+  const localToday = tehranDayKey(now);
   const chartPoints = report
     ? period === "today"
       ? [{ date: localToday, orders: report.totals.orders, revenue: report.totals.revenue }]
@@ -318,12 +319,6 @@ function DashboardContent({
     : [];
   return (
     <>
-      {preview && (
-        <div className="demo-banner" role="status">
-          پیش‌نمایش طراحی — تمام اعداد و سفارش‌ها ساختگی‌اند و هیچ اتصال یا
-          تغییر واقعی انجام نمی‌شود.
-        </div>
-      )}
       <div className="page-heading">
         <div>
           <span className="eyebrow">نبض فروشگاه</span>
@@ -496,7 +491,7 @@ function DashboardContent({
 }
 
 function Dashboard() {
-  const { mode, identity, read, logout } = useAuth();
+  const { read } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -507,16 +502,14 @@ function Dashboard() {
     data: SalesReport | null;
     error: string;
   }>({ key: "", data: null, error: "" });
-  const preview = mode === "preview";
   const reportKey = `${period}:${reportRevision}`;
   const report = reportState.key === reportKey ? reportState.data : null;
   const reportError = reportState.key === reportKey ? reportState.error : "";
-  const reportLoading = !preview && reportState.key !== reportKey;
+  const reportLoading = reportState.key !== reportKey;
 
   useEffect(() => {
-    if (preview) return;
     let active = true;
-    void read<DashboardData>("/admin/dashboard")
+    void read<DashboardData>("/admin/dashboard?tz=" + encodeURIComponent(REPORT_TIME_ZONE))
       .then((result) => {
         if (active) setData(result);
       })
@@ -526,10 +519,9 @@ function Dashboard() {
     return () => {
       active = false;
     };
-  }, [preview, read, revision]);
+  }, [read, revision]);
 
   useEffect(() => {
-    if (preview) return;
     let active = true;
     void read<SalesReport>(periodQuery(period))
       .then((result) => {
@@ -541,40 +533,11 @@ function Dashboard() {
     return () => {
       active = false;
     };
-  }, [period, preview, read, reportKey]);
+  }, [period, read, reportKey]);
 
   return (
-    <div className="admin-shell">
-      <Sidebar />
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="topbar-context">
-            <span className="topbar-dot" /> پنل مدیریت <span>/</span> نمای کلی
-          </div>
-          <div className="topbar-user">
-            <ThemeToggle />
-            <span className="user-avatar" aria-hidden="true">
-              {identity?.firstName?.charAt(0) || "م"}
-            </span>
-            <span className="user-name">{identity?.firstName || "مدیر"}</span>
-            <button type="button" onClick={logout}>
-              خروج
-            </button>
-          </div>
-        </header>
-        <main className="dashboard-main">
-          {preview && sampleDashboard ? (
-            <DashboardContent
-              data={sampleDashboard}
-              report={sampleSalesReport(period)}
-              period={period}
-              onPeriodChange={setPeriod}
-              reportLoading={false}
-              reportError=""
-              onReportRetry={() => setReportRevision((n) => n + 1)}
-              preview
-            />
-          ) : error ? (
+    <>
+          {error ? (
             <div className="error-panel" role="alert">
               <h1>دریافت داده انجام نشد</h1>
               <p>{error}</p>
@@ -598,22 +561,66 @@ function Dashboard() {
               reportLoading={reportLoading}
               reportError={reportError}
               onReportRetry={() => setReportRevision((n) => n + 1)}
-              preview={false}
             />
           ) : (
             <p className="loading" role="status">
               در حال دریافت نمای کلی…
             </p>
           )}
-        </main>
-      </div>
-    </div>
+    </>
   );
+}
+
+function Workspace() {
+  const { identity, logout } = useAuth();
+  const [section, setSection] = useState<AdminSection>("overview");
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => {
+    if (!navOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [navOpen]);
+  const label = navigation.flatMap((group) => group.items).find((item) => item.id === section)?.label || "نمای کلی";
+  return <div className="admin-shell">
+    {navOpen && <button type="button" className="sidebar-scrim" aria-label="بستن فهرست"
+      onClick={() => setNavOpen(false)} />}
+    <Sidebar active={section} open={navOpen} onClose={() => setNavOpen(false)}
+      onSelect={(value) => { setSection(value); setNavOpen(false); window.scrollTo(0, 0); }} />
+    <div className="main-shell">
+      <header className="topbar">
+        <div className="topbar-context">
+          <button type="button" className="nav-open" aria-label="باز کردن فهرست"
+            aria-controls="admin-navigation" aria-expanded={navOpen}
+            onClick={() => setNavOpen(true)}>☰</button>
+          <span className="topbar-dot" /> پنل مدیریت <span>/</span> {label}
+        </div>
+        <div className="topbar-user">
+          <ThemeToggle />
+          <span className="user-avatar" aria-hidden="true">{identity?.firstName?.charAt(0) || "م"}</span>
+          <span className="user-name">{identity?.firstName || "مدیر"}</span>
+          <button type="button" onClick={logout}>خروج</button>
+        </div>
+      </header>
+      <main className="dashboard-main">
+        {section === "overview" ? <Dashboard />
+          : section === "products" ? <Catalog />
+          : section === "orders" ? <Orders />
+          : section === "people" ? <Users />
+          : section === "promotions" ? <Promotions />
+          : section === "care" ? <Care />
+          : section === "reports" ? <Reports />
+          : <Operations key={section} initialTab={section === "audit" ? "audit" : section === "settings" ? "settings" : "payments"} />}
+      </main>
+    </div>
+  </div>;
 }
 
 function CurrentView() {
   const { mode } = useAuth();
-  return mode === "guest" ? <Login /> : <Dashboard />;
+  return mode === "guest" ? <Login /> : <Workspace />;
 }
 
 export default function App() {

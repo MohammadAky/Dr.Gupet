@@ -17,8 +17,8 @@ export function normalizePhone(input: string): string | null {
   return /^09\d{9}$/.test(value) ? value : null;
 }
 
-/** 5-digit OTP code, Persian digits allowed. */
+/** Backend accepts 5–6 numeric OTP digits; Persian and Arabic digits are normalized. */
 export function normalizeOtpCode(input: string): string | null {
-  const value = toEnDigits(input ?? '').replace(/\D/g, '');
-  return /^\d{5}$/.test(value) ? value : null;
+  const value = toEnDigits(input ?? '').trim();
+  return /^\d{5,6}$/.test(value) ? value : null;
 }

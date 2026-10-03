@@ -8,6 +8,8 @@ import { ErrorState, LoadingState } from '../components/states';
 import { MAX_CART_ITEM_QTY } from '../lib/constants';
 import { formatToman, formatWeight } from '../lib/format';
 import { errorText } from '../lib/labels';
+import { safeImageUrl } from '../lib/image-url';
+import { API_BASE_URL } from '../lib/env';
 
 /** Product detail: variant selection, add-to-cart and favorite toggle (F5/F7/F8 behaviour). */
 export function ProductDetailPage() {
@@ -73,6 +75,8 @@ export function ProductDetailPage() {
   if (!product.data) return <ErrorState error="محصول یافت نشد" />;
 
   const detail = product.data;
+  const leadImage = [...detail.images].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+  const imageUrl = safeImageUrl(leadImage?.url, window.location.origin, API_BASE_URL);
 
   function submitAddToCart(event: FormEvent) {
     event.preventDefault();
@@ -81,75 +85,88 @@ export function ProductDetailPage() {
   }
 
   return (
-    <article>
-      <nav aria-label="مسیر">
+    <article className="product-detail">
+      <nav className="product-detail__breadcrumb" aria-label="مسیر">
         <Link to="/">خانه</Link> / <Link to="/products">محصولات</Link> / {detail.name}
       </nav>
+      <div className="product-detail__main">
+        <div className="product-detail__media">
+          {imageUrl ? (
+            <img src={imageUrl} alt={detail.name} referrerPolicy="no-referrer" />
+          ) : (
+            <span className="product-detail__placeholder" aria-hidden="true" />
+          )}
+        </div>
+        <div className="product-detail__info">
+          <p className="product-detail__eyebrow">
+            {detail.brand.name} / {detail.category.name}
+          </p>
+          <h1>{detail.name}</h1>
+          <p>
+            {detail.petType.name} · {detail.brand.name} · {detail.category.name}
+          </p>
+          <form onSubmit={submitAddToCart}>
+            <fieldset>
+              <legend>وزن</legend>
+              {detail.variants.map((variant) => (
+                <label key={variant.id}>
+                  <input
+                    type="radio"
+                    name="variant"
+                    value={variant.id}
+                    checked={activeVariant?.id === variant.id}
+                    onChange={() => setVariantId(variant.id)}
+                  />
+                  {formatWeight(variant.weightGram)} — {formatToman(variant.price)}{' '}
+                  {variant.inStock ? '(موجود)' : '(ناموجود)'}
+                  {variant.compareAtPrice ? ` [تا ${formatToman(variant.compareAtPrice)}]` : ''}
+                  {variant.lowStock ? ' (موجودی محدود)' : ''}
+                </label>
+              ))}
+            </fieldset>
 
-      <h1>{detail.name}</h1>
-      <p>
-        {detail.brand.name} · {detail.category.name} · {detail.petType.name}
-      </p>
+            <label htmlFor="qty">تعداد</label>
+            <input
+              id="qty"
+              type="number"
+              min={1}
+              max={MAX_CART_ITEM_QTY}
+              dir="ltr"
+              value={quantity}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                setQuantity(
+                  Number.isFinite(next) ? Math.min(Math.max(next, 1), MAX_CART_ITEM_QTY) : 1,
+                );
+              }}
+            />
 
-      <form onSubmit={submitAddToCart}>
-        <fieldset>
-          <legend>وزن</legend>
-          {detail.variants.map((variant) => (
-            <label key={variant.id}>
-              <input
-                type="radio"
-                name="variant"
-                value={variant.id}
-                checked={activeVariant?.id === variant.id}
-                onChange={() => setVariantId(variant.id)}
-              />
-              {formatWeight(variant.weightGram)} — {formatToman(variant.price)}{' '}
-              {variant.inStock ? '(موجود)' : '(ناموجود)'}
-              {variant.compareAtPrice ? ` [تا ${formatToman(variant.compareAtPrice)}]` : ''}
-              {variant.lowStock ? ' (موجودی محدود)' : ''}
-            </label>
-          ))}
-        </fieldset>
+            <button
+              type="submit"
+              disabled={!activeVariant || !activeVariant.inStock || addToCart.isPending}
+            >
+              {addToCart.isPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
+            </button>
 
-        <label htmlFor="qty">تعداد</label>
-        <input
-          id="qty"
-          type="number"
-          min={1}
-          max={MAX_CART_ITEM_QTY}
-          dir="ltr"
-          value={quantity}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            setQuantity(Number.isFinite(next) ? Math.min(Math.max(next, 1), MAX_CART_ITEM_QTY) : 1);
-          }}
-        />
+            {isAuthenticated ? (
+              <button
+                type="button"
+                disabled={toggleFavorite.isPending}
+                onClick={() => toggleFavorite.mutate()}
+              >
+                {isFavorite ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها'}
+              </button>
+            ) : (
+              <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
+                برای ذخیره وارد شوید
+              </Link>
+            )}
+          </form>
+          {message && <p role="status">{message}</p>}
+        </div>
+      </div>
 
-        <button
-          type="submit"
-          disabled={!activeVariant || !activeVariant.inStock || addToCart.isPending}
-        >
-          {addToCart.isPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
-        </button>
-
-        {isAuthenticated ? (
-          <button
-            type="button"
-            disabled={toggleFavorite.isPending}
-            onClick={() => toggleFavorite.mutate()}
-          >
-            {isFavorite ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها'}
-          </button>
-        ) : (
-          <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
-            برای ذخیره وارد شوید
-          </Link>
-        )}
-      </form>
-
-      {message && <p role="status">{message}</p>}
-
-      <section>
+      <section className="product-detail__description">
         <h2>توضیحات</h2>
         <p>{detail.description ?? '—'}</p>
         <h2>ترکیبات</h2>

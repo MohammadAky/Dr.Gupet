@@ -31,14 +31,18 @@ describe('normalizePhone', () => {
 });
 
 describe('normalizeOtpCode', () => {
-  it('accepts five digits in both digit systems', () => {
+  it('accepts five or six digits in Latin, Persian, and Arabic digit systems', () => {
     expect(normalizeOtpCode('12345')).toBe('12345');
     expect(normalizeOtpCode('۱۲۳۴۵')).toBe('12345');
+    expect(normalizeOtpCode('123456')).toBe('123456');
+    expect(normalizeOtpCode('۱۲۳۴۵۶')).toBe('123456');
+    expect(normalizeOtpCode('١٢٣٤٥٦')).toBe('123456');
   });
 
-  it('rejects anything else', () => {
+  it('rejects too-short, too-long, and nonnumeric codes', () => {
     expect(normalizeOtpCode('1234')).toBeNull();
-    expect(normalizeOtpCode('123456')).toBeNull();
+    expect(normalizeOtpCode('1234567')).toBeNull();
+    expect(normalizeOtpCode('12a345')).toBeNull();
     expect(normalizeOtpCode('abcde')).toBeNull();
   });
 });

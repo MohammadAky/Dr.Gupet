@@ -22,38 +22,21 @@ export function sanitizeInternalRedirect(value: string | null | undefined, fallb
   }
 }
 
-/** The current backend returns either its local mock endpoint or Zarinpal StartPay. */
-export function safePaymentUrl(
-  value: string,
-  apiBaseUrl: string,
-  allowLocalMock: boolean,
-): string | null {
+/** Only the live gateway URL may receive the browser after order creation. */
+export function safePaymentUrl(value: string): string | null {
   try {
     const target = new URL(value);
     if (target.username || target.password) return null;
 
-    const zarinpalHost =
-      target.hostname === 'www.zarinpal.com' || target.hostname === 'sandbox.zarinpal.com';
     if (
       target.protocol === 'https:' &&
-      zarinpalHost &&
+      target.hostname === 'www.zarinpal.com' &&
       target.port === '' &&
       /^\/pg\/StartPay\/[^/]+$/.test(target.pathname)
     ) {
       return target.href;
     }
 
-    const api = new URL(apiBaseUrl);
-    const mockPath = `${api.pathname.replace(/\/+$/, '')}/payments/mock-pay`;
-    if (
-      allowLocalMock &&
-      target.protocol === 'http:' &&
-      target.origin === api.origin &&
-      target.hostname === 'localhost' &&
-      target.pathname === mockPath
-    ) {
-      return target.href;
-    }
     return null;
   } catch {
     return null;

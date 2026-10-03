@@ -7,8 +7,21 @@ const baseUrl = (import.meta.env.VITE_API_BASE_URL || "/api/v1").replace(
 interface Envelope<T> {
   success: boolean;
   data?: T;
+  meta?: PageMeta;
   message?: string;
   code?: string;
+}
+
+export interface PageMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PageResult<T> {
+  data: T[];
+  meta: PageMeta;
 }
 
 export class ApiError extends Error {
@@ -21,10 +34,13 @@ export class ApiError extends Error {
   }
 }
 
-interface Options {
-  method?: "GET" | "POST";
+export interface Options {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   token?: string;
   body?: unknown;
+  formData?: FormData;
+  withMeta?: boolean;
+  responseType?: "json" | "blob";
 }
 
 export async function apiRequest<T>(
@@ -39,16 +55,23 @@ export async function apiRequest<T>(
       credentials: "omit",
       cache: "no-store",
       headers: {
-        Accept: "application/json",
-        ...(options.body === undefined
+        Accept: options.responseType === "blob" ? "text/csv" : "application/json",
+        ...(options.body === undefined || options.formData
           ? {}
           : { "Content-Type": "application/json" }),
         ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
       },
-      body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.formData ??
+        (options.body === undefined ? undefined : JSON.stringify(options.body)),
       signal: controller.signal,
     });
+    if (response.ok && options.responseType === "blob") {
+      const contentType = response.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().includes("text/csv")) {
+        throw new ApiError("فایل گزارش با فرمت معتبر دریافت نشد.", response.status, "INVALID_RESPONSE");
+      }
+      return await response.blob() as T;
+    }
     const payload = (await response
       .json()
       .catch(() => null)) as Envelope<T> | null;
@@ -66,6 +89,12 @@ export async function apiRequest<T>(
         "INVALID_RESPONSE",
       );
     }
+    if (options.withMeta) {
+      if (!payload.meta) {
+        throw new ApiError("اطلاعات صفحه‌بندی از سرور دریافت نشد.", response.status, "INVALID_RESPONSE");
+      }
+      return { data: payload.data, meta: payload.meta } as T;
+    }
     return payload.data as T;
   } catch (error) {
     if (controller.signal.aborted)
@@ -74,6 +103,10 @@ export async function apiRequest<T>(
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+export function apiBlob(path: string, options: Omit<Options, "responseType"> = {}): Promise<Blob> {
+  return apiRequest<Blob>(path, { ...options, responseType: "blob" });
 }
 
 export interface AdminIdentity {

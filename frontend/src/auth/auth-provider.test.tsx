@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, act } from 'react';
+import { StrictMode, act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../api/endpoints';
@@ -114,6 +114,39 @@ describe('AuthProvider identity boundaries', () => {
     expect(queryClient.getQueryData(queryKeys.addresses)).toBeUndefined();
     expect(tokenStorage.get()).toBe('account-b-refresh');
     expect(container.querySelector('output')?.textContent).toBe('authed');
+  });
+
+  it('never leaves a verified session active when the profile cannot be loaded', async () => {
+    vi.mocked(api.verifyOtp).mockResolvedValue({
+      accessToken: 'temporary-access',
+      refreshToken: 'temporary-refresh',
+      user: { ...profile, status: 'ACTIVE', isPhoneVerified: true },
+      isNewUser: false,
+    });
+    vi.mocked(api.me).mockRejectedValue(new Error('network unavailable'));
+    let verify!: () => Promise<unknown>;
+    function FailedProfileProbe() {
+      const auth = useAuth();
+      useEffect(() => {
+        verify = () => auth.verifyOtp('09123456789', '12345');
+      }, [auth]);
+      return <output>{auth.status}</output>;
+    }
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <FailedProfileProbe />
+          </AuthProvider>
+        </QueryClientProvider>,
+      );
+    });
+
+    await act(async () => {
+      await expect(verify()).rejects.toThrow('دریافت حساب ممکن نشد');
+    });
+    expect(tokenStorage.get()).toBeNull();
+    expect(container.querySelector('output')?.textContent).toBe('guest');
   });
 
   it('clears account data on logout', async () => {

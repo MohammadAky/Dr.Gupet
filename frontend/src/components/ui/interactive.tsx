@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from './primitives';
 
 export interface DialogProps {
   open: boolean;
@@ -254,25 +253,4 @@ export function useToast() {
   const context = useContext(ToastContext);
   if (!context) throw new Error('useToast must be used within ToastProvider');
   return context;
-}
-
-export function DialogExample({ variant }: { variant: 'modal' | 'drawer' }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Button tone="secondary" onClick={() => setOpen(true)}>
-        {variant === 'modal' ? 'بازکردن پنجره' : 'بازکردن کشو'}
-      </Button>
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        variant={variant}
-        title="عنوان نمونه"
-        description="با کلید Escape هم می‌توانید این بخش را ببندید."
-      >
-        <p>این یک نمونهٔ محتوای قابل‌دسترس است.</p>
-        <Button onClick={() => setOpen(false)}>تأیید</Button>
-      </Dialog>
-    </>
-  );
 }

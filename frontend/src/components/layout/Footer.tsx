@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 
-export function Footer({ onNavigate }: { onNavigate: () => void }) {
+export function Footer() {
   return (
-    <footer className="app-footer" onClick={onNavigate}>
+    <footer className="app-footer">
       <div className="footer-content site-container">
         <div className="footer-brand">
           <img src="/brand/logo.jpg" alt="" width="58" height="58" loading="lazy" />
