@@ -11,7 +11,6 @@ import smsConfig from './config/sms.config';
 import paymentConfig from './config/payment.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
-import { SmsModule } from './sms/sms.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -67,7 +66,6 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     // Infrastructure modules
     PrismaModule,
     RedisModule,
-    SmsModule,
 
     // Feature modules
     AdminModule,

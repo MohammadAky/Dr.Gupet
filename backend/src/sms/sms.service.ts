@@ -1,63 +1,35 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { SmsDriver } from './sms-driver.interface';
+import { ConsoleSmsDriver } from './console.driver';
+import { SmsIrDriver } from './smsir.driver';
 
-export interface SmsDriver {
-  sendOtp(phone: string, code: string): Promise<void>;
-  sendText(phone: string, text: string): Promise<void>;
-}
-
-class ConsoleSmsDriver implements SmsDriver {
-  private readonly logger = new Logger('SmsService');
-
-  async sendOtp(phone: string, code: string): Promise<void> {
-    if (process.env.NODE_ENV !== 'production') {
-      this.logger.log(`[DEV SMS] OTP to ${phone}: ${code}`);
-    }
-  }
-
-  async sendText(phone: string, text: string): Promise<void> {
-    if (process.env.NODE_ENV !== 'production') {
-      this.logger.log(`[DEV SMS] Text to ${phone}: ${text}`);
-    }
-  }
-}
-
-// Placeholder for real providers
-class KavenegarSmsDriver implements SmsDriver {
-  async sendOtp(_phone: string, _code: string): Promise<void> {
-    // TODO(decision): implement Kavenegar API
-    throw new Error('Kavenegar driver not implemented');
-  }
-  async sendText(_phone: string, _text: string): Promise<void> {
-    throw new Error('Kavenegar driver not implemented');
-  }
-}
-
-class SmsIrSmsDriver implements SmsDriver {
-  async sendOtp(_phone: string, _code: string): Promise<void> {
-    // TODO(decision): implement SmsIr API
-    throw new Error('SmsIr driver not implemented');
-  }
-  async sendText(_phone: string, _text: string): Promise<void> {
-    throw new Error('SmsIr driver not implemented');
-  }
-}
-
+/**
+ * Provider-agnostic SMS facade. Consumers (auth, payments, …) depend only on
+ * this class — never on a concrete driver.
+ *
+ * The active driver is picked by `SMS_DRIVER`:
+ *   - `console` (default) — logs only; dev/test/E2E.
+ *   - `smsir`             — real sms.ir REST client (docs/SMS_IR_API.md).
+ *   - anything else       — warn + fall back to console.
+ */
 @Injectable()
 export class SmsService {
+  private readonly logger = new Logger(SmsService.name);
   private readonly driver: SmsDriver;
 
-  constructor(private configService: ConfigService) {
-    const driverName = this.configService.get<string>('sms.driver') || 'console';
+  constructor(configService: ConfigService) {
+    const name = configService.get<string>('sms.driver') || 'console';
 
-    switch (driverName) {
-      case 'kavenegar':
-        this.driver = new KavenegarSmsDriver();
-        break;
+    switch (name) {
       case 'smsir':
-        this.driver = new SmsIrSmsDriver();
+        this.driver = new SmsIrDriver(configService);
+        break;
+      case 'console':
+        this.driver = new ConsoleSmsDriver();
         break;
       default:
+        this.logger.warn(`Unknown SMS_DRIVER "${name}" — falling back to console`);
         this.driver = new ConsoleSmsDriver();
     }
   }

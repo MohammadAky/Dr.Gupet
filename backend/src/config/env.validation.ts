@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, validateSync } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -52,6 +52,26 @@ class EnvironmentVariables {
 
   @IsString()
   SMS_DRIVER: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_IR_TEMPLATE_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_IR_PARAM_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_IR_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_IR_LINE_NUMBER?: string;
 
   @IsString()
   PAYMENT_DRIVER: string;
