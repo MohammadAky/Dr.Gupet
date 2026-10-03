@@ -347,9 +347,13 @@ curl -X POST 'https://api.sms.ir/v1/send/verify' \
 
 ### ۸.۱ وضعیت فعلی کد
 
-- `backend/src/sms/sms.service.ts`: اینترفیس `SmsDriver` با متدهای `sendOtp(phone, code)` و `sendText(phone, text)`؛ درایورهای `console` (فعال در dev)، `kavenegar` و `smsir` (placeholder — **TODO**).
-- `backend/src/modules/auth/otp.service.ts`: تولید/اعتبارسنجی OTP (هش‌شده در Redis) را خودش انجام می‌دهد؛ **sms.ir فقط نقش «پیام‌رسان» را دارد** — یعنی کد را ما تولید و تایید می‌کنیم و sms.ir فقط متن پیام را می‌فرستد. (برعکس برخی سرویس‌ها که خودشان OTP صادر/تایید می‌کنند.)
-- `.env.example`: `SMS_DRIVER=console` و `SMS_API_KEY=`.
+- **`backend/src/sms/` ماژول عمومی و ماژولار پیامک:** قرارداد `SmsDriver` (`sendOtp`/`sendText`) + فاساد `SmsService` که بقیهٔ کد (auth، payments) فقط همین را می‌بینند؛ درایور با `SMS_DRIVER` انتخاب می‌شود (`console` پیش‌فرض، `smsir` واقعی، ناشناخته → warn + console).
+- `backend/src/sms/smsir.driver.ts` (`SmsIrDriver`): کلاینت واقعی sms.ir (انتخاب با `SMS_DRIVER=smsir`):
+  - `sendOtp(phone, code)` → `POST /v1/send/verify` — ارسال OTP با قالب (توسط `AuthService.requestOtp`).
+  - `sendText(phone, text)` → `POST /v1/send/bulk` — پیامک اطلاع‌رسانی (موفقیت پرداخت، در `PaymentsService`).
+  رفتار: نرمال‌سازی شماره به `09xxxxxxxxx`، timeout ۱۰ ثانیه، یک retry فقط برای خطاهای گذرا (HTTP 429/5xx یا status `0`/`20`)، چک `status === 1`، بدون لاگ کلید API (فقط `messageId`/`status`).
+- `backend/src/modules/auth/otp.service.ts`: تولید/اعتبارسنجی OTP (هش‌شده در Redis) را خودش انجام می‌دهد؛ **sms.ir فقط نقش «پیام‌رسان» را دارد** — یعنی کد را ما تولید و تایید می‌کنیم و sms.ir فقط متن پیام را می‌فرستد. (برعکس برخی سرویس‌ها که خودشان OTP صادر/تایید می‌کنند.) متدهای `verify` و `discard` هم اینجاست؛ با شکست ارسال پیامک، `AuthService.requestOtp` کد را با `discard` دور می‌ریزد تا کاربر قفل نشود (نکته ۸.۴-۲).
+- `.env.example`: `SMS_DRIVER=console`، `SMS_API_KEY=`، `SMS_IR_TEMPLATE_ID=`، `SMS_IR_PARAM_NAME=Code`، `SMS_IR_BASE_URL=`، `SMS_IR_LINE_NUMBER=`.
 
 ### ۸.۲ متغیرهای محیطی پیشنهادی
 
@@ -359,12 +363,15 @@ SMS_API_KEY=                     # کلید اصلی یا Sandbox از پنل sm
 SMS_IR_TEMPLATE_ID=              # templateId قالب OTP (در Sandbox: 123456)
 SMS_IR_PARAM_NAME=Code           # نام پارامتر قالب (بدون #)
 SMS_IR_BASE_URL=https://api.sms.ir/v1
+SMS_IR_LINE_NUMBER=              # خط ارسال bulk (پیامک اطلاع‌رسانی) از GET /v1/line
 ```
 
-### ۸.۳ نمونه پیاده‌سازی `SmsIrSmsDriver` (TypeScript / NestJS)
+### ۸.۳ نمونه پیاده‌سازی `SmsIrDriver` (TypeScript / NestJS)
+
+> **نکته:** پیاده‌سازی واقعی و تست‌شده در `backend/src/sms/smsir.driver.ts` (`SmsIrDriver`) است؛ نمونهٔ زیر فقط مرجع ساختاری است.
 
 ```typescript
-// نمونه مرجع — در backend/src/sms/sms.service.ts جایگزین SmsIrSmsDriver شود
+// نمونه مرجع — پیاده‌سازی واقعی: backend/src/sms/smsir.driver.ts
 interface SmsIrEnvelope {
   status: number;
   message: string;
@@ -421,7 +428,7 @@ class SmsIrSmsDriver implements SmsDriver {
 ### ۸.۴ نکات ادغام با جریان OTP (مهم)
 
 1. **کد OTP را خودمان می‌سازیم** (۶ رقمی، هش‌شده در Redis با TTL، محدودیت تلاش، cooldown) — sms.ir فقط ارسال می‌کند. تایید کد (verify) **در کد ما** انجام می‌شود، نه در API sms.ir.
-2. **شکست ارسال SMS نباید OTP را بسوزاند:** اگر `sendOtp` خطا داد، باید کد از Redis حذف شود یا به کاربر خطا برگردد؛ حالتی که کد ساخته شود ولی پیامک نرود، کاربر را قفل می‌کند. (در `requestOtp` فعلی، `generate` و `sendOtp` پشت سر هم‌اند — در پیاده‌سازی واقعی، خطا در send را handle کنید.)
+2. **شکست ارسال SMS نباید OTP را بسوزاند:** ✅ **پیاده‌سازی شد** — در `AuthService.requestOtp` اگر `sendOtp` خطا بدهد، `OtpService.discard(phone)` کد و cooldown را از Redis حذف می‌کند و کاربر بلافاصله می‌تواند دوباره درخواست دهد (پاسخ `502 INTERNAL_ERROR` با پیام فارسی).
 3. **retry در برابر خطاهای گذرا:** فقط برای HTTP 429/500 یا status `0`/`20` با backoff کوتاه retry کنید؛ برای خطاهای منطقی (۱۱۳، ۱۱۴، ۱۰۴ و…) retry بی‌فایده است.
 4. **timeout:** برای fetch مقدار timeout (مثلاً ۱۰ ثانیه) بگذارید تا درخواست‌های کاربران گیر نکند.
 5. **لاگ امنیتی:** کلید API را هرگز لاگ/کامیت نکنید؛ `messageId` و `status` را لاگ کنید.
@@ -434,7 +441,7 @@ class SmsIrSmsDriver implements SmsDriver {
 - [ ] ایجاد **کلید Sandbox** و تست با `templateId=123456`
 - [ ] تعریف قالب OTP واقعی در پنل (ارسال سریع) و دریافت `templateId`
 - [ ] تنظیم متغیرهای محیطی (۸.۲)
-- [ ] پیاده‌سازی `SmsIrSmsDriver` (۸.۳) + تست واحد با mock
+- [x] پیاده‌سازی درایور sms.ir (`src/sms/smsir.driver.ts`) + تست واحد با mock
 - [ ] تست end-to-end با Sandbox (درخواست OTP → دریافت پاسخ `status:1`)
 - [ ] سوییچ به کلید Production + شارژ اعتبار
 - [ ] (اختیاری) بررسی دلیوری با `GET /v1/send/{messageId}` و لاگ `deliveryState`

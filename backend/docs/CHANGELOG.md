@@ -1,5 +1,23 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Modular SMS layer + OTP delivery safety (2026-10-03)
+
+### Added
+- **`src/sms/` module (generic, provider-agnostic):** `SmsService` facade + `SmsDriver` interface; `SMS_DRIVER` selects the driver (`console` default for dev/test, `smsir` for the real provider, unknown → warn + console). The sms.ir REST client lives at `src/sms/smsir.driver.ts` (`SmsIrDriver`, see `docs/SMS_IR_API.md`):
+  - `sendOtp(phone, code)` → `POST /v1/send/verify` (OTP template; used by `AuthService.requestOtp`).
+  - `sendText(phone, text)` → `POST /v1/send/bulk` with `lineNumber` (payment-success notification in `PaymentsService`, still fail-silent so a notification failure never breaks the payment flow).
+  - National `09xxxxxxxxx` normalization, 10s timeout, one retry **only** for transient failures (HTTP 429/5xx or status `0`/`20`), success ⇔ HTTP 2xx **and** `status === 1`; the API key is never logged (only `messageId`/`status`).
+  - `SmsModule` is imported explicitly by `AuthModule` and `PaymentsModule` (not `@Global`).
+- **OTP rollback on delivery failure:** `OtpService.discard(phone)` removes the pending code + resend cooldown when the SMS send fails, so a failed delivery never locks the user out (SMS_IR_API.md §8.4-2). `AuthService.requestOtp` then returns `502 INTERNAL_ERROR` with a Persian message.
+- **Env:** optional `SMS_API_KEY`, `SMS_IR_TEMPLATE_ID`, `SMS_IR_PARAM_NAME`, `SMS_IR_BASE_URL`, `SMS_IR_LINE_NUMBER` (sms.ir driver config; registered in `sms.config.ts`, validated in `env.validation.ts`, documented in `.env.example`).
+- **Tests:** `otp.service.spec.ts` (hashing, cooldown/hourly limits, verify attempts, discard), `sms.service.spec.ts` (driver selection), `smsir.driver.spec.ts` (payload/headers/normalization, logical-error no-retry, transient retry, config guard rails, bulk), `auth.service.request-otp.spec.ts` (hashed storage, discard-on-failure, immediate retry). Auth concurrency spec updated to the generic sender.
+
+### Changed
+- **Consumers depend on `SmsService`, not a provider:** `AuthService` calls `sms.sendOtp`, `PaymentsService` calls `sms.sendText`. Business modules never see sms.ir types.
+
+### Removed
+- **`src/sms-ir/` module** — the provider-specific name leaked into auth/payments; the sms.ir client is now the `smsir` driver inside the generic `src/sms/` module.
+
 ## [Unreleased] - GitHub issue fixes (2026-10-01)
 
 ### Fixed

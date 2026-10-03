@@ -42,7 +42,7 @@ backend/
 │   │   └── interfaces/        # JwtPayload
 │   ├── prisma/                # PrismaService (تنها راه ارتباط با دیتابیس)
 │   ├── redis/                 # RedisService (OTP، refresh token، کش)
-│   ├── sms/                   # SmsService (console | kavenegar | smsir)
+│   ├── sms/                   # ماژول عمومی پیامک: SmsService + درایورها (console | sms.ir)
 │   ├── upload/                # آپلود تصویر
 │   ├── health/                # GET /health
 │   ├── admin/                 # ابزار ادمین (فاز ۱۴)
@@ -145,7 +145,12 @@ JWT_ACCESS_SECRET=...            # هرگز در مخزن
 JWT_REFRESH_SECRET=...
 OTP_TTL_SECONDS=120
 OTP_DEV_CODE=12345               # فقط وقتی NODE_ENV != production
-SMS_DRIVER=console               # console | kavenegar | smsir
+SMS_DRIVER=console               # console | smsir
+SMS_API_KEY=                     # کلید وب‌سرویس sms.ir (Sandbox یا Production)
+SMS_IR_TEMPLATE_ID=              # templateId قالب OTP (در Sandbox: 123456)
+SMS_IR_PARAM_NAME=Code           # نام پارامتر قالب بدون #
+SMS_IR_BASE_URL=https://api.sms.ir/v1
+SMS_IR_LINE_NUMBER=              # خط ارسال bulk (اطلاع‌رسانی پرداخت) از GET /v1/line
 PAYMENT_DRIVER=mock              # mock | zarinpal
 PAYMENT_CALLBACK_URL=http://localhost:3000/api/v1/payments/callback
 FRONTEND_PAYMENT_RESULT_URL=http://localhost:5173/payment/result
@@ -225,7 +230,7 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 
 ## ۷. استراتژی تست
 
-- **تست واحد (Jest):** OtpService، CouponsService، OrderStockService، محاسبهٔ قیمت سفارش، سرویس پیشنهاد، ابزارهای `phone`/`slugify`/`normalizeFa`.
+- **تست واحد (Jest):** OtpService (هش، سقف‌ها، discard)، جریان `requestOtp` (شکست ارسال باید OTP را دور بریزد)، انتخاب درایور `SmsService`، درایور sms.ir (payload/ retry/ خطاها با mock)، CouponsService، OrderStockService، محاسبهٔ قیمت سفارش، سرویس پیشنهاد، ابزارهای `phone`/`slugify`/`normalizeFa`.
 - **تست E2E (Supertest):** با Postgres + Redis واقعی (docker compose) و دیتابیس تستی اختصاصی؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
 - سناریوهای حتمی: جریان کامل خرید؛ جداسازی مالکیت بین دو کاربر؛ همزمانی آخرین موجودی؛ سقف‌های کوپن؛ idempotency کال‌بک پرداخت؛ دسترسی غیرمجاز/مسدود.
 - چک‌لیست تست دستی و پذیرش: [`docs/TEST_CHECKLIST.md`](docs/TEST_CHECKLIST.md).

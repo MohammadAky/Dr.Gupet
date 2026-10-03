@@ -35,7 +35,7 @@ Dr. Gupet یک فروشگاه اینترنتیِ ویژهٔ حیوانات خا�
 |---|---|
 | بک‌اند | NestJS 10 (TypeScript strict)، PostgreSQL 16، Prisma 5، Redis 7 (OTP/کش/refresh)، JWT، Swagger در `/docs`، helmet، throttler |
 | پرداخت | درگاه Zarinpal + درایور `mock` برای توسعه |
-| پیامک | درایور `console` برای توسعه + درایورهای kavenegar / smsir |
+| پیامک | ماژول `sms` عمومی و ماژولار: درایور `console` پیش‌فرض + درایور `sms.ir` (`verify` برای OTP + `bulk` برای اطلاع‌رسانی) |
 | فرانت‌اند | React 19 + Vite، TypeScript strict، React Router 7، TanStack Query 5، Zod، Tailwind 4، Vitest |
 | رابط کاربری | فارسی/راست‌چین (RTL)، فونت وزیرمتن (Self-hosted)، تاریخ جلالی در نمایش |
 | زیرساخت | Docker Compose (Postgres + Redis)، Dockerfile چندمرحله‌ای بک‌اند |
