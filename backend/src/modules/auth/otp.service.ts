@@ -110,6 +110,15 @@ export class OtpService {
     return true;
   }
 
+  /**
+   * Drop a pending OTP (and its resend cooldown) when the delivery channel fails,
+   * so a failed SMS send never locks the user out of requesting a new code.
+   * The hourly request counter is intentionally kept as anti-abuse.
+   */
+  async discard(phone: string): Promise<void> {
+    await this.redis.del(`otp:${phone}`, `otp:cooldown:${phone}`);
+  }
+
   private hashOtp(code: string): string {
     const secret = this.configService.get<string>('jwt.accessSecret') || 'default-secret';
     return crypto.createHmac('sha256', secret).update(code).digest('hex');

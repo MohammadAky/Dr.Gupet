@@ -89,7 +89,7 @@ function makeAuthService(redis: FakeRedis, refreshPayload: { sub: number; jti: s
     }),
     sign: jest.fn().mockReturnValue('signed-token'),
   };
-  const sms = { sendOtp: jest.fn(), sendPasswordReset: jest.fn() };
+  const sms = { sendOtp: jest.fn(), sendText: jest.fn() };
   const otpService = {
     generate: jest.fn().mockResolvedValue('12345'),
     verify: jest.fn().mockResolvedValue(true),

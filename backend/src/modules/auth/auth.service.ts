@@ -26,7 +26,20 @@ export class AuthService {
    */
   async requestOtp(phone: string): Promise<{ expiresIn: number; cooldownSeconds: number }> {
     const code = await this.otpService.generate(phone);
-    await this.sms.sendOtp(phone, code);
+
+    try {
+      await this.sms.sendOtp(phone, code);
+    } catch (error) {
+      // A failed delivery must not burn/lock the OTP (docs/SMS_IR_API.md §8.4-2):
+      // drop the code and its cooldown so the user can request again immediately.
+      await this.otpService.discard(phone);
+      this.logger.error(`OTP sms delivery failed: ${(error as Error).message}`);
+      throw new AppException(
+        'INTERNAL_ERROR',
+        'ارسال پیامک تایید با خطا مواجه شد. لطفاً دوباره تلاش کنید',
+        502,
+      );
+    }
 
     const ttl = this.configService.get<number>('otp.ttlSeconds') || 120;
     const cooldown = this.configService.get<number>('otp.resendCooldownSeconds') || 60;

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentGateway } from './gateways/payment-gateway.interface';
@@ -8,6 +8,7 @@ import { SmsService } from '../../sms/sms.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
   private gateway: PaymentGateway;
 
   constructor(
@@ -141,8 +142,9 @@ export class PaymentsService {
           `پرداخت سفارش ${payment.order.orderNumber} با موفقیت انجام شد.`,
         );
       }
-    } catch {
+    } catch (error) {
       // SMS failure should not break payment flow
+      this.logger.warn(`payment success notification failed: ${(error as Error).message}`);
     }
 
     return { success: true, orderId: payment.orderId, orderNumber: payment.order.orderNumber };
