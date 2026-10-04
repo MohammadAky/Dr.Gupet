@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { slugify } from '../../common/utils/slugify.util';
+import { normalizeFa } from '../../common/utils/normalize-fa.util';
 
 @Injectable()
 export class CategoriesService {
@@ -52,9 +53,19 @@ export class CategoriesService {
   // -------------------------------------------------------------------
 
   /** Flat list including inactive, with parent/children info */
-  async findAllAdmin(petTypeId?: number) {
+  async findAllAdmin(
+    petTypeId?: number,
+    opts: { search?: string; isActive?: boolean } = {},
+  ) {
     const where: any = {};
     if (petTypeId) where.petTypeId = petTypeId;
+    if (opts.search) {
+      where.OR = [
+        { name: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+        { slug: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+      ];
+    }
+    if (opts.isActive !== undefined) where.isActive = opts.isActive;
 
     return this.prisma.productCategory.findMany({
       where,

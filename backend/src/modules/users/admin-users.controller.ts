@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
@@ -46,6 +47,32 @@ export class AdminUsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOneAdmin(id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create user by phone + role (admin only)' })
+  @ApiResponse({ status: 201, description: 'Created user' })
+  @ApiResponse({ status: 409, description: 'Phone already taken' })
+  async create(
+    @Body()
+    body: {
+      phone: string;
+      role?: string;
+      firstName?: string;
+      lastName?: string;
+    },
+    @Req() req: any,
+  ) {
+    const user = await this.usersService.createByAdmin(body);
+    await this.auditService.record({
+      adminId: req.user.sub,
+      action: 'CREATE',
+      entity: 'User',
+      entityId: user.id,
+      summary: user.phone,
+      ip: req.ip,
+    });
+    return user;
   }
 
   @Patch(':id')

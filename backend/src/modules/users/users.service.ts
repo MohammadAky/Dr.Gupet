@@ -199,6 +199,46 @@ export class UsersService {
   }
 
   /**
+   * Create user (admin): phone + role (+ optional name) — issue #10.
+   * Phone is normalized to `09xxxxxxxxx` and must be unique.
+   */
+  async createByAdmin(data: {
+    phone: string;
+    role?: string;
+    firstName?: string;
+    lastName?: string;
+  }) {
+    const digits = String(data.phone ?? '').replace(/[^\d]/g, '');
+    let phone = digits;
+    if (phone.startsWith('98')) phone = `0${phone.slice(2)}`;
+    else if (phone.startsWith('0098')) phone = `0${phone.slice(4)}`;
+    else if (phone.startsWith('9') && phone.length === 10) phone = `0${phone}`;
+    if (!/^09\d{9}$/.test(phone)) {
+      throw new AppException('VALIDATION_ERROR', 'شماره موبایل معتبر نیست', 400);
+    }
+
+    const role = data.role ?? 'USER';
+    if (!['USER', 'ADMIN'].includes(role)) {
+      throw new AppException('VALIDATION_ERROR', 'نقش نامعتبر است', 400);
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    if (existing) {
+      throw new AppException('CONFLICT', 'کاربری با این شماره موبایل وجود دارد', 409);
+    }
+
+    return this.prisma.user.create({
+      data: {
+        phone,
+        role,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      },
+      select: USER_SAFE_SELECT,
+    });
+  }
+
+  /**
    * Update user (admin): profile fields, role and status
    */
   async updateByAdmin(

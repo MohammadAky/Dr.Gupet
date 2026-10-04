@@ -24,14 +24,7 @@ export class OtpService {
     const maxPerHour = this.configService.get<number>('otp.maxPerHour') || 5;
     const devCode = this.configService.get<string>('otp.devCode');
 
-    // Check cooldown
-    const cooldownKey = `otp:cooldown:${phone}`;
-    const hasCooldown = await this.redis.exists(cooldownKey);
-    if (hasCooldown) {
-      throw new AppException('OTP_RATE_LIMITED', 'لطفاً چند لحظه صبر کنید و دوباره تلاش کنید', 429);
-    }
-
-    // Check hourly limit
+    // Check hourly limit (atomic counter)
     const countKey = `otp:count:${phone}`;
     const count = await this.redis.incr(countKey);
     if (count === 1) {
@@ -39,6 +32,14 @@ export class OtpService {
     }
     if (count > maxPerHour) {
       throw new AppException('OTP_RATE_LIMITED', 'تعداد درخواست‌ها از حد مجاز فراتر رفته است', 429);
+    }
+
+    // Atomically claim the resend cooldown (issue #03): SET NX — only one of
+    // two concurrent requests wins the claim; the loser is rate-limited.
+    const cooldownKey = `otp:cooldown:${phone}`;
+    const claimedCooldown = await this.redis.setNx(cooldownKey, '1', cooldown);
+    if (!claimedCooldown) {
+      throw new AppException('OTP_RATE_LIMITED', 'لطفاً چند لحظه صبر کنید و دوباره تلاش کنید', 429);
     }
 
     // Generate code
@@ -55,9 +56,6 @@ export class OtpService {
     // Store hashed OTP
     const otpKey = `otp:${phone}`;
     await this.redis.set(otpKey, hashedCode, ttl);
-
-    // Set cooldown
-    await this.redis.set(cooldownKey, '1', cooldown);
 
     return code;
   }

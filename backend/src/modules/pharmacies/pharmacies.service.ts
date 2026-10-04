@@ -12,17 +12,21 @@ export class PharmaciesService {
    */
   async findAll(
     query: PaginationQueryDto & {
+      q?: string;
       city?: string;
       province?: string;
       is24h?: boolean | string;
       onDuty?: boolean | string;
     },
   ) {
-    const { page = 1, limit = 20, city, province, is24h, onDuty } = query;
+    const { page = 1, limit = 20, q, city, province, is24h, onDuty } = query;
     const skip = (page - 1) * limit;
 
     const where: any = { isActive: true };
 
+    if (q) {
+      where.name = { contains: normalizeFa(q), mode: 'insensitive' };
+    }
     if (city) {
       where.city = { contains: normalizeFa(city), mode: 'insensitive' };
     }
@@ -176,6 +180,7 @@ export class PharmaciesService {
     is24h?: boolean;
     isVerified?: boolean;
     isActive?: boolean;
+    onDuty?: boolean;
   }) {
     return this.prisma.pharmacy.create({
       data: {
@@ -190,6 +195,7 @@ export class PharmaciesService {
         is24h: data.is24h ?? false,
         isVerified: data.isVerified ?? false,
         isActive: data.isActive ?? true,
+        onDuty: data.onDuty ?? false,
       },
     });
   }
@@ -208,6 +214,7 @@ export class PharmaciesService {
       is24h: boolean;
       isVerified: boolean;
       isActive: boolean;
+      onDuty: boolean;
     }>,
   ) {
     const pharmacy = await this.prisma.pharmacy.findUnique({ where: { id } });
@@ -215,7 +222,28 @@ export class PharmaciesService {
       throw new NotFoundException('داروخانه یافت نشد');
     }
 
-    return this.prisma.pharmacy.update({ where: { id }, data });
+    // Explicit whitelisted mapping (issue #08) — only known fields reach Prisma.
+    const payload: Record<string, unknown> = {};
+    for (const field of [
+      'name',
+      'province',
+      'city',
+      'address',
+      'lat',
+      'lng',
+      'phone',
+      'workingHours',
+      'is24h',
+      'isVerified',
+      'isActive',
+      'onDuty',
+    ] as const) {
+      if (data[field] !== undefined) {
+        payload[field] = data[field];
+      }
+    }
+
+    return this.prisma.pharmacy.update({ where: { id }, data: payload });
   }
 
   async remove(id: number) {

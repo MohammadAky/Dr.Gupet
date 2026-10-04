@@ -31,10 +31,8 @@ describe('SmsService driver selection', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to console for an unknown driver', async () => {
-    const service = makeService('kavenegar');
-
-    await expect(service.sendOtp('09121234567', '123456')).resolves.toBeUndefined();
+  it('rejects an unknown driver at startup (issue #04: no silent fallback)', () => {
+    expect(() => makeService('kavenegar')).toThrow(/Unknown SMS_DRIVER/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

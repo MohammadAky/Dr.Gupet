@@ -5,6 +5,12 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { strictBoolean } from '../../clinics/dto/clinic-query.dto';
 
 export class PharmacyQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ maxLength: 100, description: 'Search by name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
   @ApiPropertyOptional({ maxLength: 100, description: 'Filter by city' })
   @IsOptional()
   @IsString()

@@ -30,8 +30,15 @@ export class AdminBreedsController {
 
   @Get()
   @ApiOperation({ summary: 'List breeds incl. inactive (admin only)' })
-  async findAll(@Query('petTypeId') petTypeId?: string) {
-    return this.breedsService.findAllAdmin(petTypeId ? Number(petTypeId) : undefined);
+  async findAll(
+    @Query('petTypeId') petTypeId?: string,
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    return this.breedsService.findAllAdmin(petTypeId ? Number(petTypeId) : undefined, {
+      search,
+      isActive: isActive === undefined ? undefined : isActive === 'true',
+    });
   }
 
   @Post()

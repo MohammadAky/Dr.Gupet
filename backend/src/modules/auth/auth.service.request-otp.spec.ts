@@ -33,6 +33,12 @@ class FakeRedis {
     return true;
   }
 
+  async setNx(key: string, value: string): Promise<boolean> {
+    if (this.store.has(key)) return false;
+    this.store.set(key, value);
+    return true;
+  }
+
   async exists(key: string): Promise<boolean> {
     return this.store.has(key);
   }

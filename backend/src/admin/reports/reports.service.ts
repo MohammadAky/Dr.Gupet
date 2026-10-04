@@ -33,9 +33,14 @@ function startOfNDaysAgo(end: Date, tz: string, n: number): Date {
   return start;
 }
 
-function toCsv(headers: string[], rows: (string | number)[][]): string {
+export function toCsv(headers: string[], rows: (string | number)[][]): string {
   const escape = (v: string | number) => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    // Neutralize spreadsheet formula injection (issue #09): a leading =, +, -, @
+    // (also after whitespace) would execute in Excel/Sheets — prefix with a quote.
+    if (/^[\t\r\n ]*[=+\-@]/.test(s)) {
+      s = `'${s}`;
+    }
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [headers.join(','), ...rows.map((row) => row.map(escape).join(','))].join('\n');

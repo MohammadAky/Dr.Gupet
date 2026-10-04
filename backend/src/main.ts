@@ -11,6 +11,13 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  // Express 'trust proxy' — only when explicitly configured (issue #03/#06:
+  // correct client IPs for throttling/logging behind a reverse proxy).
+  const trustProxy = process.env.TRUST_PROXY;
+  if (trustProxy && trustProxy !== 'false') {
+    app.set('trust proxy', Number.isNaN(Number(trustProxy)) ? trustProxy : Number(trustProxy));
+  }
+
   // Global prefix
   app.setGlobalPrefix('api/v1');
 

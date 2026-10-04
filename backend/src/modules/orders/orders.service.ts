@@ -235,7 +235,10 @@ export class OrdersService {
   }
 
   /**
-   * Cancel order (only PENDING_PAYMENT)
+   * Cancel order (only PENDING_PAYMENT).
+   * The status transition is atomic (`updateMany` guarded by the current
+   * status) so cancel racing the expire job or a payment callback can never
+   * release the same stock twice (issue #02).
    */
   async cancel(userId: number, orderId: number) {
     const order = await this.prisma.order.findUnique({
@@ -256,7 +259,21 @@ export class OrdersService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Release stock
+      // Atomic claim: only one caller can move the order out of PENDING_PAYMENT.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, userId, status: 'PENDING_PAYMENT' },
+        data: { status: 'CANCELED' },
+      });
+
+      if (claimed.count === 0) {
+        throw new AppException(
+          'ORDER_INVALID_STATE',
+          'فقط سفارش‌های در انتظار پرداخت قابل لغو هستند',
+          400,
+        );
+      }
+
+      // Release stock — runs exactly once, guarded by the claim above.
       await this.orderStockService.release(
         tx,
         order.items.map((item) => ({
@@ -272,11 +289,7 @@ export class OrdersService {
         });
       }
 
-      // Update order status
-      return tx.order.update({
-        where: { id: orderId },
-        data: { status: 'CANCELED' },
-      });
+      return tx.order.findUnique({ where: { id: orderId } });
     });
   }
 
@@ -302,7 +315,18 @@ export class OrdersService {
     for (const order of expiredOrders) {
       try {
         await this.prisma.$transaction(async (tx) => {
-          // Release stock
+          // Atomic claim — a concurrent cancel/payment callback that already
+          // moved the order out of PENDING_PAYMENT makes this a no-op (issue #02).
+          const claimed = await tx.order.updateMany({
+            where: { id: order.id, status: 'PENDING_PAYMENT' },
+            data: { status: 'CANCELED' },
+          });
+
+          if (claimed.count === 0) {
+            return;
+          }
+
+          // Release stock — only after the claim succeeded.
           await this.orderStockService.release(
             tx,
             order.items.map((item) => ({
@@ -317,12 +341,6 @@ export class OrdersService {
               where: { orderId: order.id },
             });
           }
-
-          // Update order status
-          await tx.order.update({
-            where: { id: order.id },
-            data: { status: 'CANCELED' },
-          });
         });
       } catch (error) {
         console.error(`Failed to expire order ${order.orderNumber}:`, error);

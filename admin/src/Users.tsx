@@ -69,6 +69,11 @@ export function Users() {
   const [lastName, setLastName] = useState("");
   const [editRole, setEditRole] = useState<"USER" | "ADMIN">("USER");
   const [editStatus, setEditStatus] = useState<"ACTIVE" | "BLOCKED">("ACTIVE");
+  const [creating, setCreating] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newRole, setNewRole] = useState<"USER" | "ADMIN">("USER");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -117,6 +122,35 @@ export function Users() {
       setBusy(false);
     }
   }
+  async function createUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await request("/admin/users", {
+        method: "POST",
+        body: {
+          phone: newPhone.trim(),
+          role: newRole,
+          firstName: newFirstName.trim() || undefined,
+          lastName: newLastName.trim() || undefined,
+        },
+      });
+      setRevision((value) => value + 1);
+      setNewPhone("");
+      setNewFirstName("");
+      setNewLastName("");
+      setNewRole("USER");
+      setCreating(false);
+      setMessage("کاربر تازه ثبت شد.");
+    } catch (problem) {
+      setError(errorMessage(problem));
+    } finally {
+      setBusy(false);
+    }
+  }
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(1);
@@ -130,6 +164,64 @@ export function Users() {
         title="کاربران"
         description="پروندهٔ کاربران، نقش و وضعیت دسترسی را همراه با تاریخچهٔ مرتبط بررسی کنید."
       />
+      <section className="manage-card" aria-label="افزودن کاربر">
+        <div className="manage-actions">
+          <button
+            type="button"
+            className="manage-primary"
+            onClick={() => setCreating((value) => !value)}
+          >
+            {creating ? "بستن فرم" : "افزودن کاربر"}
+          </button>
+        </div>
+        {creating && (
+          <form className="manage-toolbar" onSubmit={createUser}>
+            <label>
+              شماره موبایل
+              <input
+                dir="ltr"
+                value={newPhone}
+                onChange={(event) => setNewPhone(event.target.value)}
+                placeholder="09xxxxxxxxx"
+                required
+              />
+            </label>
+            <label>
+              نام
+              <input
+                value={newFirstName}
+                onChange={(event) => setNewFirstName(event.target.value)}
+                placeholder="نام"
+              />
+            </label>
+            <label>
+              نام خانوادگی
+              <input
+                value={newLastName}
+                onChange={(event) => setNewLastName(event.target.value)}
+                placeholder="نام خانوادگی"
+              />
+            </label>
+            <label>
+              نقش
+              <select
+                value={newRole}
+                onChange={(event) =>
+                  setNewRole(event.target.value as "USER" | "ADMIN")
+                }
+              >
+                <option value="USER">کاربر</option>
+                <option value="ADMIN">مدیر</option>
+              </select>
+            </label>
+            <button type="submit" className="manage-primary" disabled={busy}>
+              ثبت کاربر
+            </button>
+            <Notice message={error} />
+            <Notice message={message} kind="success" />
+          </form>
+        )}
+      </section>
       <section className="manage-card" aria-label="فهرست کاربران">
         <form className="manage-toolbar" onSubmit={apply}>
           <label>

@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
+import { IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -50,7 +50,7 @@ class EnvironmentVariables {
   @IsString()
   OTP_DEV_CODE: string;
 
-  @IsString()
+  @IsIn(['console', 'smsir'])
   SMS_DRIVER: string;
 
   @IsOptional()
@@ -73,8 +73,28 @@ class EnvironmentVariables {
   @IsString()
   SMS_IR_LINE_NUMBER?: string;
 
-  @IsString()
+  @IsIn(['mock', 'zarinpal'])
   PAYMENT_DRIVER: string;
+
+  @IsOptional()
+  @IsString()
+  ZARINPAL_MERCHANT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  ZARINPAL_API_BASE?: string;
+
+  @IsOptional()
+  @IsString()
+  ZARINPAL_STARTPAY_BASE?: string;
+
+  @IsOptional()
+  @IsString()
+  PAYMENT_MOCK_PAY_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  PAYMENT_CALLBACK_SECRET?: string;
 
   @IsString()
   PAYMENT_CALLBACK_URL: string;
@@ -85,8 +105,17 @@ class EnvironmentVariables {
   @IsString()
   UPLOAD_DIR: string;
 
-  @IsNumber()
+  @Min(1)
+  @Max(10)
   UPLOAD_MAX_MB: number;
+
+  @IsOptional()
+  @IsNumber()
+  UPLOAD_DAILY_COUNT_LIMIT?: number;
+
+  @IsOptional()
+  @IsNumber()
+  UPLOAD_DAILY_BYTES_LIMIT?: number;
 
   @IsNumber()
   SHIPPING_FLAT_COST: number;
@@ -112,6 +141,24 @@ export function validate(config: Record<string, unknown>) {
 
   if (errors.length > 0) {
     throw new Error(errors.toString());
+  }
+
+  // Production hardening (issues #01, #04): mock/dev drivers must never reach
+  // production, and real provider credentials must be present.
+  const nodeEnv = validatedConfig.NODE_ENV;
+  if (nodeEnv === Environment.Production) {
+    if (validatedConfig.PAYMENT_DRIVER !== 'zarinpal') {
+      throw new Error('PAYMENT_DRIVER must be "zarinpal" in production');
+    }
+    if (validatedConfig.SMS_DRIVER !== 'smsir') {
+      throw new Error('SMS_DRIVER must be "smsir" in production');
+    }
+    if (!validatedConfig.SMS_API_KEY || !validatedConfig.SMS_IR_TEMPLATE_ID) {
+      throw new Error('SMS_API_KEY and SMS_IR_TEMPLATE_ID are required in production');
+    }
+    if (!validatedConfig.ZARINPAL_MERCHANT_ID) {
+      throw new Error('ZARINPAL_MERCHANT_ID is required in production');
+    }
   }
 
   return validatedConfig;

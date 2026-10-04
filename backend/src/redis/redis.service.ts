@@ -38,12 +38,24 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
+  /** Atomic SET key value [EX ttl] NX — returns true only for the first caller. */
+  async setNx(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
+    const result = ttlSeconds
+      ? await this.client.set(key, value, 'EX', ttlSeconds, 'NX')
+      : await this.client.set(key, value, 'NX');
+    return result === 'OK';
+  }
+
   async del(...keys: string[]): Promise<number> {
     return this.client.del(...keys);
   }
 
   async incr(key: string): Promise<number> {
     return this.client.incr(key);
+  }
+
+  async incrBy(key: string, amount: number): Promise<number> {
+    return this.client.incrby(key, amount);
   }
 
   async expire(key: string, seconds: number): Promise<boolean> {

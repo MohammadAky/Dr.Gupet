@@ -12,16 +12,20 @@ export class ClinicsService {
    */
   async findAll(
     query: PaginationQueryDto & {
+      q?: string;
       city?: string;
       province?: string;
       is24h?: boolean | string;
     },
   ) {
-    const { page = 1, limit = 20, city, province, is24h } = query;
+    const { page = 1, limit = 20, q, city, province, is24h } = query;
     const skip = (page - 1) * limit;
 
     const where: any = { isActive: true };
 
+    if (q) {
+      where.name = { contains: normalizeFa(q), mode: 'insensitive' };
+    }
     if (city) {
       where.city = { contains: normalizeFa(city), mode: 'insensitive' };
     }

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { slugify } from '../../common/utils/slugify.util';
+import { normalizeFa } from '../../common/utils/normalize-fa.util';
 
 @Injectable()
 export class PetTypesService {
@@ -43,8 +44,18 @@ export class PetTypesService {
   // Admin
   // -------------------------------------------------------------------
 
-  async findAllAdmin() {
+  async findAllAdmin(opts: { search?: string; isActive?: boolean } = {}) {
+    const where: any = {};
+    if (opts.search) {
+      where.OR = [
+        { name: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+        { slug: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+      ];
+    }
+    if (opts.isActive !== undefined) where.isActive = opts.isActive;
+
     return this.prisma.petType.findMany({
+      where,
       include: {
         _count: { select: { breeds: true, pets: true, products: true, medicines: true } },
       },

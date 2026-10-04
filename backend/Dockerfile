@@ -47,5 +47,8 @@ RUN mkdir -p /app/uploads
 # Expose port
 EXPOSE 3000
 
-# Run prisma migrate and start the application
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# Run prisma migrate and start the application.
+# NOTE (issue #06): the app uses SQLite — the database file (/app/data/dev.db
+# via DATABASE_URL) and /app/uploads MUST be mounted as volumes in compose, or
+# all data is lost when the container is rebuilt.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

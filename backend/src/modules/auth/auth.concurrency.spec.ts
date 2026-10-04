@@ -51,6 +51,13 @@ class FakeRedis {
     return 60;
   }
 
+  async setNx(key: string, value: string): Promise<boolean> {
+    // Atomic (as Redis SET NX is): check+set with no yield in between.
+    if (this.store.has(key)) return false;
+    this.store.set(key, value);
+    return true;
+  }
+
   async exists(key: string): Promise<boolean> {
     await this.yield();
     return this.store.has(key);

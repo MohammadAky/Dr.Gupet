@@ -1,19 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16
-    container_name: pet_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: pet_db
-      POSTGRES_USER: pet
-      POSTGRES_PASSWORD: pet
-    ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
   redis:
     image: redis:7-alpine
     container_name: pet_redis
@@ -23,6 +10,24 @@ services:
     volumes:
       - redis_data:/data
 
+  # Backend runs on SQLite (issue #06): the database file and the uploads
+  # directory MUST live on host-mounted volumes so they survive container
+  # rebuilds — they are the only persistent state of the application.
+  backend:
+    build: .
+    container_name: pet_backend
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      DATABASE_URL: 'file:/app/data/dev.db'
+      REDIS_URL: 'redis://redis:6379'
+      UPLOAD_DIR: '/app/uploads'
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+
 volumes:
-  postgres_data:
   redis_data:

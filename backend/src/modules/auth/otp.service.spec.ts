@@ -32,6 +32,12 @@ class FakeRedis {
     return true;
   }
 
+  async setNx(key: string, value: string): Promise<boolean> {
+    if (this.store.has(key)) return false;
+    this.store.set(key, value);
+    return true;
+  }
+
   async exists(key: string): Promise<boolean> {
     return this.store.has(key);
   }
@@ -83,6 +89,22 @@ describe('OtpService', () => {
 
       await otp.generate('09121234567');
       await expect(otp.generate('09121234567')).rejects.toMatchObject({
+        code: 'OTP_RATE_LIMITED',
+      });
+    });
+
+    it('atomically claims the cooldown — only one of two concurrent generates wins (issue #03)', async () => {
+      const { otp } = makeOtp();
+
+      const results = await Promise.allSettled([
+        otp.generate('09121234567'),
+        otp.generate('09121234567'),
+      ]);
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
         code: 'OTP_RATE_LIMITED',
       });
     });

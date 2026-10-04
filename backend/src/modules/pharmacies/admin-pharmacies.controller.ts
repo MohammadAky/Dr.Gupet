@@ -69,6 +69,7 @@ export class AdminPharmaciesController {
       is24h?: boolean;
       isVerified?: boolean;
       isActive?: boolean;
+      onDuty?: boolean;
     },
     @Req() req: any,
   ) {
@@ -101,6 +102,7 @@ export class AdminPharmaciesController {
       is24h: boolean;
       isVerified: boolean;
       isActive: boolean;
+      onDuty: boolean;
     }>,
     @Req() req: any,
   ) {

@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   ParseIntPipe,
   UseGuards,
   Req,
@@ -29,8 +30,14 @@ export class AdminBrandsController {
 
   @Get()
   @ApiOperation({ summary: 'List brands incl. inactive (admin only)' })
-  async findAll() {
-    return this.brandsService.findAllAdmin();
+  async findAll(
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    return this.brandsService.findAllAdmin({
+      search,
+      isActive: isActive === undefined ? undefined : isActive === 'true',
+    });
   }
 
   @Post()

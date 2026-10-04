@@ -96,7 +96,7 @@ export class AdminPaymentsService {
       throw new NotFoundException('پرداخت یافت نشد');
     }
 
-    const result = await this.paymentsService.handleCallback(id, true);
+    const result = await this.paymentsService.handleCallback(id, { adminReconcile: true });
     return this.prisma.payment
       .findUnique({
         where: { id },

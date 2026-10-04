@@ -30,8 +30,15 @@ export class AdminTagsController {
 
   @Get()
   @ApiOperation({ summary: 'List tags with usage counts (admin only)' })
-  async findAll(@Query('type') type?: string) {
-    return this.tagsService.findAllAdmin(type);
+  async findAll(
+    @Query('type') type?: string,
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    return this.tagsService.findAllAdmin(type, {
+      search,
+      isActive: isActive === undefined ? undefined : isActive === 'true',
+    });
   }
 
   @Post()

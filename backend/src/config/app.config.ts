@@ -7,6 +7,8 @@ export default registerAs('app', () => ({
   corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173'],
   uploadDir: process.env.UPLOAD_DIR || './uploads',
   uploadMaxMb: parseInt(process.env.UPLOAD_MAX_MB || '5', 10),
+  uploadDailyCountLimit: parseInt(process.env.UPLOAD_DAILY_COUNT_LIMIT || '50', 10),
+  uploadDailyBytesLimit: parseInt(process.env.UPLOAD_DAILY_BYTES_LIMIT || String(50 * 1024 * 1024), 10),
   shippingFlatCost: parseInt(process.env.SHIPPING_FLAT_COST || '50000', 10),
   freeShippingThreshold: parseInt(process.env.FREE_SHIPPING_THRESHOLD || '1500000', 10),
   orderExpireMinutes: parseInt(process.env.ORDER_EXPIRE_MINUTES || '30', 10),

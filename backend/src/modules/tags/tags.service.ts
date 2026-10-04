@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { slugify } from '../../common/utils/slugify.util';
+import { normalizeFa } from '../../common/utils/normalize-fa.util';
 
 @Injectable()
 export class TagsService {
@@ -29,8 +30,17 @@ export class TagsService {
   // Admin
   // -------------------------------------------------------------------
 
-  async findAllAdmin(type?: string) {
-    const where = type ? { type } : {};
+  async findAllAdmin(type?: string, opts: { search?: string; isActive?: boolean } = {}) {
+    const where: any = {};
+    if (type) where.type = type;
+    if (opts.search) {
+      where.OR = [
+        { name: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+        { slug: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+      ];
+    }
+    // Note: Tag has no isActive column — opts.isActive is accepted for API
+    // uniformity with the other reference entities but intentionally ignored.
 
     return this.prisma.tag.findMany({
       where,

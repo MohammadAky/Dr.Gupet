@@ -7,11 +7,11 @@
 ## ۱. راه‌اندازی
 
 ```bash
-docker compose up -d           # PostgreSQL 16 + Redis 7
+docker compose up -d           # Redis 7 + بک‌اند (SQLite در volume)
 npm ci
 cp .env.example .env
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:migrate         # SQLite (فایل dev.db)
 npm run prisma:seed            # seed idempotent (upsert با slug/فیلدهای یکتا)
 npm run start:dev              # http://localhost:3000/api/v1
 ```
@@ -61,6 +61,8 @@ backend/
 - پیشوند سراسری: `/api/v1`. نام منابع جمع و kebab-case: `/pet-types`، `/cart/items`.
 - تاریخ‌ها رشته‌های ISO-8601 UTC؛ تبدیل جلالی وظیفهٔ فرانت‌اند است.
 - Auth: `Authorization: Bearer <accessToken>`. **همهٔ مسیرها به‌صورت پیش‌فرض نیازمند احراز هویت‌اند** (JwtAuthGuard سراسری)؛ مسیرهای عمومی با `@Public()`.
+- **نشست و خروج (issue #11):** `POST /auth/logout` فقط نشست refresh (خانوادهٔ توکن در Redis) را باطل می‌کند؛ access token صادرشده تا سررسید طبیعی خود (پیش‌فرض ≤ ۱۵ دقیقه، `JWT_ACCESS_TTL`) معتبر می‌ماند. حساب‌های `BLOCKED`/حذف‌نشانی‌شده در **هر درخواست** با ۴۰۱ رد می‌شوند (بررسی در JWT strategy). همگام‌سازی خروج بین تب‌های باز مرورگر (BroadcastChannel/storage event) بر عهدهٔ فرانت‌اند است — بک‌اند فقط نشست refresh را می‌بندد.
+- **نرخ محدودسازی:** سراسری ۱۰۰ درخواست/دقیقه؛ `otp/request` و `otp/verify` و `upload/image` هر کدام ۱۰/دقیقه (`@Throttle`). افزودن `TRUST_PROXY` هنگام قرارگیری پشت reverse proxy برای IP درست کلاینت.
 
 ### ۳.۲ پوشش پاسخ
 
@@ -139,7 +141,7 @@ Clinic   (کلینیک‌ها — فهرست عمومی)
 NODE_ENV=development
 PORT=3000
 CORS_ORIGINS=http://localhost:5173
-DATABASE_URL=postgresql://pet:pet@localhost:5432/pet_db?schema=public
+DATABASE_URL="file:./dev.db"    # SQLite (پایدار در volume داکر؛ نگهداری فایل دیتابیس)
 REDIS_URL=redis://localhost:6379
 JWT_ACCESS_SECRET=...            # هرگز در مخزن
 JWT_REFRESH_SECRET=...
@@ -161,7 +163,7 @@ ORDER_EXPIRE_MINUTES=30
 ADMIN_SEED_PHONE=09120000000
 ```
 
-`docker compose` سرویس‌های `postgres:16` (db/user/password: `pet`) و `redis:7` را بالا می‌آورد.
+`docker compose` سرویس‌های `redis:7` و بک‌اند را بالا می‌آورد. دیتابیس **SQLite** است (`file:./dev.db`) و فایل آن به‌همراه پوشهٔ `uploads` در volume‌های میزبان (`./data` و `./uploads`) نگهداری می‌شود تا با بازسازی کانتینر از بین نرود (ایشوز #۰۶). مهاجرت آینده به PostgreSQL از مسیر Prisma (`provider = "postgresql"`) انجام‌پذیر است؛ تا آن زمان SQLite مرجع است.
 
 ## ۶. قواعد کسب‌وکار
 
@@ -231,7 +233,7 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 ## ۷. استراتژی تست
 
 - **تست واحد (Jest):** OtpService (هش، سقف‌ها، discard)، جریان `requestOtp` (شکست ارسال باید OTP را دور بریزد)، انتخاب درایور `SmsService`، درایور sms.ir (payload/ retry/ خطاها با mock)، CouponsService، OrderStockService، محاسبهٔ قیمت سفارش، سرویس پیشنهاد، ابزارهای `phone`/`slugify`/`normalizeFa`.
-- **تست E2E (Supertest):** با Postgres + Redis واقعی (docker compose) و دیتابیس تستی اختصاصی؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
+- **تست E2E (Supertest):** با SQLite (فایل تستی اختصاصی) + Redis واقعی (docker compose)؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
 - سناریوهای حتمی: جریان کامل خرید؛ جداسازی مالکیت بین دو کاربر؛ همزمانی آخرین موجودی؛ سقف‌های کوپن؛ idempotency کال‌بک پرداخت؛ دسترسی غیرمجاز/مسدود.
 - چک‌لیست تست دستی و پذیرش: [`docs/TEST_CHECKLIST.md`](docs/TEST_CHECKLIST.md).
 
@@ -248,7 +250,7 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 | لاگ تغییرات | `GET /admin/audit-logs` (فیلتر entity/action/adminId) |
 | کاربران | `GET/POST/PATCH/DELETE /admin/users...` + `PATCH /admin/users/:id/restore` (جستجو، نقش/وضعیت، حذف نرم) |
 | کاتالوگ | `admin/products` (+ `:id/variants`، `variants/:id`، `:id/images`، `images/:id`، `:id/tags`)، `admin/brands`، `admin/categories`، `admin/pet-types`، `admin/breeds`، `admin/tags` |
-| سفارش‌ها | `GET/POST/PATCH /admin/orders...` — `:id/transition` (PAID→PROCESSING→SHIPPED→DELIVERED)، `:id/tracking`، `:id/cancel` (برگشت موجودی)، `:id/refund` (نشانه‌گذاری استرداد) |
+| سفارش‌ها | `GET/PATCH /admin/orders...` — `:id/transition` (PAID→PROCESSING→SHIPPED→DELIVERED)، `:id/tracking`، `:id/cancel` (برگشت موجودی)، `:id/refund` (نشانه‌گذاری استرداد) — ساخت سفارش فقط از `POST /orders` (کاربر) است؛ `POST /admin/orders` وجود ندارد |
 | پرداخت‌ها | `GET /admin/payments...` — `:id/reconcile` (verify مجدد درگاه)، `:id/mark-failed` |
 | کوپن‌ها | CRUD `/admin/coupons` + آمار مصرف (حذف کوپن استفاده‌شده → غیرفعال‌سازی) |
 | دارو/داروخانه | CRUD `/admin/medicines`، CRUD `/admin/pharmacies` + `POST/DELETE /admin/pharmacies/:id/medicines/:medicineId` |

@@ -12,6 +12,12 @@ export function strictBoolean({ value }: { value: unknown }): unknown {
 }
 
 export class ClinicQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ maxLength: 100, description: 'Search by name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
   @ApiPropertyOptional({ maxLength: 100, description: 'Filter by city' })
   @IsOptional()
   @IsString()
