@@ -119,7 +119,7 @@ describe('SmsIrDriver', () => {
         );
       const driver = makeDriver();
 
-      await expect(driver.sendOtp('09121234567', '123456')).resolves.toBeUndefined();
+      await expect(driver.sendOtp('09121234567', '123456')).resolves.toEqual({ messageId: 7 });
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 

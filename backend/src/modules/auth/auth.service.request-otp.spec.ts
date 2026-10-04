@@ -1,4 +1,4 @@
-import { OtpService } from './otp.service';
+import { OtpService } from './otp/otp.service';
 import { AuthService } from './auth.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 

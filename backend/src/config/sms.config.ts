@@ -8,4 +8,6 @@ export default registerAs('sms', () => ({
   paramName: process.env.SMS_IR_PARAM_NAME || 'Code',
   baseUrl: process.env.SMS_IR_BASE_URL || 'https://api.sms.ir/v1',
   lineNumber: process.env.SMS_IR_LINE_NUMBER,
+  // Notification policy — which events text the user (payment success, …).
+  notifyPaymentSuccess: process.env.SMS_NOTIFY_PAYMENT_SUCCESS !== 'false',
 }));

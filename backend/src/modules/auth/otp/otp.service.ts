@@ -1,9 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { RedisService } from '../../redis/redis.service';
-import { AppException } from '../../common/filters/all-exceptions.filter';
+import { RedisService } from '../../../redis/redis.service';
+import { AppException } from '../../../common/filters/all-exceptions.filter';
+import { otpKeys, OTP_HOURLY_WINDOW_SECONDS } from './otp.constants';
 
+/**
+ * OTP code policy: generation, hashing, verification, rate limits.
+ * All Redis key names and time windows come from `otp.constants`; all policy
+ * values come from the `otp` config namespace (env OTP_* — see otp.config.ts).
+ * Message delivery is the SmsService's job; this service never talks to SMS.
+ */
 @Injectable()
 export class OtpService {
   private readonly logger = new Logger(OtpService.name);
@@ -25,10 +32,10 @@ export class OtpService {
     const devCode = this.configService.get<string>('otp.devCode');
 
     // Check hourly limit (atomic counter)
-    const countKey = `otp:count:${phone}`;
+    const countKey = otpKeys.count(phone);
     const count = await this.redis.incr(countKey);
     if (count === 1) {
-      await this.redis.expire(countKey, 3600);
+      await this.redis.expire(countKey, OTP_HOURLY_WINDOW_SECONDS);
     }
     if (count > maxPerHour) {
       throw new AppException('OTP_RATE_LIMITED', 'تعداد درخواست‌ها از حد مجاز فراتر رفته است', 429);
@@ -36,7 +43,7 @@ export class OtpService {
 
     // Atomically claim the resend cooldown (issue #03): SET NX — only one of
     // two concurrent requests wins the claim; the loser is rate-limited.
-    const cooldownKey = `otp:cooldown:${phone}`;
+    const cooldownKey = otpKeys.cooldown(phone);
     const claimedCooldown = await this.redis.setNx(cooldownKey, '1', cooldown);
     if (!claimedCooldown) {
       throw new AppException('OTP_RATE_LIMITED', 'لطفاً چند لحظه صبر کنید و دوباره تلاش کنید', 429);
@@ -54,8 +61,7 @@ export class OtpService {
     const hashedCode = this.hashOtp(code);
 
     // Store hashed OTP
-    const otpKey = `otp:${phone}`;
-    await this.redis.set(otpKey, hashedCode, ttl);
+    await this.redis.set(otpKeys.code(phone), hashedCode, ttl);
 
     return code;
   }
@@ -67,7 +73,7 @@ export class OtpService {
   async verify(phone: string, code: string): Promise<boolean> {
     const maxAttempts = this.configService.get<number>('otp.maxVerifyAttempts') || 5;
 
-    const otpKey = `otp:${phone}`;
+    const otpKey = otpKeys.code(phone);
     const storedHash = await this.redis.get(otpKey);
 
     if (!storedHash) {
@@ -75,10 +81,10 @@ export class OtpService {
     }
 
     // Check attempts
-    const attemptsKey = `otp:attempts:${phone}`;
+    const attemptsKey = otpKeys.attempts(phone);
     const attempts = await this.redis.incr(attemptsKey);
     if (attempts === 1) {
-      await this.redis.expire(attemptsKey, 3600);
+      await this.redis.expire(attemptsKey, OTP_HOURLY_WINDOW_SECONDS);
     }
 
     if (attempts > maxAttempts) {
@@ -114,11 +120,21 @@ export class OtpService {
    * The hourly request counter is intentionally kept as anti-abuse.
    */
   async discard(phone: string): Promise<void> {
-    await this.redis.del(`otp:${phone}`, `otp:cooldown:${phone}`);
+    await this.redis.del(otpKeys.code(phone), otpKeys.cooldown(phone));
   }
 
+  /**
+   * Hash the OTP for at-rest storage. Uses the dedicated OTP_HASH_SECRET so
+   * rotating JWT secrets never invalidates in-flight codes; falls back to the
+   * access secret only outside production (never a hardcoded default).
+   */
   private hashOtp(code: string): string {
-    const secret = this.configService.get<string>('jwt.accessSecret') || 'default-secret';
+    const secret =
+      this.configService.get<string>('otp.hashSecret') ||
+      this.configService.get<string>('jwt.accessSecret');
+    if (!secret) {
+      throw new Error('OTP_HASH_SECRET (or JWT_ACCESS_SECRET) must be configured');
+    }
     return crypto.createHmac('sha256', secret).update(code).digest('hex');
   }
 }

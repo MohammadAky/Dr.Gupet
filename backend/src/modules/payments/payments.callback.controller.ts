@@ -66,7 +66,8 @@ export class PaymentsCallbackController {
     @Res() res: Response,
   ) {
     // The simulated bank page only exists outside production (issue #01).
-    if (process.env.NODE_ENV === 'production') {
+    const nodeEnv = this.configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
+    if (nodeEnv === 'production') {
       throw new NotFoundException();
     }
 

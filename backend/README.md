@@ -95,7 +95,7 @@ backend/
 
 ### ۳.۵ متن فارسی و شماره موبایل
 
-- `phone.util.ts`: نرمال‌سازی به `09XXXXXXXXX`. ارقام فارسی/عربی (`۰-۹`، `٠-٩`)، پیشوندهای `+98`، `0098`، `98` و فاصله/خط تیره پذیرفته می‌شوند؛ اعتبارسنجی با `/^09\d{9}$/`.
+- `phone.util.ts`: نرمال‌سازی به `09XXXXXXXXX`. ارقام فارسی/عربی (`۰-۹`، `٠-٩`)، پیشوندهای `+98`، `0098`، `98`، شمارهٔ بدون صفر (`9121234567`) و فاصله/خط تیره پذیرفته می‌شوند؛ اعتبارسنجی با `/^09\d{9}$/`. **این تابع تنها مرجع نرمال‌سازی شماره است** — DTOهای auth (با `@Transform`)، `users.createByAdmin` و درایور sms.ir همگی از همین تابع استفاده می‌کنند.
 - در جستجو و ذخیرهٔ نام‌ها حروف عربی نرمال شود: `ي → ی`، `ك → ک`، حذف کاراکترهای zero-width و tatweel (`normalizeFa()`).
 - `slugify.util.ts`: حروف فارسی حفظ می‌شوند؛ whitespace → `-`؛ حروف لاتین small؛ slugها ذخیره‌شده، یکتا و بدون بازتولید پس از ایجاد.
 
@@ -230,9 +230,27 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 
 `MAX_ADDRESSES_PER_USER = 10`، `MAX_PETS_PER_USER = 10`، `MAX_CART_ITEM_QTY = 20`، `LOW_STOCK_THRESHOLD = 5`، `PUPPY_KITTEN_MAX_MONTHS = 12`، `SENIOR_MIN_MONTHS = 84`، `DOG_SMALL_MAX_KG = 10`، `DOG_MEDIUM_MAX_KG = 25`، `DEFAULT_PAGE_LIMIT = 20`، `MAX_PAGE_LIMIT = 50`، `MEDICINE_DISCLAIMER`.
 
+### ۶.۷ معماری OTP و SMS
+
+**مرز مسئولیت:** `OtpService` (`modules/auth/otp/`) فقط سیاست کد است — تولید، هش، تایید یک‌بارمصرف، سقف‌ها؛ هرگز با SMS کار نمی‌کند. `SmsService` (`src/sms/`) فقط تحویل پیام است — facade بی‌طرف از ارائه‌دهنده با درایورهای `console`/`smsir`. پرداخت و auth هر دو فقط `SmsService` صدا می‌زنند.
+
+**سیاست نرخ (لایه‌های مستقل):**
+
+| لایه | محدوده | مقدار |
+|---|---|---|
+| `ThrottlerGuard` سراسری | هر IP | ۱۰۰ درخواست/دقیقه |
+| `@Throttle` مسیرهای `otp/*` و `upload/image` | هر IP | ۱۰/دقیقه |
+| cooldown ارسال (`SET NX` اتمیک — `otp:cooldown:{phone}`) | هر شماره | `OTP_RESEND_COOLDOWN_SECONDS` |
+| سقف درخواست ساعتی (`otp:count:{phone}`) | هر شماره | `OTP_MAX_PER_HOUR` در ساعت |
+| سقف تلاش تایید (`otp:attempts:{phone}`) | هر کد | `OTP_MAX_VERIFY_ATTEMPTS` |
+
+**کلیدهای Redis** در `modules/auth/otp/otp.constants.ts` متمرکزند؛ کد فقط به‌صورت HMAC ذخیره می‌شود با **`OTP_HASH_SECRET`** (جدا از secret توکن‌ها؛ در production الزامی — چرخش JWT هرگز OTP جاری را نامعتبر نمی‌کند). مصرف کد با `DEL` اتمیک است: دقیقاً یکی از درخواست‌های همزمان برنده می‌شود؛ شکست ارسال پیامک، کد و cooldown را دور می‌ریزد (سقف ساعتی برای ضدسوءاستفاده می‌ماند).
+
+**لاگ تحویل:** هر ارسال (OTP/اعلان) در جدول `SmsLog` با وضعیت `SENT`/`FAILED`، `messageId` پیام‌رسان و خلاصهٔ خطای امن ثبت می‌شود؛ پیگیری «کد نرسید» از `GET /admin/sms/logs` (فیلتر phone/kind/status). سیاست اعلان: `SMS_NOTIFY_PAYMENT_SUCCESS=false` پیامک موفقیت پرداخت را خاموش می‌کند.
+
 ## ۷. استراتژی تست
 
-- **تست واحد (Jest):** OtpService (هش، سقف‌ها، discard)، جریان `requestOtp` (شکست ارسال باید OTP را دور بریزد)، انتخاب درایور `SmsService`، درایور sms.ir (payload/ retry/ خطاها با mock)، CouponsService، OrderStockService، محاسبهٔ قیمت سفارش، سرویس پیشنهاد، ابزارهای `phone`/`slugify`/`normalizeFa`.
+- **تست واحد (Jest):** OtpService (هش، سقف‌ها، discard، همزمانی cooldown/verify)، جریان `requestOtp` (شکست ارسال باید OTP را دور بریزد)، انتخاب درایور `SmsService` + لاگ `SmsLog`، درایور sms.ir (payload/ retry/ خطاها با mock)، سخت‌سازی callback پرداخت (امضا/Status/race)، cancel/expire اتمیک سفارش، سهمیهٔ آپلود، `POST /admin/users`، خنثی‌سازی CSV، جستجوهای admin/public، CouponsService، OrderStockService، سبد خرید/پت/آدرس/علاقه‌مندی، ابزارهای `phone`/`slugify`/`normalizeFa`.
 - **تست E2E (Supertest):** با SQLite (فایل تستی اختصاصی) + Redis واقعی (docker compose)؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
 - سناریوهای حتمی: جریان کامل خرید؛ جداسازی مالکیت بین دو کاربر؛ همزمانی آخرین موجودی؛ سقف‌های کوپن؛ idempotency کال‌بک پرداخت؛ دسترسی غیرمجاز/مسدود.
 - چک‌لیست تست دستی و پذیرش: [`docs/TEST_CHECKLIST.md`](docs/TEST_CHECKLIST.md).

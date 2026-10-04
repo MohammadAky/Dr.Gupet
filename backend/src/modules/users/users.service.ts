@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
+import { normalizePhone } from '../../common/utils/phone.util';
 
 const USER_SAFE_SELECT = {
   id: true,
@@ -208,12 +209,9 @@ export class UsersService {
     firstName?: string;
     lastName?: string;
   }) {
-    const digits = String(data.phone ?? '').replace(/[^\d]/g, '');
-    let phone = digits;
-    if (phone.startsWith('98')) phone = `0${phone.slice(2)}`;
-    else if (phone.startsWith('0098')) phone = `0${phone.slice(4)}`;
-    else if (phone.startsWith('9') && phone.length === 10) phone = `0${phone}`;
-    if (!/^09\d{9}$/.test(phone)) {
+    // Single source of truth for phone normalization (common/utils/phone.util).
+    const phone = normalizePhone(String(data.phone ?? ''));
+    if (!phone) {
       throw new AppException('VALIDATION_ERROR', 'شماره موبایل معتبر نیست', 400);
     }
 

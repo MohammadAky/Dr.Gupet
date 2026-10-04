@@ -33,7 +33,8 @@ export class PaymentsService {
     if (driver !== 'mock' && driver !== 'zarinpal') {
       throw new Error(`Unknown PAYMENT_DRIVER "${driver}" — expected "mock" or "zarinpal"`);
     }
-    if (driver === 'mock' && process.env.NODE_ENV === 'production') {
+    const nodeEnv = this.configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
+    if (driver === 'mock' && nodeEnv === 'production') {
       throw new Error('PAYMENT_DRIVER=mock is not allowed in production');
     }
     this.driver = driver;
@@ -246,19 +247,22 @@ export class PaymentsService {
       return { success: true, needsReview: true, ...base };
     }
 
-    // Send SMS notification (fail silently)
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: payment.order.userId },
-      });
-      if (user) {
-        await this.sms.sendText(
-          user.phone,
-          `پرداخت سفارش ${payment.order.orderNumber} با موفقیت انجام شد.`,
-        );
+    // Send SMS notification (fail silently) — notification policy from config.
+    const notifyEnabled = this.configService.get<boolean>('sms.notifyPaymentSuccess') !== false;
+    if (notifyEnabled) {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: payment.order.userId },
+        });
+        if (user) {
+          await this.sms.sendText(
+            user.phone,
+            `پرداخت سفارش ${payment.order.orderNumber} با موفقیت انجام شد.`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(`payment success notification failed: ${(error as Error).message}`);
       }
-    } catch (error) {
-      this.logger.warn(`payment success notification failed: ${(error as Error).message}`);
     }
 
     return { success: true, needsReview: false, ...base };

@@ -47,8 +47,13 @@ class EnvironmentVariables {
   @IsNumber()
   OTP_MAX_VERIFY_ATTEMPTS: number;
 
+  @IsOptional()
   @IsString()
   OTP_DEV_CODE: string;
+
+  @IsOptional()
+  @IsString()
+  OTP_HASH_SECRET?: string;
 
   @IsIn(['console', 'smsir'])
   SMS_DRIVER: string;
@@ -158,6 +163,9 @@ export function validate(config: Record<string, unknown>) {
     }
     if (!validatedConfig.ZARINPAL_MERCHANT_ID) {
       throw new Error('ZARINPAL_MERCHANT_ID is required in production');
+    }
+    if (!validatedConfig.OTP_HASH_SECRET) {
+      throw new Error('OTP_HASH_SECRET is required in production (dedicated from JWT secrets)');
     }
   }
 

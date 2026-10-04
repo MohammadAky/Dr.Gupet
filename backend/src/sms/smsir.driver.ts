@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { SmsDriver } from './sms-driver.interface';
+import type { SmsDriver, SmsSendResult } from './sms-driver.interface';
+import { normalizePhone } from '../common/utils/phone.util';
 
 /** Response envelope of the sms.ir REST API (docs/SMS_IR_API.md §1.3). */
 interface SmsIrEnvelope<T = unknown> {
@@ -28,7 +29,7 @@ export class SmsIrDriver implements SmsDriver {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async sendOtp(phone: string, code: string): Promise<void> {
+  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const apiKey = this.requireConfig('sms.apiKey', 'SMS_API_KEY');
     const templateId = Number(this.requireConfig('sms.templateId', 'SMS_IR_TEMPLATE_ID'));
     if (!Number.isInteger(templateId) || templateId <= 0) {
@@ -36,25 +37,27 @@ export class SmsIrDriver implements SmsDriver {
     }
     const paramName = this.configService.get<string>('sms.paramName') || 'Code';
 
-    await this.post('/send/verify', apiKey, {
+    const data = (await this.post('/send/verify', apiKey, {
       mobile: this.normalizeMobile(phone),
       templateId,
       parameters: [{ name: paramName, value: code }], // value ≤ 25 chars (§2.2)
-    });
+    })) as { messageId?: number } | undefined;
+    return { messageId: data?.messageId };
   }
 
-  async sendText(phone: string, text: string): Promise<void> {
+  async sendText(phone: string, text: string): Promise<SmsSendResult> {
     const apiKey = this.requireConfig('sms.apiKey', 'SMS_API_KEY');
     const lineNumber = Number(this.requireConfig('sms.lineNumber', 'SMS_IR_LINE_NUMBER'));
     if (!Number.isInteger(lineNumber) || lineNumber <= 0) {
       throw new Error('sms.ir is not configured: SMS_IR_LINE_NUMBER must be a numeric line');
     }
 
-    await this.post('/send/bulk', apiKey, {
+    const data = (await this.post('/send/bulk', apiKey, {
       lineNumber,
       messageText: text,
       mobiles: [this.normalizeMobile(phone)],
-    });
+    })) as { messageId?: number } | undefined;
+    return { messageId: data?.messageId };
   }
 
   /**
@@ -136,12 +139,12 @@ export class SmsIrDriver implements SmsDriver {
   }
 
   /** Normalize an Iranian mobile to the national `09xxxxxxxxx` format (§2.5). */
+  /** Normalize Iranian mobiles via the shared util (common/utils/phone.util). */
   private normalizeMobile(phone: string): string {
-    const digits = phone.replace(/[^\d+]/g, '');
-    if (/^09\d{9}$/.test(digits)) return digits;
-    if (/^989\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
-    if (/^\+989\d{9}$/.test(digits)) return `0${digits.slice(3)}`;
-    if (/^9\d{9}$/.test(digits)) return `0${digits}`;
-    throw new Error(`invalid Iranian mobile number: ${phone}`);
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      throw new Error(`invalid Iranian mobile number: ${phone}`);
+    }
+    return normalized;
   }
 }

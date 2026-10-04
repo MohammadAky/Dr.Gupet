@@ -9,6 +9,7 @@ import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
 import smsConfig from './config/sms.config';
 import paymentConfig from './config/payment.config';
+import otpConfig from './config/otp.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
@@ -43,7 +44,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, jwtConfig, redisConfig, smsConfig, paymentConfig],
+      load: [appConfig, jwtConfig, redisConfig, smsConfig, paymentConfig, otpConfig],
       validate,
     }),
 
