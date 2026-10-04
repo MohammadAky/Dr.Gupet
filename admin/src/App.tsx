@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { AuthProvider, useAuth } from "./auth";
 import { ApiError } from "./api/client";
 import { Catalog } from "./Catalog";
@@ -208,17 +208,25 @@ const navigation: Array<{
   ] },
 ];
 
-function Sidebar({ active, onSelect, open, onClose }: {
+function Sidebar({ active, onSelect, open, onClose, mobile, sidebarRef, closeRef }: {
   active: AdminSection;
   onSelect: (value: AdminSection) => void;
   open: boolean;
   onClose: () => void;
+  mobile: boolean;
+  sidebarRef: RefObject<HTMLElement | null>;
+  closeRef: RefObject<HTMLButtonElement | null>;
 }) {
   return (
-    <aside className={"sidebar" + (open ? " sidebar--open" : "")} id="admin-navigation">
+    <aside ref={sidebarRef} className={"sidebar" + (open ? " sidebar--open" : "")}
+      id="admin-navigation" inert={mobile && !open}
+      role={mobile && open ? "dialog" : undefined}
+      aria-modal={mobile && open ? true : undefined}
+      aria-label={mobile && open ? "فهرست مدیریت" : undefined}
+      tabIndex={mobile && open ? -1 : undefined}>
       <div className="sidebar-brand-row">
       <Brand compact />
-        <button type="button" className="sidebar-close" onClick={onClose}
+        <button ref={closeRef} type="button" className="sidebar-close" onClick={onClose}
           aria-label="بستن فهرست">×</button>
       </div>
       <nav aria-label="بخش‌های مدیریت">
@@ -267,10 +275,10 @@ function SalesChart({
 }) {
   const max = Math.max(1, ...points.map((point) => point.revenue));
   return (
+    <>
     <div
       className="chart"
-      role="img"
-      aria-label={`روند فروش ${label}`}
+      aria-hidden="true"
       style={{ gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))` }}
     >
       {points.map((point) => (
@@ -289,6 +297,18 @@ function SalesChart({
         </div>
       ))}
     </div>
+    <table className="chart-data-table">
+      <caption>فروش روزانه {label}</caption>
+      <thead><tr><th scope="col">تاریخ</th><th scope="col">مبلغ فروش</th><th scope="col">تعداد سفارش</th></tr></thead>
+      <tbody>{points.map((point) => (
+        <tr key={point.date}>
+          <th scope="row"><time dateTime={point.date}>{dateFormat.format(new Date(`${point.date}T12:00:00Z`))}</time></th>
+          <td>{money(point.revenue)}</td>
+          <td>{number.format(point.orders)}</td>
+        </tr>
+      ))}</tbody>
+    </table>
+    </>
   );
 }
 
@@ -571,29 +591,95 @@ function Dashboard() {
   );
 }
 
+const MOBILE_NAV_QUERY = "(max-width: 850px)";
+
+function mobileNavigationViewport(): boolean {
+  return typeof window.matchMedia === "function"
+    ? window.matchMedia(MOBILE_NAV_QUERY).matches
+    : window.innerWidth <= 850;
+}
+
 function Workspace() {
   const { identity, logout } = useAuth();
   const [section, setSection] = useState<AdminSection>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  const [mobile, setMobile] = useState(mobileNavigationViewport);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const openRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef<"mobile" | "desktop" | null>(null);
+  const drawerOpen = mobile && navOpen;
+
   useEffect(() => {
-    if (!navOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setNavOpen(false);
+    const media = typeof window.matchMedia === "function" ? window.matchMedia(MOBILE_NAV_QUERY) : null;
+    const update = () => {
+      const next = media ? media.matches : window.innerWidth <= 850;
+      setMobile(next);
+      if (!next) setNavOpen(false);
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [navOpen]);
+    if (media) media.addEventListener("change", update);
+    else window.addEventListener("resize", update);
+    return () => {
+      if (media) media.removeEventListener("change", update);
+      else window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!drawerOpen) {
+      if (restoreFocusRef.current === "mobile") openRef.current?.focus();
+      else if (restoreFocusRef.current === "desktop")
+        sidebarRef.current?.querySelector<HTMLButtonElement>(".sidebar-link--active")?.focus();
+      restoreFocusRef.current = null;
+      if (mobile && sidebarRef.current?.contains(document.activeElement)) openRef.current?.focus();
+      return;
+    }
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+    if (closeRef.current) closeRef.current.focus();
+    else sidebar.focus();
+    const priorOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const buttons = Array.from(sidebar.querySelectorAll<HTMLButtonElement>("button:not([disabled])"));
+      const first = buttons[0];
+      const last = buttons.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        sidebar.focus();
+      } else if (event.shiftKey && (document.activeElement === first || !sidebar.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !sidebar.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = priorOverflow;
+      restoreFocusRef.current = mobileNavigationViewport() ? "mobile" : "desktop";
+    };
+  }, [drawerOpen, mobile]);
   const label = navigation.flatMap((group) => group.items).find((item) => item.id === section)?.label || "نمای کلی";
   return <div className="admin-shell">
-    {navOpen && <button type="button" className="sidebar-scrim" aria-label="بستن فهرست"
+    {drawerOpen && <button type="button" className="sidebar-scrim" aria-hidden="true" tabIndex={-1}
       onClick={() => setNavOpen(false)} />}
-    <Sidebar active={section} open={navOpen} onClose={() => setNavOpen(false)}
+    <Sidebar active={section} open={drawerOpen} mobile={mobile} sidebarRef={sidebarRef} closeRef={closeRef}
+      onClose={() => setNavOpen(false)}
       onSelect={(value) => { setSection(value); setNavOpen(false); window.scrollTo(0, 0); }} />
-    <div className="main-shell">
+    <div className="main-shell" inert={drawerOpen}>
       <header className="topbar">
         <div className="topbar-context">
-          <button type="button" className="nav-open" aria-label="باز کردن فهرست"
-            aria-controls="admin-navigation" aria-expanded={navOpen}
+          <button ref={openRef} type="button" className="nav-open" aria-label="باز کردن فهرست"
+            aria-controls="admin-navigation" aria-expanded={drawerOpen}
             onClick={() => setNavOpen(true)}>☰</button>
           <span className="topbar-dot" /> پنل مدیریت <span>/</span> {label}
         </div>

@@ -43,6 +43,9 @@
   background: var(--forest);
   color: #fff;
 }
+[data-theme="dark"] .care-tab--active {
+  color: #102c17;
+}
 .care-filter {
   display: flex;
   align-items: end;

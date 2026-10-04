@@ -1,31 +1,72 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { queryKeys } from '../api/query-keys';
+import { useAuth } from '../auth/auth-provider';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { MAX_ADDRESSES_PER_USER } from '../lib/constants';
 import { errorText } from '../lib/labels';
 
 /** Address book (F3): list, set default, delete (server keeps one default). */
 export function AddressesPage() {
-  const queryClient = useQueryClient();
-  const addresses = useQuery({ queryKey: queryKeys.addresses, queryFn: () => api.listAddresses() });
+  const { status, user } = useAuth();
+  const userId = status === 'authed' ? user?.id ?? null : null;
+  if (userId === null) return <p>برای مشاهدهٔ آدرس‌های خود وارد حساب شوید.</p>;
+  return <AddressesContent key={userId} />;
+}
 
-  function invalidate() {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.addresses });
-  }
+function AddressesContent() {
+  const queryClient = useQueryClient();
+  const active = useRef(true);
+  const addresses = useQuery({
+    queryKey: queryKeys.addresses,
+    queryFn: async ({ signal }) => {
+      const result = await api.listAddresses();
+      if (signal.aborted || !active.current) throw new DOMException('Inactive session', 'AbortError');
+      return result;
+    },
+  });
+  const writing = useRef(false);
+  const [pending, setPending] = useState<{ kind: 'default' | 'delete'; id: number } | null>(null);
+  const [notice, setNotice] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
+
+  useLayoutEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
 
   const setDefault = useMutation({
     mutationFn: (id: number) => api.setDefaultAddress(id),
-    onSuccess: invalidate,
-    onError: (error) => alert(errorText(error)),
   });
 
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteAddress(id),
-    onSuccess: invalidate,
-    onError: (error) => alert(errorText(error)),
   });
+
+  async function changeAddress(kind: 'default' | 'delete', id: number) {
+    if (!active.current || writing.current || (kind === 'delete' && !window.confirm('این آدرس حذف شود؟'))) return;
+    writing.current = true;
+    setPending({ kind, id });
+    setNotice(null);
+    try {
+      if (kind === 'default') await setDefault.mutateAsync(id);
+      else await remove.mutateAsync(id);
+      if (!active.current) return;
+      await queryClient.invalidateQueries({ queryKey: queryKeys.addresses });
+      if (active.current) setNotice({
+        kind: 'success',
+        text: kind === 'default' ? 'آدرس پیش‌فرض تغییر کرد.' : 'آدرس حذف شد.',
+      });
+    } catch (error) {
+      if (active.current) setNotice({ kind: 'error', text: errorText(error) });
+    } finally {
+      if (active.current) {
+        writing.current = false;
+        setPending(null);
+      }
+    }
+  }
 
   if (addresses.isLoading) return <LoadingState />;
   if (addresses.error)
@@ -35,8 +76,9 @@ export function AddressesPage() {
   const atLimit = items.length >= MAX_ADDRESSES_PER_USER;
 
   return (
-    <section>
+    <section aria-busy={pending !== null}>
       <h1>آدرس‌های من</h1>
+      {notice && <p role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
 
       {items.length === 0 && (
         <EmptyState
@@ -61,15 +103,14 @@ export function AddressesPage() {
             <p>
               <Link to={`/addresses/${address.id}/edit`}>ویرایش</Link>
               {!address.isDefault && (
-                <button type="button" onClick={() => setDefault.mutate(address.id)}>
+                <button type="button" disabled={pending !== null} onClick={() => void changeAddress('default', address.id)}>
                   پیش‌فرض کردن
                 </button>
               )}
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm('این آدرس حذف شود؟')) remove.mutate(address.id);
-                }}
+                disabled={pending !== null}
+                onClick={() => void changeAddress('delete', address.id)}
               >
                 حذف
               </button>

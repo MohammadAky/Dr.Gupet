@@ -240,6 +240,10 @@
   color: #fff;
   border-color: var(--forest, #183c22);
 }
+[data-theme="dark"] .manage-tabs button[aria-selected="true"],
+[data-theme="dark"] .manage-tabs button[aria-pressed="true"] {
+  color: #102c17;
+}
 .manage-report-head {
   display: flex;
   align-items: center;

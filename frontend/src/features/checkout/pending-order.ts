@@ -11,7 +11,16 @@ export interface PendingOrder {
   orderNumber: string;
 }
 
+function isPendingOrder(value: unknown): value is PendingOrder {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Partial<PendingOrder>;
+  return typeof candidate.orderId === 'number' && Number.isSafeInteger(candidate.orderId) &&
+    candidate.orderId > 0 && typeof candidate.orderNumber === 'string' &&
+    candidate.orderNumber.trim().length > 0;
+}
+
 export function writePendingOrder(order: PendingOrder): void {
+  if (!isPendingOrder(order)) return;
   try {
     window.sessionStorage.setItem(KEY, JSON.stringify(order));
   } catch {
@@ -23,10 +32,8 @@ export function readPendingOrder(): PendingOrder | null {
   try {
     const raw = window.sessionStorage.getItem(KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PendingOrder;
-    return typeof parsed.orderId === 'number' && typeof parsed.orderNumber === 'string'
-      ? parsed
-      : null;
+    const parsed: unknown = JSON.parse(raw);
+    return isPendingOrder(parsed) ? parsed : null;
   } catch {
     return null;
   }

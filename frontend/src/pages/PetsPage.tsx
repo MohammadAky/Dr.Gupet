@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { queryKeys } from '../api/query-keys';
+import { useAuth } from '../auth/auth-provider';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { MAX_PETS_PER_USER } from '../lib/constants';
 import { formatWeight } from '../lib/format';
@@ -9,14 +11,55 @@ import { errorText, GENDER_FA, LIFE_STAGE_FA, TAG_TYPE_FA } from '../lib/labels'
 
 /** Pets list (F4) — soft delete with confirmation. */
 export function PetsPage() {
+  const { status, user } = useAuth();
+  const userId = status === 'authed' ? user?.id ?? null : null;
+  if (userId === null) return <p>برای مشاهدهٔ حیوانات خود وارد حساب شوید.</p>;
+  return <PetsContent key={userId} />;
+}
+
+function PetsContent() {
   const queryClient = useQueryClient();
-  const pets = useQuery({ queryKey: queryKeys.pets, queryFn: () => api.listPets() });
+  const active = useRef(true);
+  const pets = useQuery({
+    queryKey: queryKeys.pets,
+    queryFn: async ({ signal }) => {
+      const result = await api.listPets();
+      if (signal.aborted || !active.current) throw new DOMException('Inactive session', 'AbortError');
+      return result;
+    },
+  });
+  const writing = useRef(false);
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
+
+  useLayoutEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
 
   const remove = useMutation({
     mutationFn: (id: number) => api.deletePet(id),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.pets }),
-    onError: (error) => alert(errorText(error)),
   });
+
+  async function deletePet(id: number, name: string) {
+    if (!active.current || writing.current || !window.confirm(`«${name}» حذف شود؟`)) return;
+    writing.current = true;
+    setPendingId(id);
+    setNotice(null);
+    try {
+      await remove.mutateAsync(id);
+      if (!active.current) return;
+      await queryClient.invalidateQueries({ queryKey: queryKeys.pets });
+      if (active.current) setNotice({ kind: 'success', text: 'حیوان حذف شد.' });
+    } catch (error) {
+      if (active.current) setNotice({ kind: 'error', text: errorText(error) });
+    } finally {
+      if (active.current) {
+        writing.current = false;
+        setPendingId(null);
+      }
+    }
+  }
 
   if (pets.isLoading) return <LoadingState />;
   if (pets.error) return <ErrorState error={pets.error} onRetry={() => void pets.refetch()} />;
@@ -25,8 +68,9 @@ export function PetsPage() {
   const atLimit = items.length >= MAX_PETS_PER_USER;
 
   return (
-    <section>
+    <section aria-busy={pendingId !== null}>
       <h1>حیوانات من</h1>
+      {notice && <p role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
 
       {items.length === 0 && (
         <EmptyState
@@ -58,9 +102,8 @@ export function PetsPage() {
               <Link to={`/pets/${pet.id}/edit`}>ویرایش</Link>
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`«${pet.name}» حذف شود؟`)) remove.mutate(pet.id);
-                }}
+                disabled={pendingId !== null}
+                onClick={() => void deletePet(pet.id, pet.name)}
               >
                 حذف
               </button>

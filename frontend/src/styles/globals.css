@@ -36,8 +36,16 @@ img {
   max-width: 100%;
 }
 :focus-visible {
-  outline: 3px solid var(--gold);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
+}
+.header-search:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+.app-footer,
+.home-ending {
+  --focus: #d49f28;
 }
 ::selection {
   background: var(--gold-soft);
@@ -247,6 +255,77 @@ img {
 }
 .mobile-search[hidden] {
   display: none !important;
+}
+.header-search,
+.mobile-search {
+  position: relative;
+}
+.search-suggestions {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 10px);
+  z-index: 2;
+  max-height: min(480px, 55dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  box-shadow: var(--shadow-card);
+  scrollbar-width: thin;
+}
+.search-suggestions__group + .search-suggestions__group {
+  border-block-start: 1px solid var(--line);
+  margin-block-start: 6px;
+}
+.search-suggestions__heading {
+  display: block;
+  padding: 8px 12px 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.header-search .search-suggestions__option,
+.mobile-search .search-suggestions__option {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: start;
+  overflow-wrap: anywhere;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+.search-suggestions__option:hover,
+.search-suggestions__option[aria-selected='true'] {
+  background: var(--gold-soft);
+  box-shadow: inset -3px 0 var(--gold);
+}
+.search-suggestions__option small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.search-suggestions__status {
+  padding: 10px 12px;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.9;
+}
+.search-suggestions__status--muted {
+  color: var(--muted);
+  border-block-start: 1px solid var(--line);
+  font-size: 0.72rem;
 }
 .mobile-logout,
 .mobile-bottom-nav {
@@ -1101,6 +1180,8 @@ img {
   }
   .header-actions .mobile-search-trigger {
     display: inline-flex;
+    min-width: 44px;
+    flex-shrink: 0;
   }
   .mobile-toggle {
     display: inline-flex;
@@ -1932,7 +2013,7 @@ img {
   margin: 4px 0 0;
 }
 
-@media (hover: hover) and (pointer: fine) {
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .header-actions a:hover,
   .header-actions button:hover {
     transform: translateY(-2px);

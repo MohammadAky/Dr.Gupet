@@ -9,6 +9,7 @@ import { Header } from './components/layout/Header';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { ThemeToggle } from './components/layout/ThemeToggle';
 import { ConsentBanner } from './privacy/ConsentBanner';
+import { PageMetadata } from './components/PageMetadata';
 
 export function Shell() {
   const { status, user, logout } = useAuth();
@@ -51,6 +52,7 @@ export function Shell() {
 
   return (
     <div className="app-shell">
+      <PageMetadata />
       <a className="skip-link" href="#main-content">
         رفتن به محتوای اصلی
       </a>

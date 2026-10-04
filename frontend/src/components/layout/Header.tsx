@@ -1,6 +1,178 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { shopApi, type Page } from '../../api/endpoints-shop';
+import type { Clinic, Medicine, Pharmacy, ProductCard } from '../../api/types';
 import type { AuthStatus } from '../../auth/auth-provider';
+
+type SearchSource = 'desktop' | 'mobile';
+type SuggestionGroup = 'products' | 'medicines' | 'pharmacies' | 'clinics';
+
+interface Suggestion {
+  key: string;
+  group: SuggestionGroup;
+  name: string;
+  detail: string;
+  to: string;
+}
+
+interface DirectoryResult<T> {
+  items: T[];
+  limited: boolean;
+}
+
+interface DirectoryCache<T> {
+  promise: Promise<DirectoryResult<T>>;
+  expiresAt: number;
+}
+
+const GROUP_LABELS: Record<SuggestionGroup, string> = {
+  products: 'محصولات',
+  medicines: 'داروها',
+  pharmacies: 'داروخانه‌ها',
+  clinics: 'کلینیک‌ها',
+};
+const GROUP_ORDER = Object.keys(GROUP_LABELS) as SuggestionGroup[];
+const DIRECTORY_PAGE_SIZE = 50;
+const DIRECTORY_MAX_PAGES = 5;
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/ي/g, 'ی')
+    .replace(/ك/g, 'ک')
+    .replace(/\u200c|\u200d|\u200e|\u200f|ـ/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLocaleLowerCase('fa-IR');
+}
+
+function eligibleSearch(value: string): boolean {
+  return Array.from(value).filter((character) => /\p{L}/u.test(character)).length >= 3;
+}
+
+async function fetchDirectory<T>(load: (page: number) => Promise<Page<T>>): Promise<DirectoryResult<T>> {
+  const first = await load(1);
+  const totalPages = first.meta?.totalPages ?? 1;
+  const lastPage = Math.min(Math.max(totalPages, 1), DIRECTORY_MAX_PAGES);
+  const rest = await Promise.all(
+    Array.from({ length: lastPage - 1 }, (_, index) => load(index + 2)),
+  );
+  return {
+    items: [first, ...rest].flatMap((page) => page.data),
+    limited: !first.meta || totalPages > DIRECTORY_MAX_PAGES,
+  };
+}
+
+function uniqueSuggestions(items: Suggestion[]): Suggestion[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.key)) return false;
+    seen.add(item.key);
+    return true;
+  });
+}
+
+function productSuggestion(item: ProductCard): Suggestion | null {
+  if (!item.slug || typeof item.name !== 'string' || !item.name.trim()) return null;
+  return {
+    key: `products-${item.id}`,
+    group: 'products',
+    name: item.name,
+    detail: item.brand?.name ?? '',
+    to: `/products/${encodeURIComponent(item.slug)}`,
+  };
+}
+
+function namedSuggestion(
+  group: Exclude<SuggestionGroup, 'products'>,
+  item: Medicine | Pharmacy | Clinic,
+): Suggestion | null {
+  if (!Number.isSafeInteger(item.id) || item.id < 1 || !item.name?.trim()) return null;
+  return {
+    key: `${group}-${item.id}`,
+    group,
+    name: item.name,
+    detail: 'city' in item ? item.city : (item.activeIngredient ?? ''),
+    to: `/${group}/${item.id}`,
+  };
+}
+
+function SearchSuggestions({
+  source,
+  items,
+  pending,
+  failed,
+  limited,
+  activeIndex,
+  onActiveIndex,
+  onSelect,
+}: {
+  source: SearchSource;
+  items: Suggestion[];
+  pending: boolean;
+  failed: boolean;
+  limited: boolean;
+  activeIndex: number;
+  onActiveIndex: (index: number) => void;
+  onSelect: (item: Suggestion) => void;
+}) {
+  const listboxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeIndex < 0) return;
+    const option = listboxRef.current?.querySelector<HTMLElement>(`#${source}-search-option-${activeIndex}`);
+    option?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeIndex, source]);
+
+  return (
+    <div className="search-suggestions">
+      <div ref={listboxRef} id={`${source}-search-suggestions`} role="listbox" aria-label="پیشنهادهای جست‌وجو">
+        {GROUP_ORDER.map((group) => {
+          const groupItems = items.filter((item) => item.group === group);
+          if (!groupItems.length) return null;
+          return (
+            <div className="search-suggestions__group" role="group" aria-label={GROUP_LABELS[group]} key={group}>
+              <span className="search-suggestions__heading" aria-hidden="true">{GROUP_LABELS[group]}</span>
+              {groupItems.map((item) => {
+                const index = items.indexOf(item);
+                return (
+                  <button
+                    className="search-suggestions__option"
+                    type="button"
+                    role="option"
+                    id={`${source}-search-option-${index}`}
+                    aria-selected={activeIndex === index}
+                    key={item.key}
+                    onMouseEnter={() => onActiveIndex(index)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onSelect(item)}
+                  >
+                    <span>{item.name}</span>
+                    {item.detail && <small>{item.detail}</small>}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {pending && <p className="search-suggestions__status" role="status">در حال جست‌وجو…</p>}
+      {!pending && !items.length && (
+        <p className="search-suggestions__status" role="status">
+          {failed ? 'دریافت نتایج ممکن نشد؛ دوباره تلاش کنید.' : 'در نتایج بررسی‌شده موردی پیدا نشد.'}
+        </p>
+      )}
+      {!pending && failed && items.length > 0 && (
+        <p className="search-suggestions__status" role="status">برخی دسته‌ها در دسترس نبودند.</p>
+      )}
+      {!pending && limited && (
+        <p className="search-suggestions__status search-suggestions__status--muted">
+          پیشنهادهای مراکز به فهرست بارگذاری‌شده محدودند.
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface HeaderProps {
   status: AuthStatus;
@@ -67,16 +239,160 @@ export function Header({
   onMenuClose,
   onLogout,
 }: HeaderProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef<HTMLInputElement>(null);
+  const generationRef = useRef(0);
+  const pharmacyCacheRef = useRef<DirectoryCache<Pharmacy> | null>(null);
+  const clinicCacheRef = useRef<DirectoryCache<Clinic> | null>(null);
+  const [activeSearch, setActiveSearch] = useState<SearchSource | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [limited, setLimited] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const normalizedSearch = normalizeSearchText(search);
+  const canSuggest = eligibleSearch(normalizedSearch);
+
+  const getPharmacies = useCallback(() => {
+    const current = pharmacyCacheRef.current;
+    if (current && current.expiresAt > Date.now()) return current.promise;
+    const promise = fetchDirectory((page) => shopApi.pharmacies({ page, limit: DIRECTORY_PAGE_SIZE }));
+    const entry = { promise, expiresAt: Date.now() + 120_000 };
+    pharmacyCacheRef.current = entry;
+    void promise.catch(() => {
+      if (pharmacyCacheRef.current === entry) pharmacyCacheRef.current = null;
+    });
+    return promise;
+  }, []);
+
+  const getClinics = useCallback(() => {
+    const current = clinicCacheRef.current;
+    if (current && current.expiresAt > Date.now()) return current.promise;
+    const promise = fetchDirectory((page) => shopApi.clinics({ page, limit: DIRECTORY_PAGE_SIZE }));
+    const entry = { promise, expiresAt: Date.now() + 120_000 };
+    clinicCacheRef.current = entry;
+    void promise.catch(() => {
+      if (clinicCacheRef.current === entry) clinicCacheRef.current = null;
+    });
+    return promise;
+  }, []);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    queueMicrotask(() => setActiveSearch(null));
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!activeSearch || !canSuggest) return;
+    const generation = ++generationRef.current;
+    const query = Array.from(normalizedSearch).slice(0, 100).join('');
+    const timer = window.setTimeout(() => {
+      void Promise.allSettled([
+        shopApi.products({ q: query, limit: 5 }),
+        shopApi.medicines({ q: query, limit: 5 }),
+        getPharmacies(),
+        getClinics(),
+      ] as const).then(([products, medicines, pharmacies, clinics]) => {
+        if (generationRef.current !== generation) return;
+        const matches = (name: string) => normalizeSearchText(name).includes(query);
+        const next = uniqueSuggestions([
+          ...(products.status === 'fulfilled' ? products.value.data : [])
+            .map(productSuggestion)
+            .filter((item): item is Suggestion => item !== null),
+          ...(medicines.status === 'fulfilled' ? medicines.value.data : [])
+            .map((item) => namedSuggestion('medicines', item))
+            .filter((item): item is Suggestion => item !== null),
+          ...(pharmacies.status === 'fulfilled' ? pharmacies.value.items : [])
+            .filter((item) => matches(item.name))
+            .slice(0, 5)
+            .map((item) => namedSuggestion('pharmacies', item))
+            .filter((item): item is Suggestion => item !== null),
+          ...(clinics.status === 'fulfilled' ? clinics.value.items : [])
+            .filter((item) => matches(item.name))
+            .slice(0, 5)
+            .map((item) => namedSuggestion('clinics', item))
+            .filter((item): item is Suggestion => item !== null),
+        ]);
+        setSuggestions(next);
+        setActiveIndex(-1);
+        setFailed([products, medicines, pharmacies, clinics].some((item) => item.status === 'rejected'));
+        setLimited(
+          (pharmacies.status === 'fulfilled' && pharmacies.value.limited) ||
+          (clinics.status === 'fulfilled' && clinics.value.limited),
+        );
+        setPending(false);
+      });
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      generationRef.current += 1;
+    };
+  }, [activeSearch, canSuggest, normalizedSearch, getPharmacies, getClinics]);
 
   useEffect(() => {
     if (mobileSearchOpen) mobileSearchRef.current?.focus();
   }, [mobileSearchOpen]);
 
-  function submitMobileSearch(event: FormEvent<HTMLFormElement>) {
+  function closeSuggestions() {
+    generationRef.current += 1;
+    setActiveSearch(null);
+    setActiveIndex(-1);
+    setPending(false);
+  }
+
+  function selectSuggestion(item: Suggestion) {
+    closeSuggestions();
+    setMobileSearchOpen(false);
+    onMenuClose();
+    navigate(item.to);
+  }
+
+  function updateSearch(value: string, source: SearchSource) {
+    generationRef.current += 1;
+    onSearchChange(value);
+    setActiveSearch(source);
+    setSuggestions([]);
+    setActiveIndex(-1);
+    setFailed(false);
+    setLimited(false);
+    setPending(eligibleSearch(normalizeSearchText(value)));
+  }
+
+  function focusSearch(source: SearchSource) {
+    setActiveSearch(source);
+    if (canSuggest) setPending(true);
+  }
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    if (activeSearch && activeIndex >= 0 && suggestions[activeIndex]) {
+      event.preventDefault();
+      selectSuggestion(suggestions[activeIndex]);
+      return;
+    }
+    closeSuggestions();
     onSearchSubmit(event);
     setMobileSearchOpen(false);
+  }
+
+  function searchKeyDown(event: KeyboardEvent<HTMLInputElement>, source: SearchSource) {
+    if (event.key === 'Escape') {
+      if (activeSearch === source || (source === 'mobile' && mobileSearchOpen)) {
+        event.preventDefault();
+        closeSuggestions();
+        if (source === 'mobile') setMobileSearchOpen(false);
+      }
+      return;
+    }
+    if (activeSearch !== source || !suggestions.length) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((index) => (index + 1) % suggestions.length);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((index) => (index <= 0 ? suggestions.length - 1 : index - 1));
+    }
   }
 
   return (
@@ -85,26 +401,39 @@ export function Header({
         <div className="header-brand">
           <button type="button" className="mobile-toggle" aria-expanded={menuOpen}
             aria-controls="main-navigation" aria-label={menuOpen ? 'بستن فهرست' : 'باز کردن فهرست'}
-            onClick={() => { setMobileSearchOpen(false); onMenuToggle(); }}>
+            onClick={() => { closeSuggestions(); setMobileSearchOpen(false); onMenuToggle(); }}>
             <Icon name="menu" />
           </button>
-          <Link to="/" className="app-logo" aria-label="دکتر گوپت، صفحهٔ اصلی" onClick={onMenuClose}>
+          <Link to="/" className="app-logo" aria-label="دکتر گوپت، صفحهٔ اصلی" onClick={() => { closeSuggestions(); onMenuClose(); }}>
             <img src="/brand/logo.jpg" alt="" width="55" height="55" />
             <span>
               دکتر گوپت<small>DR. GUPET</small>
             </span>
           </Link>
         </div>
-        <form className="header-search" role="search" onSubmit={onSearchSubmit}>
+        <form className="header-search" role="search" onSubmit={submitSearch}
+          onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeSuggestions(); }}>
           <input
             value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            aria-label="جستجوی محصولات"
-            placeholder="جستجوی محصول، برند و ..."
+            maxLength={100}
+            onChange={(event) => updateSearch(event.target.value, 'desktop')}
+            onFocus={() => focusSearch('desktop')}
+            onKeyDown={(event) => searchKeyDown(event, 'desktop')}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={activeSearch === 'desktop' && canSuggest}
+            aria-controls={activeSearch === 'desktop' && canSuggest ? 'desktop-search-suggestions' : undefined}
+            aria-activedescendant={activeSearch === 'desktop' && activeIndex >= 0 ? `desktop-search-option-${activeIndex}` : undefined}
+            aria-label="جستجوی محصولات، داروها و مراکز"
+            placeholder="جستجوی محصول، دارو یا مرکز"
           />
           <button type="submit" aria-label="جستجو">
             <Icon name="search" />
           </button>
+          {activeSearch === 'desktop' && canSuggest && (
+            <SearchSuggestions source="desktop" items={suggestions} pending={pending} failed={failed}
+              limited={limited} activeIndex={activeIndex} onActiveIndex={setActiveIndex} onSelect={selectSuggestion} />
+          )}
         </form>
         <div className="header-actions">
           <button
@@ -113,7 +442,7 @@ export function Header({
             aria-label={mobileSearchOpen ? 'بستن جستجو' : 'باز کردن جستجو'}
             aria-expanded={mobileSearchOpen}
             aria-controls="mobile-site-search"
-            onClick={() => { onMenuClose(); setMobileSearchOpen((open) => !open); }}
+            onClick={() => { closeSuggestions(); onMenuClose(); setMobileSearchOpen((open) => !open); }}
           >
             <Icon name="search" />
           </button>
@@ -148,17 +477,30 @@ export function Header({
         id="mobile-site-search"
         className="mobile-search site-container"
         role="search"
-        onSubmit={submitMobileSearch}
+        onSubmit={submitSearch}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeSuggestions(); }}
         hidden={!mobileSearchOpen}
       >
         <input
           ref={mobileSearchRef}
           value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          aria-label="جستجوی محصولات در موبایل"
-          placeholder="جستجوی محصول یا برند"
+          maxLength={100}
+          onChange={(event) => updateSearch(event.target.value, 'mobile')}
+          onFocus={() => focusSearch('mobile')}
+          onKeyDown={(event) => searchKeyDown(event, 'mobile')}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={activeSearch === 'mobile' && canSuggest}
+          aria-controls={activeSearch === 'mobile' && canSuggest ? 'mobile-search-suggestions' : undefined}
+          aria-activedescendant={activeSearch === 'mobile' && activeIndex >= 0 ? `mobile-search-option-${activeIndex}` : undefined}
+          aria-label="جستجوی محصولات، داروها و مراکز در موبایل"
+          placeholder="جستجوی محصول، دارو یا مرکز"
         />
         <button type="submit">جستجو</button>
+        {activeSearch === 'mobile' && canSuggest && (
+          <SearchSuggestions source="mobile" items={suggestions} pending={pending} failed={failed}
+            limited={limited} activeIndex={activeIndex} onActiveIndex={setActiveIndex} onSelect={selectSuggestion} />
+        )}
       </form>
       <nav id="main-navigation" className={`app-nav${menuOpen ? ' is-open' : ''}`} aria-label="ناوبری اصلی">
         <div className="app-nav__inner site-container" onClick={onMenuClose}>

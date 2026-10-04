@@ -143,6 +143,34 @@
 - **Decision:** مالک روشن کرد که منوی همبرگری موبایل باید باقی بماند. آیکون جست‌وجو مستقل از آن و کنار سبد خرید در نوار بالا قرار می‌گیرد؛ فیلد جست‌وجو با لمس آیکون باز می‌شود و داخل منوی همبرگری نیست. لینک‌های ناوبری در همان منوی همبرگری هستند. ورود و حساب فقط در نوار پایین موبایل دیده می‌شوند و کلید تم شناور پایین چپ باقی می‌ماند.
 - **Consequences:** بخش ناوبری افقی در DEC-020 با این تصمیم جایگزین شده است. باز و بسته شدن منو و جست‌وجو، Escape، صفحه‌کلید و چیدمان موبایل باید در پیش‌نمایش بررسی شوند.
 
+## DEC-022: پیشنهادهای دسته‌بندی‌شدهٔ جست‌وجوی سراسری
+
+- **Status:** IMPLEMENTED LOCALLY; LIVE API ACCEPTANCE OPEN
+- **Date:** 2026-10-03
+- **Decision:** هدر دسکتاپ و موبایل از سه حرف Unicode، با debounce برابر ۲۵۰ میلی‌ثانیه، پیشنهادهای محصولات، داروها، داروخانه‌ها و کلینیک‌ها را نشان می‌دهد. درخواست‌ها از `shopApi` و API client موجود می‌گذرند. محصولات/داروها از `q` سرور استفاده می‌کنند؛ تا رفع `.issue/14`، مراکز از حداکثر پنج صفحهٔ ۵۰تایی واقعی با کَش دو دقیقه‌ای در حافظهٔ همان هدر و تطبیق نام خوانده می‌شوند. فرادادهٔ ناقص یا فهرست بزرگ‌تر با اطلاع محدودبودن پیشنهادها همراه است. پاسخ نسل قبلی پس از تغییر متن/مسیر/بستن پیشنهادها کنار گذاشته می‌شود.
+- **Consequences:** وابستگی جدید، سرویس جست‌وجوی بیرونی، رهگیری، ذخیرهٔ عبارت جست‌وجو یا تغییر احراز هویت اضافه نشده است. گزینه‌ها متن React و مسیر داخلی ثابت با slug کدگذاری‌شده یا ID معتبر دارند. Enter بدون انتخاب، رفتار جست‌وجوی محصولات را حفظ می‌کند. جست‌وجوی کامل مراکز و ترتیب امتیاز Google به قرارداد بک‌اند وابسته‌اند؛ دادهٔ نمایشی یا نتیجهٔ ساختگی برای جایگزینی API وارد نمی‌شود.
+
+## DEC-023: تخمین خرید و اعتبار موقت کوپن
+
+- **Status:** IMPLEMENTED LOCALLY; LIVE PAYMENT ACCEPTANCE OPEN
+- **Date:** 2026-10-04
+- **Decision:** سبد و تسویه تخمین ارسال معتبر و صحیحِ غیرمنفی سرور را، شامل صفر، مقدم می‌دانند؛ در نبود آن از ثابت‌های موجود با برچسب تخمین جایگزین استفاده می‌کنند. تخفیف فقط برای همان متن کد، وضعیت مالی/موجودی سبد و نشست معتبر است. تغییر این‌ها یا پاسخ دیرهنگام، نتیجه را باطل می‌کند. تعداد سبد صحیح و بین ۱ تا ۲۰ است. ارسال سفارش با قفل همزمانی رابط انجام می‌شود؛ پس از ساخت سفارش و شکست آغاز پرداخت، تلاش بعدی فقط پرداخت همان سفارش است.
+- **Consequences:** مبلغ قطعی همچنان پاسخ سفارش سرور است؛ کلاینت مبلغ به API سفارش نمی‌فرستد. ارسال رایگان بر جمع پیش از تخفیف سنجیده می‌شود. وابستگی جدید یا تغییر توکن/کوکی اضافه نشده است. تضمین سقف کوپن و اعتبار عددی سرور در `.issue/16` و `.issue/17` پیگیری می‌شود. آزمون‌های کنترل‌شده جای پرداخت زنده را نمی‌گیرند.
+
+## DEC-024: فرادادهٔ مسیرهای SPA و نمایه‌سازی
+
+- **Status:** IMPLEMENTATION IN LOCAL REVIEW; PUBLIC CRAWLER ACCEPTANCE OPEN
+- **Date:** 2026-10-04
+- **Decision:** یک کامپوننت داخلی عنوان، توضیح و robots صفحه را با مسیر هماهنگ می‌کند. نام جزئیات عمومی از کَش React Query موجود مشاهده می‌شود؛ این مشاهده درخواست شبکهٔ تازه ندارد. صفحه‌های حساب، ورود، سبد، تسویه، پرداخت، مسیر ناشناخته و نتایج دارای query از نمایه‌سازی منع می‌شوند. HTML مستقل ادمین نیز `noindex, nofollow` دارد. فراداده فقط متن است؛ HTML دادهٔ API درج نمی‌شود.
+- **Consequences:** وابستگی جدید، رهگیری یا تغییر هویت اضافه نمی‌شود. robots کنترل دسترسی نیست. دامنهٔ نهایی هنوز مشخص نیست و canonical حدسی ساخته نمی‌شود. sitemap پویا و سیاست هدرهای سرور در `.issue/13` باقی‌اند. head در SPA به JavaScript وابسته است؛ پذیرش خزنده و وضعیت HTTP/فرادادهٔ اولیه روی هاست پیش از انتشار لازم است.
+
+## DEC-025: Same-origin API base behind Apache
+
+- **Status:** IMPLEMENTATION FOR LOCAL SERVER REVIEW
+- **Date:** 2026-10-04
+- **Decision:** Support a root-relative API base such as `/api/v1` in the existing central customer API client, resolved against the browser origin. Preserve absolute API bases for existing Vite development. Deployment must not require baking a machine address into the public bundle.
+- **Consequences:** The XAMPP preview uses a same-origin reverse proxy. Bearer headers, `credentials: omit`, query encoding, timeout and response-envelope handling stay unchanged. No new dependency or authentication bypass is introduced. Verify relative and absolute configurations plus actual browser API requests; Apache serves build output only.
+
 ## Open owner and release decisions
 
 

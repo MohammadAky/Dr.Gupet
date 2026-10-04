@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
@@ -14,8 +14,9 @@ import { API_BASE_URL } from '../lib/env';
 /** Product detail: variant selection, add-to-cart and favorite toggle (F5/F7/F8 behaviour). */
 export function ProductDetailPage() {
   const { slug = '' } = useParams();
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const isAuthenticated = status === 'authed';
+  const identity = isAuthenticated ? user?.id ?? null : null;
   const queryClient = useQueryClient();
 
   const product = useQuery({
@@ -26,13 +27,53 @@ export function ProductDetailPage() {
 
   const favorites = useQuery({
     queryKey: queryKeys.favorites(1),
-    queryFn: () => shopApi.favorites(1, 50),
-    enabled: isAuthenticated,
+    queryFn: async ({ signal }) => {
+      const generation = generationRef.current;
+      const result = await shopApi.favorites(1, 50);
+      if (signal.aborted || !mountedRef.current || identityRef.current !== identity ||
+        generationRef.current !== generation) throw new DOMException('Inactive session', 'AbortError');
+      return result;
+    },
+    enabled: identity !== null,
   });
 
   const [variantId, setVariantId] = useState<number | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const [quantityInput, setQuantityInput] = useState('1');
   const [message, setMessage] = useState<string | null>(null);
+  const [addPending, setAddPending] = useState(false);
+  const [favoritePending, setFavoritePending] = useState(false);
+  const mountedRef = useRef(true);
+  const identityRef = useRef(identity);
+  const slugRef = useRef(slug);
+  const generationRef = useRef(0);
+  const addInFlightRef = useRef(false);
+  const favoriteInFlightRef = useRef(false);
+  const quantity = Number(quantityInput);
+  const validQuantity =
+    /^[0-9]+$/.test(quantityInput) &&
+    Number.isSafeInteger(quantity) &&
+    quantity >= 1 &&
+    quantity <= MAX_CART_ITEM_QTY;
+
+  useLayoutEffect(() => {
+    if (identityRef.current === identity && slugRef.current === slug) return;
+    identityRef.current = identity;
+    slugRef.current = slug;
+    generationRef.current += 1;
+    addInFlightRef.current = false;
+    favoriteInFlightRef.current = false;
+    setAddPending(false);
+    setFavoritePending(false);
+    setMessage(null);
+  }, [identity, slug]);
+
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+    };
+  }, []);
 
   const activeVariant = useMemo(
     () =>
@@ -43,15 +84,8 @@ export function ProductDetailPage() {
   );
 
   const addToCart = useMutation({
-    mutationFn: () => {
-      if (!activeVariant) throw new Error('یک وزن انتخاب کنید');
-      return shopApi.addCartItem(activeVariant.id, quantity);
-    },
-    onSuccess: () => {
-      setMessage('به سبد خرید اضافه شد.');
-      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-    },
-    onError: (error) => setMessage(errorText(error)),
+    mutationFn: ({ variantId, count }: { variantId: number; count: number }) =>
+      shopApi.addCartItem(variantId, count),
   });
 
   const isFavorite =
@@ -59,15 +93,63 @@ export function ProductDetailPage() {
     (favorites.data?.data.some((card) => card.id === product.data.id) ?? false);
 
   const toggleFavorite = useMutation({
-    mutationFn: () => {
-      if (!product.data) throw new Error('محصول بارگذاری نشده است');
-      return isFavorite
-        ? shopApi.removeFavorite(product.data.id)
-        : shopApi.addFavorite(product.data.id);
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['favorites'] }),
-    onError: (error) => setMessage(errorText(error)),
+    mutationFn: ({ productId, remove }: { productId: number; remove: boolean }) =>
+      remove ? shopApi.removeFavorite(productId) : shopApi.addFavorite(productId),
   });
+
+  function responseIsCurrent(requestIdentity: number, requestSlug: string, generation: number) {
+    return mountedRef.current && identityRef.current === requestIdentity &&
+      slugRef.current === requestSlug && generationRef.current === generation;
+  }
+
+  function submitAddToCart(event: FormEvent) {
+    event.preventDefault();
+    if (!mountedRef.current || addInFlightRef.current || identityRef.current === null || !activeVariant?.inStock ||
+      !validQuantity) return;
+    const requestIdentity = identityRef.current;
+    const requestSlug = slugRef.current;
+    const generation = generationRef.current;
+    addInFlightRef.current = true;
+    setAddPending(true);
+    setMessage(null);
+    void addToCart.mutateAsync({ variantId: activeVariant.id, count: quantity })
+      .then(() => {
+        if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
+        setMessage('به سبد خرید اضافه شد.');
+        void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      })
+      .catch((error: unknown) => {
+        if (responseIsCurrent(requestIdentity, requestSlug, generation)) setMessage(errorText(error));
+      })
+      .finally(() => {
+        if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
+        addInFlightRef.current = false;
+        setAddPending(false);
+      });
+  }
+
+  function submitFavorite() {
+    if (!mountedRef.current || favoriteInFlightRef.current || identityRef.current === null || !product.data) return;
+    const requestIdentity = identityRef.current;
+    const requestSlug = slugRef.current;
+    const generation = generationRef.current;
+    favoriteInFlightRef.current = true;
+    setFavoritePending(true);
+    setMessage(null);
+    void toggleFavorite.mutateAsync({ productId: product.data.id, remove: isFavorite })
+      .then(() => {
+        if (responseIsCurrent(requestIdentity, requestSlug, generation))
+          void queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      })
+      .catch((error: unknown) => {
+        if (responseIsCurrent(requestIdentity, requestSlug, generation)) setMessage(errorText(error));
+      })
+      .finally(() => {
+        if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
+        favoriteInFlightRef.current = false;
+        setFavoritePending(false);
+      });
+  }
 
   if (product.isLoading) return <LoadingState />;
   if (product.error)
@@ -77,12 +159,6 @@ export function ProductDetailPage() {
   const detail = product.data;
   const leadImage = [...detail.images].sort((a, b) => a.sortOrder - b.sortOrder)[0];
   const imageUrl = safeImageUrl(leadImage?.url, window.location.origin, API_BASE_URL);
-
-  function submitAddToCart(event: FormEvent) {
-    event.preventDefault();
-    setMessage(null);
-    addToCart.mutate();
-  }
 
   return (
     <article className="product-detail">
@@ -131,28 +207,32 @@ export function ProductDetailPage() {
               type="number"
               min={1}
               max={MAX_CART_ITEM_QTY}
+              step={1}
               dir="ltr"
-              value={quantity}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                setQuantity(
-                  Number.isFinite(next) ? Math.min(Math.max(next, 1), MAX_CART_ITEM_QTY) : 1,
-                );
-              }}
+              value={quantityInput}
+              aria-invalid={!validQuantity}
+              aria-describedby={!validQuantity ? 'qty-error' : undefined}
+              onChange={(event) => setQuantityInput(event.target.value)}
             />
+            {!validQuantity && <p id="qty-error" role="alert">تعداد باید عدد صحیح بین ۱ تا {MAX_CART_ITEM_QTY} باشد.</p>}
 
             <button
               type="submit"
-              disabled={!activeVariant || !activeVariant.inStock || addToCart.isPending}
+              disabled={identity === null || !activeVariant?.inStock || !validQuantity || addPending}
             >
-              {addToCart.isPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
+              {addPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
             </button>
+            {identity === null && (
+              <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
+                برای افزودن به سبد خرید وارد شوید
+              </Link>
+            )}
 
-            {isAuthenticated ? (
+            {identity !== null ? (
               <button
                 type="button"
-                disabled={toggleFavorite.isPending}
-                onClick={() => toggleFavorite.mutate()}
+                disabled={favoritePending}
+                onClick={submitFavorite}
               >
                 {isFavorite ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها'}
               </button>

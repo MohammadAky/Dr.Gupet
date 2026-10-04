@@ -2,11 +2,82 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../lib/errors';
 import { requestData, setAuthBridge } from './client';
 
-vi.mock('../lib/env', () => ({ API_BASE_URL: 'http://localhost:3000/api/v1' }));
+const env = vi.hoisted(() => ({ API_BASE_URL: 'http://localhost:3000/api/v1' }));
+vi.mock('../lib/env', () => env);
 
 afterEach(() => {
   vi.unstubAllGlobals();
   setAuthBridge(null);
+  env.API_BASE_URL = 'http://localhost:3000/api/v1';
+});
+
+describe('API deployment URL resolution', () => {
+  it('resolves a root-relative API on the current origin with encoded queries and Bearer auth', async () => {
+    env.API_BASE_URL = '/api/v1';
+    vi.stubGlobal('window', { location: { origin: 'http://127.0.0.1:8080' } });
+    setAuthBridge({ getAccessToken: () => 'local-access', refresh: vi.fn() });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await requestData('/products', {
+      query: { q: 'رویال & گربه', page: 2, active: false, empty: '', missing: undefined, absent: null },
+    });
+
+    const url = new URL(fetchMock.mock.calls[0]?.[0] as string);
+    expect(url.origin).toBe('http://127.0.0.1:8080');
+    expect(url.pathname).toBe('/api/v1/products');
+    expect([...url.searchParams.entries()]).toEqual([
+      ['q', 'رویال & گربه'], ['page', '2'], ['active', 'false'],
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: 'omit', headers: { Authorization: 'Bearer local-access' },
+    });
+  });
+
+  it('keeps public requests on the same HTTPS origin without attaching auth or cookies', async () => {
+    env.API_BASE_URL = '/api/v1';
+    vi.stubGlobal('window', { location: { origin: 'https://drgupet.example' } });
+    setAuthBridge({ getAccessToken: () => 'private-access', refresh: vi.fn() });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await requestData('/clinics', { auth: false });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://drgupet.example/api/v1/clinics');
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'omit' });
+    expect(fetchMock.mock.calls[0]?.[1].headers).not.toHaveProperty('Authorization');
+  });
+
+  it.each(['//other.example/api/v1', '/\\other.example/api/v1'])(
+    'rejects an unsafe relative base %s before making a request', async (base) => {
+      env.API_BASE_URL = base;
+      vi.stubGlobal('window', { location: { origin: 'https://drgupet.example' } });
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      await expect(requestData('/users/me')).rejects.toThrow('Invalid root-relative API base URL');
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves the absolute development API without a browser global', async () => {
+    vi.stubGlobal('window', undefined);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await requestData('/products', { query: { q: 'رویال' }, auth: false });
+
+    const url = new URL(fetchMock.mock.calls[0]?.[0] as string);
+    expect(url.origin).toBe('http://localhost:3000');
+    expect(url.pathname).toBe('/api/v1/products');
+    expect(url.searchParams.get('q')).toBe('رویال');
+  });
 });
 
 describe('API response envelope', () => {

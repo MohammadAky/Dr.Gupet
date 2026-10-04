@@ -12,6 +12,7 @@
   --muted: #596859;
   --line: #e5e8de;
   --danger: #a62424;
+  --focus: #315237;
   --radius-sm: 12px;
   --radius-md: 20px;
   --radius-lg: 32px;
@@ -34,5 +35,6 @@
   --line: #35493a;
   --forest-soft: #bfd6b8;
   --gold-soft: #3c341e;
+  --focus: #d49f28;
   --shadow-card: 0 14px 36px rgb(0 0 0 / 24%);
 }

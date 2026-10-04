@@ -1,7 +1,8 @@
 /**
  * Business constants mirrored from the backend (README §9.6 and backend/.env).
  * They are used for UI estimates only — the server always computes the payable
- * amount (BE-REQ-04: GET /cart returns itemsTotal only).
+ * amount. GET /cart can supply configured estimates; these defaults are only
+ * a labelled fallback when a valid server estimate is unavailable.
  */
 export const MAX_ADDRESSES_PER_USER = 10;
 export const MAX_PETS_PER_USER = 10;

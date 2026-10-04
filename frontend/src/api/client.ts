@@ -33,7 +33,21 @@ export function setAuthBridge(next: AuthBridge | null): void {
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const url = new URL(`${API_BASE_URL}${path}`);
+  let url: URL;
+  if (API_BASE_URL.startsWith('/')) {
+    // Root-relative deployment URLs stay on this page's origin. Do not resolve
+    // protocol-relative or backslash-prefixed URLs that could change the host.
+    if (API_BASE_URL.startsWith('//') || API_BASE_URL.includes('\\')) {
+      throw new TypeError('Invalid root-relative API base URL');
+    }
+    if (typeof window === 'undefined') {
+      throw new TypeError('Root-relative API base URL requires a browser origin');
+    }
+    url = new URL(`${API_BASE_URL}${path}`, window.location.origin);
+  } else {
+    // Absolute development URLs also work outside a browser (for unit tests).
+    url = new URL(`${API_BASE_URL}${path}`);
+  }
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value === undefined || value === null || value === '') continue;

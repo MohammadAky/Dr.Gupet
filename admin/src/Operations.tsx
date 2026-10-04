@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useAuth } from "./auth";
 import {
   errorMessage,
@@ -54,6 +54,13 @@ const settingLabels: Record<SettingKey, string> = {
   ORDER_EXPIRE_MINUTES: "انقضای سفارش (دقیقه)",
 };
 const settingKeys = Object.keys(settingLabels) as SettingKey[];
+const operationTabs = ["payments", "audit", "settings"] as const;
+type OperationTab = (typeof operationTabs)[number];
+const operationTabLabels: Record<OperationTab, string> = {
+  payments: "پرداخت‌ها",
+  audit: "لاگ عملیات",
+  settings: "تنظیمات",
+};
 
 function Payments() {
   const { request } = useAuth();
@@ -463,9 +470,39 @@ function Settings() {
 export function Operations({
   initialTab = "payments",
 }: {
-  initialTab?: "payments" | "audit" | "settings";
+  initialTab?: OperationTab;
 }) {
-  const [tab, setTab] = useState<"payments" | "audit" | "settings">(initialTab);
+  const [tab, setTab] = useState<OperationTab>(initialTab);
+  const instanceId = useId();
+  const tabId = (item: OperationTab) => `${instanceId}-${item}-tab`;
+  const panelId = (item: OperationTab) => `${instanceId}-${item}-panel`;
+
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: OperationTab) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const index = operationTabs.indexOf(current);
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowLeft":
+        nextIndex = (index + 1) % operationTabs.length;
+        break;
+      case "ArrowRight":
+        nextIndex = (index - 1 + operationTabs.length) % operationTabs.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = operationTabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const next = operationTabs[nextIndex] ?? current;
+    setTab(next);
+    event.currentTarget.ownerDocument.getElementById(tabId(next))?.focus();
+  }
+
   return (
     <div className="manage-page">
       <PageHeader
@@ -473,36 +510,37 @@ export function Operations({
         title="عملیات"
         description="پرداخت‌ها، رخدادهای مدیریتی و تنظیمات عملیاتی فروشگاه را پیگیری کنید."
       />
-      <div className="manage-tabs" role="tablist" aria-label="بخش‌های عملیات">
-        <button
-          role="tab"
-          aria-selected={tab === "payments"}
-          onClick={() => setTab("payments")}
-        >
-          پرداخت‌ها
-        </button>
-        <button
-          role="tab"
-          aria-selected={tab === "audit"}
-          onClick={() => setTab("audit")}
-        >
-          لاگ عملیات
-        </button>
-        <button
-          role="tab"
-          aria-selected={tab === "settings"}
-          onClick={() => setTab("settings")}
-        >
-          تنظیمات
-        </button>
+      <div className="manage-tabs" role="tablist" aria-label="بخش‌های عملیات" dir="rtl">
+        {operationTabs.map((item) => (
+          <button
+            key={item}
+            id={tabId(item)}
+            type="button"
+            role="tab"
+            aria-selected={tab === item}
+            aria-controls={panelId(item)}
+            tabIndex={tab === item ? 0 : -1}
+            onKeyDown={(event) => onTabKeyDown(event, item)}
+            onClick={() => setTab(item)}
+          >
+            {operationTabLabels[item]}
+          </button>
+        ))}
       </div>
-      {tab === "payments" ? (
-        <Payments />
-      ) : tab === "audit" ? (
-        <AuditLogs />
-      ) : (
-        <Settings />
-      )}
+      {operationTabs.map((item) => (
+        <div
+          key={item}
+          id={panelId(item)}
+          role="tabpanel"
+          aria-labelledby={tabId(item)}
+          tabIndex={tab === item ? 0 : -1}
+          hidden={tab !== item}
+        >
+          {tab === item && (
+            item === "payments" ? <Payments /> : item === "audit" ? <AuditLogs /> : <Settings />
+          )}
+        </div>
+      ))}
     </div>
   );
 }
