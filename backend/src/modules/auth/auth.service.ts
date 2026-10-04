@@ -5,7 +5,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { SmsService } from '../../sms/sms.service';
-import { OtpService } from './otp.service';
+import { OtpService } from './otp/otp.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 
 @Injectable()

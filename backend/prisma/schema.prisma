@@ -341,6 +341,22 @@ model Payment {
   order Order @relation(fields: [orderId], references: [id])
 }
 
+/// Delivery log for every SMS the platform sends (OTP + notifications).
+/// Gives support teams evidence for "my code never arrived" tickets (phase 2).
+model SmsLog {
+  id             Int      @id @default(autoincrement())
+  phone          String
+  kind           String // OTP | NOTIFY
+  status         String // SENT | FAILED
+  messageId      String? // provider message id (sms.ir data.messageId)
+  providerStatus Int? // provider envelope status code on failure
+  error          String? // safe error summary (never contains secrets)
+  createdAt      DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([kind, status, createdAt])
+}
+
 // ---------------------------------------------------------------------
 // پنل ادمین
 // ---------------------------------------------------------------------

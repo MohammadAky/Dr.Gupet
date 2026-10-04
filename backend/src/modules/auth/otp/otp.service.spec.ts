@@ -1,5 +1,5 @@
 import { OtpService } from './otp.service';
-import { AppException } from '../../common/filters/all-exceptions.filter';
+import { AppException } from '../../../common/filters/all-exceptions.filter';
 
 /** Minimal fake Redis — enough for OtpService.generate/verify/discard. */
 class FakeRedis {
