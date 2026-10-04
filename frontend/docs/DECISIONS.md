@@ -174,7 +174,7 @@
 ## Open owner and release decisions
 
 
-- **FR-DEC-03:** Deployment target, public URLs, backend CORS origin and payment callback URL are unknown; local preview only.
+- **FR-DEC-03:** Owner confirmed Ubuntu VPS deployment with `https://drgupet.ir` and `https://admin.drgupet.ir` on 2026-10-04. Use a same-origin `/api/v1` reverse proxy for each public build (DEC-025); configure the customer build's `VITE_API_BASE_URL` explicitly. Origin TLS, proxy/CORS and payment callback configuration still require the backend/operator's acceptance; Cloudflare zone activation alone is not a running website.
 - **FR-DEC-06:** Browser E2E tooling remains optional for F11; automated tests and manual preview do not replace live payment/auth acceptance.
 - **FR-DEC-07:** Resolved by DEC-012: `main` only until the owner asks for another branch; local preview and approval before commit or push.
 - **FR-DEC-08/09:** The backend development environment and deployment environment list require confirmation from the respective owners. A local `VITE_API_BASE_URL` exists only in ignored `.env`.

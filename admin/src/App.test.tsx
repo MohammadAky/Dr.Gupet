@@ -11,6 +11,7 @@ function response(data: unknown, status = 200): Response {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");
   window.localStorage.clear();
@@ -51,6 +52,115 @@ it("requires OTP and refuses a non-admin identity", async () => {
   ]);
   expect(fetchMock.mock.calls.every(([, init]) => init.credentials === "omit")).toBe(true);
   expect(document.cookie).toBe("");
+});
+
+async function requestAdminCode() {
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "۰۹۱۲۰۰۰۰۰۰۰" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "دریافت کد" })); });
+}
+
+it("resends to the normalized admin phone after the server cooldown and resets the code", async () => {
+  vi.useFakeTimers();
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(response({ expiresIn: 120, cooldownSeconds: 4 }))
+    .mockResolvedValueOnce(response({ expiresIn: 120, cooldownSeconds: 8 }));
+  vi.stubGlobal("fetch", fetchMock);
+  await requestAdminCode();
+  expect((screen.getByRole("button", { name: /ارسال مجدد تا ۴ ثانیه/ }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: /ارسال مجدد تا/ }));
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fireEvent.change(screen.getByLabelText("کد تأیید"), { target: { value: "12345" } });
+  act(() => { vi.advanceTimersByTime(4000); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "ارسال مجدد کد" })); });
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock.mock.calls[1]![0]).toBe("/api/v1/auth/otp/request");
+  expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toEqual({ phone: "09120000000" });
+  expect(fetchMock.mock.calls[1]![1].credentials).toBe("omit");
+  expect(fetchMock.mock.calls[1]![1].headers.Authorization).toBeUndefined();
+  expect((screen.getByLabelText("کد تأیید") as HTMLInputElement).value).toBe("");
+  expect(screen.getByRole("status").textContent).toContain("کد جدید ارسال شد");
+  expect((screen.getByRole("button", { name: /ارسال مجدد تا ۸ ثانیه/ }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("heading", { name: "نمای کلی" })).toBeNull();
+});
+
+it("keeps the OTP form usable and permits retry when resend delivery fails", async () => {
+  vi.useFakeTimers();
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(response({ expiresIn: 120, cooldownSeconds: 1 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, message: "ارسال پیامک انجام نشد", code: "SMS_FAILED" }),
+      { status: 502, headers: { "Content-Type": "application/json" } }))
+    .mockResolvedValueOnce(response({ expiresIn: 120, cooldownSeconds: 3 }));
+  vi.stubGlobal("fetch", fetchMock);
+  await requestAdminCode();
+  act(() => { vi.advanceTimersByTime(1000); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "ارسال مجدد کد" })); });
+  expect(screen.getByRole("alert").textContent).toContain("ارسال پیامک انجام نشد");
+  expect(screen.getByLabelText("کد تأیید")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "ارسال مجدد کد" }) as HTMLButtonElement).disabled).toBe(false);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "ارسال مجدد کد" })); });
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("status").textContent).toContain("کد جدید ارسال شد");
+});
+
+it("locks resend, verification and phone editing while a resend is pending", async () => {
+  let finishResend!: (value: Response) => void;
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(response({ expiresIn: 120, cooldownSeconds: 0 }))
+    .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishResend = resolve; }));
+  vi.stubGlobal("fetch", fetchMock);
+  await requestAdminCode();
+  fireEvent.change(screen.getByLabelText("کد تأیید"), { target: { value: "12345" } });
+  const resend = screen.getByRole("button", { name: "ارسال مجدد کد" });
+  fireEvent.click(resend);
+  fireEvent.click(resend);
+  fireEvent.submit(screen.getByLabelText("کد تأیید").closest("form")!);
+  fireEvent.click(screen.getByRole("button", { name: "تغییر شماره" }));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect((screen.getByLabelText("کد تأیید") as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "تغییر شماره" }) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => { finishResend(response({ expiresIn: 120, cooldownSeconds: 2 })); });
+  expect((screen.getByLabelText("کد تأیید") as HTMLInputElement).disabled).toBe(false);
+});
+
+it("preserves the cooldown when returning to the same phone and uses a safe older-server fallback", async () => {
+  vi.useFakeTimers();
+  const fetchMock = vi.fn().mockResolvedValue(response({ expiresIn: 120 }));
+  vi.stubGlobal("fetch", fetchMock);
+  await requestAdminCode();
+  expect((screen.getByRole("button", { name: /ارسال مجدد تا ۶۰ ثانیه/ }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "تغییر شماره" }));
+  fireEvent.submit(screen.getByLabelText("شمارهٔ موبایل").closest("form")!);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect((screen.getByRole("button", { name: "دریافت کد" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "09121111111" } });
+  expect((screen.getByRole("button", { name: "دریافت کد" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("does not send duplicate initial requests or resend during OTP verification", async () => {
+  let finishRequest!: (value: Response) => void;
+  let finishVerify!: (value: Response) => void;
+  const fetchMock = vi.fn()
+    .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishRequest = resolve; }))
+    .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishVerify = resolve; }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "09120000000" } });
+  const form = screen.getByLabelText("شمارهٔ موبایل").closest("form")!;
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  await act(async () => { finishRequest(response({ expiresIn: 120, cooldownSeconds: 0 })); });
+  fireEvent.change(screen.getByLabelText("کد تأیید"), { target: { value: "12345" } });
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  fireEvent.click(screen.getByRole("button", { name: "ارسال مجدد کد" }));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock.mock.calls[1]![0]).toBe("/api/v1/auth/otp/verify");
+  await act(async () => { finishVerify(response(null, 401)); });
+  expect(screen.getByRole("alert")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "ارسال مجدد کد" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
 function mobileViewport(initial = true) {

@@ -60,6 +60,26 @@ function Login() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [cooldown, setCooldown] = useState<{ phone: string; until: number } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const pending = useRef(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!cooldown) return;
+    const timer = window.setInterval(() => {
+      const currentTime = Date.now();
+      setNow(currentTime);
+      if (currentTime >= cooldown.until) window.clearInterval(timer);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   const normalizeDigits = (value: string) =>
     value
@@ -67,8 +87,44 @@ function Login() {
       .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 1632))
       .replace(/[\s-]/g, "");
 
+  const remaining = cooldown?.phone === normalizeDigits(phone)
+    ? Math.max(0, Math.ceil((cooldown.until - now) / 1000))
+    : 0;
+
+  async function sendCode(normalizedPhone: string, resend = false) {
+    const result = await requestOtp(normalizedPhone);
+    if (!mounted.current) return;
+    const seconds = typeof result.cooldownSeconds === "number" &&
+      Number.isSafeInteger(result.cooldownSeconds) && result.cooldownSeconds >= 0
+      ? result.cooldownSeconds : 60;
+    const sentAt = Date.now();
+    setNow(sentAt);
+    setCooldown({ phone: normalizedPhone, until: sentAt + seconds * 1000 });
+    setPhone(normalizedPhone);
+    setCode("");
+    setStep("code");
+    setNotice(resend ? "کد جدید ارسال شد؛ آخرین کد دریافتی را وارد کنید." : "کد تأیید ارسال شد.");
+  }
+
+  async function resend() {
+    if (pending.current || remaining > 0 || step !== "code") return;
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await sendCode(normalizeDigits(phone), true);
+    } catch (problem) {
+      if (mounted.current) setError(humanError(problem));
+    } finally {
+      pending.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending.current || (step === "phone" && remaining > 0)) return;
     setError("");
     const normalizedPhone = normalizeDigits(phone);
     if (!/^09\d{9}$/.test(normalizedPhone)) {
@@ -79,19 +135,19 @@ function Login() {
       setError("کد تأیید باید ۵ یا ۶ رقم باشد.");
       return;
     }
+    pending.current = true;
     setBusy(true);
     try {
       if (step === "phone") {
-        await requestOtp(normalizedPhone);
-        setPhone(normalizedPhone);
-        setStep("code");
+        await sendCode(normalizedPhone);
       } else {
         await verifyOtp(normalizedPhone, normalizeDigits(code));
       }
     } catch (problem) {
-      setError(humanError(problem));
+      if (mounted.current) setError(humanError(problem));
     } finally {
-      setBusy(false);
+      pending.current = false;
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -126,6 +182,7 @@ function Login() {
                 inputMode="tel"
                 dir="ltr"
                 value={phone}
+                disabled={busy}
                 onChange={(event) => setPhone(event.target.value)}
                 placeholder="0912 000 0000"
                 aria-invalid={Boolean(error)}
@@ -139,6 +196,7 @@ function Login() {
                 inputMode="numeric"
                 dir="ltr"
                 value={code}
+                disabled={busy}
                 onChange={(event) => setCode(event.target.value)}
                 placeholder="کد ۵ یا ۶ رقمی"
                 aria-invalid={Boolean(error)}
@@ -150,10 +208,11 @@ function Login() {
               {error}
             </p>
           )}
+          {notice && <p className="login-notice" role="status">{notice}</p>}
           <button
             type="submit"
             className="button button--primary"
-            disabled={busy}
+            disabled={busy || (step === "phone" && remaining > 0)}
           >
             {busy
               ? "در حال بررسی…"
@@ -162,13 +221,25 @@ function Login() {
                 : "ورود به پنل"}
           </button>
           {step === "code" && (
+            <button type="button" className="button button--text"
+              disabled={busy || remaining > 0} onClick={() => void resend()}>
+              {remaining > 0 ? `ارسال مجدد تا ${number.format(remaining)} ثانیه دیگر` : "ارسال مجدد کد"}
+            </button>
+          )}
+          {step === "phone" && remaining > 0 && (
+            <p className="login-notice">ارسال مجدد تا {number.format(remaining)} ثانیه دیگر</p>
+          )}
+          {step === "code" && (
             <button
               type="button"
               className="button button--text"
+              disabled={busy}
               onClick={() => {
+                if (pending.current) return;
                 setStep("phone");
                 setCode("");
                 setError("");
+                setNotice("");
               }}
             >
               تغییر شماره

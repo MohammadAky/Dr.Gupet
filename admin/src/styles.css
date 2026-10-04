@@ -185,6 +185,19 @@ button:disabled {
 .button--primary:hover {
   background: var(--forest-soft);
 }
+.login-card .button--primary:not(:disabled):hover {
+  background: var(--forest-soft);
+  color: #fff;
+}
+.login-card .button--text {
+  color: var(--title);
+}
+.login-notice {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.9;
+}
 .button--text {
   background: transparent;
   color: var(--forest);
@@ -948,6 +961,10 @@ td[dir="ltr"] {
 [data-theme="dark"] .period-selector button[aria-pressed="true"],
 [data-theme="dark"] .button--primary {
   background: #d7a841;
+  color: #102515;
+}
+[data-theme="dark"] .login-card .button--primary:not(:disabled):hover {
+  background: #e7bd61;
   color: #102515;
 }
 [data-theme="dark"] .eyebrow,

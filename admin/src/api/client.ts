@@ -125,7 +125,7 @@ export interface TokenPair {
 
 export const adminApi = {
   requestOtp: (phone: string) =>
-    apiRequest<{ expiresIn: number }>("/auth/otp/request", {
+    apiRequest<{ expiresIn: number; cooldownSeconds?: number }>("/auth/otp/request", {
       method: "POST",
       body: { phone },
     }),

@@ -3,6 +3,7 @@ import { type FormEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
+import { clinicArtwork } from '../lib/image-url';
 import { citySuggestions, provinces } from '../lib/locations';
 import { Pagination } from './Pagination';
 import { SearchableFilter } from './SearchableFilter';
@@ -56,7 +57,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
   }
 
   return (
-    <section className="directory-page">
+    <section className={`directory-page${clinics ? ' clinic-directory' : ''}`}>
       <div className="directory-page__heading">
         <span className="eyebrow">راهنمای مراکز</span>
         <h1>{title}</h1>
@@ -135,22 +136,61 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
         <>
           <div className="directory-grid">
             {data.data.map((place) => (
-              <article className="directory-card" key={place.id}>
-                <div className="directory-card__meta">
-                  {place.isVerified && <span>تأییدشده</span>}
-                  {place.is24h && <span>۲۴ ساعته</span>}
-                  {!clinics && place.onDuty && <span>کشیک</span>}
+              <article className={`directory-card${clinics ? ' clinic-card' : ''}`} key={place.id}>
+                {clinics && (
+                  <figure className="clinic-card__image">
+                    <img
+                      src={`${clinicArtwork(place.id)}-480.webp`}
+                      srcSet={`${clinicArtwork(place.id)}-480.webp 480w, ${clinicArtwork(place.id)}-960.webp 960w`}
+                      sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 360px"
+                      width="960"
+                      height="720"
+                      loading="lazy"
+                      decoding="async"
+                      alt=""
+                    />
+                    <figcaption>تصویر نمادین</figcaption>
+                  </figure>
+                )}
+                <div className={clinics ? 'clinic-card__body' : undefined}>
+                  <div className="directory-card__meta">
+                    {place.isVerified && <span>تأییدشده</span>}
+                    {place.is24h && <span>۲۴ ساعته</span>}
+                    {!clinics && place.onDuty && <span>کشیک</span>}
+                  </div>
+                  <h2>
+                    <Link to={`${base}/${place.id}`}>{place.name}</Link>
+                  </h2>
+                  <p className={clinics ? 'clinic-card__location' : undefined}>
+                    {place.province}، {place.city}
+                  </p>
+                  <p className="directory-card__address">{place.address}</p>
+                  <div className={clinics ? 'clinic-card__actions' : undefined}>
+                    <Link className="directory-card__link" to={`${base}/${place.id}`}>
+                      مشاهدهٔ اطلاعات <span aria-hidden="true">←</span>
+                    </Link>
+                    {clinics && place.phone && (
+                      <a
+                        className="clinic-card__contact"
+                        href={`tel:${place.phone}`}
+                        aria-label={`تماس با ${place.name}`}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M8.1 3H5a2 2 0 0 0-2 2c0 8.8 7.2 16 16 16a2 2 0 0 0 2-2v-3.1l-4.6-1.5-1.8 2.3a13.4 13.4 0 0 1-7.3-7.3l2.3-1.8L8.1 3Z" />
+                        </svg>
+                        تماس
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <h2>
-                  <Link to={`${base}/${place.id}`}>{place.name}</Link>
-                </h2>
-                <p>
-                  {place.province}، {place.city}
-                </p>
-                <p className="directory-card__address">{place.address}</p>
-                <Link className="directory-card__link" to={`${base}/${place.id}`}>
-                  مشاهدهٔ اطلاعات <span aria-hidden="true">←</span>
-                </Link>
               </article>
             ))}
           </div>

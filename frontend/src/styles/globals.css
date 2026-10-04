@@ -935,13 +935,19 @@ img {
 .content-page .auth-page form button[type='submit'] {
   width: 100%;
   min-height: 47px;
+  border: 1px solid var(--forest);
+  border-radius: 999px;
+  padding: 7px 15px;
   color: #fff;
   background: var(--forest);
   border-color: var(--forest);
   font-weight: 700;
 }
-.content-page .auth-page form button[type='submit']:hover {
-  background: var(--forest-soft);
+.content-page .auth-page form button[type='submit']:hover:not(:disabled),
+.content-page .auth-page form button[type='submit']:focus-visible {
+  background: var(--forest-deep);
+  border-color: var(--forest-deep);
+  color: #fff;
 }
 .auth-page > button {
   margin: 14px 0 0 10px;

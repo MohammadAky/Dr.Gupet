@@ -1,3 +1,9 @@
+/** Stable original illustrations; these are never photographs of the listed clinic. */
+export function clinicArtwork(id: number): string {
+  const scenes = ['discovery-clinic', 'clinic-care-dog', 'clinic-care-reception'];
+  return `/brand/${scenes[id % scenes.length] ?? scenes[0]}`;
+}
+
 /** Limit API-provided images to the app, its API host, or local blob previews. */
 export function safeImageUrl(value: unknown, appOrigin: string, apiBaseUrl: string): string | null {
   if (

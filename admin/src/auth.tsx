@@ -18,7 +18,7 @@ type Mode = "guest" | "admin";
 interface AuthValue {
   mode: Mode;
   identity: AdminIdentity | null;
-  requestOtp(phone: string): Promise<void>;
+  requestOtp(phone: string): Promise<{ expiresIn: number; cooldownSeconds?: number }>;
   verifyOtp(phone: string, code: string): Promise<void>;
   read<T>(path: string): Promise<T>;
   request<T>(path: string, options?: Omit<Options, "token">): Promise<T>;
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function requestOtp(phone: string) {
-    await adminApi.requestOtp(phone);
+    return adminApi.requestOtp(phone);
   }
 
   async function verifyOtp(phone: string, code: string) {

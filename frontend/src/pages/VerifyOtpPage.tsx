@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
@@ -22,6 +22,13 @@ export function VerifyOtpPage() {
   const [code, setCode] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [cooldown, setCooldown] = useState(() => readOtpCooldown(phone));
+  const pending = useRef(false);
+  const mounted = useRef(true);
+
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -32,29 +39,39 @@ export function VerifyOtpPage() {
   const resend = useMutation({
     mutationFn: () => api.requestOtp(phone),
     onSuccess: (result) => {
+      if (!mounted.current) return;
       storeOtpCooldown(phone, result.cooldownSeconds);
       setCooldown(readOtpCooldown(phone));
+      setCode('');
+      setFieldError(undefined);
     },
+    onSettled: () => { pending.current = false; },
   });
 
   const login = useMutation({
     mutationFn: async (value: string) => verifyOtp(phone, value),
     onSuccess: () => {
+      if (!mounted.current) return;
       clearOtpPhone();
       navigate(next, { replace: true });
     },
+    onSettled: () => { pending.current = false; },
   });
+
+  const busy = login.isPending || resend.isPending;
 
   if (!phone) return <Navigate to="/login" replace />;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (pending.current) return;
     const parsed = otpCodeSchema.safeParse(code);
     if (!parsed.success) {
       setFieldError(parsed.error.issues[0]?.message);
       return;
     }
     setFieldError(undefined);
+    pending.current = true;
     login.mutate(parsed.data);
   }
 
@@ -76,10 +93,11 @@ export function VerifyOtpPage() {
             maxLength={6}
             dir="ltr"
             value={code}
+            disabled={busy}
             onChange={(event) => setCode(event.target.value)}
           />
         </Field>
-        <button type="submit" disabled={login.isPending}>
+        <button className="auth-submit" type="submit" disabled={busy}>
           {login.isPending ? 'در حال ورود…' : 'ورود'}
         </button>
       </form>
@@ -88,8 +106,12 @@ export function VerifyOtpPage() {
 
       <button
         type="button"
-        disabled={cooldown > 0 || resend.isPending}
-        onClick={() => resend.mutate()}
+        disabled={cooldown > 0 || busy}
+        onClick={() => {
+          if (pending.current || cooldown > 0) return;
+          pending.current = true;
+          resend.mutate();
+        }}
       >
         {cooldown > 0 ? `ارسال مجدد کد (${cooldown} ثانیه)` : 'ارسال مجدد کد'}
       </button>
@@ -97,7 +119,9 @@ export function VerifyOtpPage() {
 
       <button
         type="button"
+        disabled={busy}
         onClick={() => {
+          if (pending.current) return;
           clearOtpPhone();
           navigate('/login');
         }}
