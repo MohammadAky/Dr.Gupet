@@ -305,12 +305,13 @@ async function main() {
 
   console.log('✅ Medicines created');
 
-  // 12. Admin user
+  // 12. Admin user (phone from ADMIN_SEED_PHONE — default 09120000000)
+  const adminPhone = process.env.ADMIN_SEED_PHONE || '09120000000';
   await prisma.user.upsert({
-    where: { phone: '09120000000' },
-    update: {},
+    where: { phone: adminPhone },
+    update: { role: 'ADMIN', isPhoneVerified: true },
     create: {
-      phone: '09120000000',
+      phone: adminPhone,
       firstName: 'Admin',
       lastName: 'User',
       role: 'ADMIN',
