@@ -49,7 +49,7 @@ export class ProductsService {
 
     // Search by name (normalized Persian)
     if (q) {
-      where.name = { contains: normalizeFa(q), mode: 'insensitive' };
+      where.name = { contains: normalizeFa(q) };
     }
 
     // Filter by pet type

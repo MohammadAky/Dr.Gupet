@@ -20,7 +20,7 @@ export class SmsLogsService {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (phone) where.phone = { contains: phone, mode: 'insensitive' };
+    if (phone) where.phone = { contains: phone };
     if (kind) where.kind = kind;
     if (status) where.status = status;
 

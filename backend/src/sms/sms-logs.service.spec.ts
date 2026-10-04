@@ -31,7 +31,7 @@ describe('SmsLogsService.findAllAdmin', () => {
     const service = new SmsLogsService(prisma);
     await service.findAllAdmin({ phone: '0912', kind: 'OTP', status: 'FAILED' });
     expect(prisma.smsLog.findMany.mock.calls[0][0].where).toEqual({
-      phone: { contains: '0912', mode: 'insensitive' },
+      phone: { contains: '0912' },
       kind: 'OTP',
       status: 'FAILED',
     });

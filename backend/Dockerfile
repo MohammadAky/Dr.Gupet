@@ -47,8 +47,9 @@ RUN mkdir -p /app/uploads
 # Expose port
 EXPOSE 3000
 
-# Run prisma migrate and start the application.
-# NOTE (issue #06): the app uses SQLite — the database file (/app/data/dev.db
-# via DATABASE_URL) and /app/uploads MUST be mounted as volumes in compose, or
-# all data is lost when the container is rebuilt.
+# Run prisma migrations and start the application.
+# NOTE: all structured data lives in the external MySQL database
+# (DATABASE_URL, e.g. mysql://user:pass@mysql:3306/pet_db) — only uploaded
+# files (/app/uploads) need a mounted volume. `prisma migrate deploy` applies
+# the committed migrations on every boot.
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

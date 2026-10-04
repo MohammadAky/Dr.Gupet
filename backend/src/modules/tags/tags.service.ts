@@ -35,8 +35,8 @@ export class TagsService {
     if (type) where.type = type;
     if (opts.search) {
       where.OR = [
-        { name: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
-        { slug: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+        { name: { contains: normalizeFa(opts.search) } },
+        { slug: { contains: normalizeFa(opts.search) } },
       ];
     }
     // Note: Tag has no isActive column — opts.isActive is accepted for API

@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: pet_mysql
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: pet_db
+      MYSQL_USER: pet
+      MYSQL_PASSWORD: pet
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-ppet']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     container_name: pet_redis
@@ -10,24 +30,27 @@ services:
     volumes:
       - redis_data:/data
 
-  # Backend runs on SQLite (issue #06): the database file and the uploads
-  # directory MUST live on host-mounted volumes so they survive container
-  # rebuilds — they are the only persistent state of the application.
+  # Backend persists uploaded files in the `uploads` volume. All structured
+  # data lives in MySQL (volume `mysql_data`) — nothing is stored inside the
+  # container itself, so containers can be rebuilt freely.
   backend:
     build: .
     container_name: pet_backend
     restart: unless-stopped
     depends_on:
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     environment:
-      DATABASE_URL: 'file:/app/data/dev.db'
+      DATABASE_URL: 'mysql://pet:pet@mysql:3306/pet_db'
       REDIS_URL: 'redis://redis:6379'
       UPLOAD_DIR: '/app/uploads'
     ports:
       - '3000:3000'
     volumes:
-      - ./data:/app/data
       - ./uploads:/app/uploads
 
 volumes:
+  mysql_data:
   redis_data:

@@ -26,7 +26,7 @@ export class AdminCouponsService {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (search) where.code = { contains: search.toUpperCase(), mode: 'insensitive' };
+    if (search) where.code = { contains: search.toUpperCase() };
     if (isActive !== undefined) where.isActive = isActive;
 
     const [coupons, total] = await Promise.all([

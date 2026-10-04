@@ -59,7 +59,7 @@ export class AdminOrdersService {
     if (status) where.status = status;
     if (userId) where.userId = userId;
     if (search) {
-      where.orderNumber = { contains: normalizeFa(search), mode: 'insensitive' };
+      where.orderNumber = { contains: normalizeFa(search) };
     }
     if (from || to) {
       where.createdAt = {};

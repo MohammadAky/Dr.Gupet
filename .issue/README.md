@@ -47,7 +47,7 @@
 | `03-otp-throttle-not-active.md` | ✅ | ثبت سراسری `ThrottlerGuard`؛ cooldown اتمیک با `SET NX EX`؛ سقف IP با `TRUST_PROXY`؛ تست ۴۲۹/همزمانی |
 | `04-real-sms-driver-missing.md` | ✅ | درایور sms.ir (`send/verify` + `send/bulk`) با timeout/retry گذرا؛ اعتبارسنجی startup در production؛ دورریزی OTP هنگام شکست ارسال |
 | `05-payment-gateway-flows-broken.md` | ✅ | لینک mock با `paymentId`؛ URLهای کلاسیک WebGate زرین‌پال (`PaymentRequest.json`/`PaymentVerification.json`/`StartPay`) با override از env؛ رفع باگ `zarinpalSandbox \|\| true` |
-| `06-database-persistence-deployment.md` | ✅ | هم‌راستاسازی مستندات با SQLite؛ docker-compose با volume برای `dev.db` + `uploads`؛ اصلاح entrypoint (`dist/src/main`) |
+| `06-database-persistence-deployment.md` | ✅ | ابتدا هم‌راستاسازی با SQLite؛ سپس **برای استقرار production به MySQL 8 مهاجرت شد** — `provider = "mysql"`، مهاجرت پایهٔ یکپارچه (`20261004000000_init`)، `@db.Text` برای فیلدهای بلند، حذف `mode: 'insensitive'` (ناسازگار با MySQL)، docker-compose با سرویس `mysql:8.4` + volume، اصلاح entrypoint (`dist/src/main`) |
 | `07-upload-unbounded.md` | ✅ | سهمیهٔ روزانهٔ per-user (تعداد + بایت) در Redis با rollback؛ محدودیت حجم از `UPLOAD_MAX_MB` (اعتبارسنجی ۱–۱۰)؛ `@Throttle`؛ پاکسازی فایل ناقص |
 | `08-pharmacy-duty-unmanageable.md` | ✅ | `onDuty` در DTO/سرویس create و update؛ map صریح فیلدهای مجاز (بدون عبور body خام) |
 | `09-report-csv-formula-injection.md` | ✅ | خنثی‌سازی `=+-@` (حتی بعد از whitespace) با پیشوند `'` در `toCsv` |

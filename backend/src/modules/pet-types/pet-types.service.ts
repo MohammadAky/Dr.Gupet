@@ -48,8 +48,8 @@ export class PetTypesService {
     const where: any = {};
     if (opts.search) {
       where.OR = [
-        { name: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
-        { slug: { contains: normalizeFa(opts.search), mode: 'insensitive' } },
+        { name: { contains: normalizeFa(opts.search) } },
+        { slug: { contains: normalizeFa(opts.search) } },
       ];
     }
     if (opts.isActive !== undefined) where.isActive = opts.isActive;

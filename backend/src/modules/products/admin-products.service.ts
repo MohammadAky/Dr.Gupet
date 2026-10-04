@@ -57,8 +57,8 @@ export class AdminProductsService {
     const where: any = {};
     if (search) {
       where.OR = [
-        { name: { contains: normalizeFa(search), mode: 'insensitive' } },
-        { slug: { contains: normalizeFa(search), mode: 'insensitive' } },
+        { name: { contains: normalizeFa(search) } },
+        { slug: { contains: normalizeFa(search) } },
       ];
     }
     if (isActive !== undefined) where.isActive = isActive;

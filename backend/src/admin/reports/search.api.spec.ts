@@ -27,8 +27,8 @@ describe('reference entity admin search (search + isActive)', () => {
     const where = findMany.mock.calls[0][0].where;
     expect(where.isActive).toBe(true);
     expect(where.OR).toEqual([
-      { name: { contains: expect.any(String), mode: 'insensitive' } },
-      { slug: { contains: expect.any(String), mode: 'insensitive' } },
+      { name: { contains: expect.any(String) } },
+      { slug: { contains: expect.any(String) } },
     ]);
   });
 
@@ -86,7 +86,7 @@ describe('public q search for clinics and pharmacies (part c)', () => {
     await service.findAll({ page: 1, limit: 20, q: 'کلینیک پارس' } as any);
     const where = findMany.mock.calls[0][0].where;
     expect(where.isActive).toBe(true);
-    expect(where.name).toEqual({ contains: expect.any(String), mode: 'insensitive' });
+    expect(where.name).toEqual({ contains: expect.any(String) });
   });
 
   it('PharmaciesService.findAll searches by name alongside city filters', async () => {

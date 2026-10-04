@@ -102,9 +102,9 @@ export class UsersService {
     if (search) {
       const term = normalizeFa(search);
       where.OR = [
-        { phone: { contains: term, mode: 'insensitive' } },
-        { firstName: { contains: term, mode: 'insensitive' } },
-        { lastName: { contains: term, mode: 'insensitive' } },
+        { phone: { contains: term } },
+        { firstName: { contains: term } },
+        { lastName: { contains: term } },
       ];
     }
     if (role) where.role = role;

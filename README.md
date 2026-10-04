@@ -33,12 +33,12 @@ Dr. Gupet یک فروشگاه اینترنتیِ ویژهٔ حیوانات خا�
 
 | بخش | انتخاب |
 |---|---|
-| بک‌اند | NestJS 10 (TypeScript strict)، Prisma 5 با provider فعلی SQLite، Redis 7 (OTP/کش/refresh)، JWT، Swagger در `/docs`، helmet، throttler؛ PostgreSQL در راهنما/Compose آمده ولی با schema فعلی یکسان نیست (`.issue/06`) |
-| پرداخت | درگاه Zarinpal و درایور `mock` موجودند؛ جریان پرداخت واقعی برای انتشار هنوز آماده نیست (`.issue/01`، `.issue/05`) |
-| پیامک | ماژول `sms` عمومی و ماژولار: درایور `console` پیش‌فرض + درایور `sms.ir` پیاده‌سازی‌شده (`verify` برای OTP + `bulk` برای اطلاع‌رسانی)؛ درایور kavenegar وجود ندارد و پذیرش زندهٔ ارسال باز است (`.issue/04`) |
+| بک‌اند | NestJS 10 (TypeScript strict)، Prisma 5 با **MySQL 8** (`utf8mb4`)، Redis 7 (OTP/کش/refresh)، JWT، Swagger در `/docs`، helmet، throttler سراسری؛ مهاجرت‌ها در `backend/prisma/migrations` و با `prisma migrate deploy` اعمال می‌شوند |
+| پرداخت | درگاه Zarinpal (WebGate کلاسیک با URLهای قابل‌override) و درایور `mock` (فقط توسعه/تست)؛ callback امضاشده (HMAC)، `Status==='OK'` الزامی، گذارهای اتمیک سفارش/پرداخت |
+| پیامک | ماژول `sms` عمومی و ماژولار: درایور `console` (توسعه) + درایور `sms.ir` (`verify` برای OTP + `bulk` برای اطلاع‌رسانی)؛ لاگ تحویل `SmsLog` + `GET /admin/sms/logs`؛ سیاست اعلان با env |
 | فرانت‌اند | React 19 + Vite، TypeScript strict، React Router 7، TanStack Query 5، Zod، Tailwind 4، Vitest |
 | رابط کاربری | فارسی/راست‌چین (RTL)، فونت وزیرمتن (Self-hosted)، تاریخ جلالی در نمایش |
-| زیرساخت | Docker Compose (Postgres + Redis)، Dockerfile چندمرحله‌ای بک‌اند؛ ماندگاری SQLite/آپلود برای production باید تعیین شود (`.issue/06`) |
+| زیرساخت | Docker Compose (MySQL 8.4 + Redis 7 + بک‌اند)، Dockerfile چندمرحله‌ای؛ داده در volume `mysql_data` و آپلودها در `uploads` ماندگارند |
 
 ## ۴. ساختار مخزن
 
@@ -60,7 +60,7 @@ Dr.Gupet/
 
 ## ۵. راه‌اندازی سریع
 
-**پیش‌نیازها:** Node.js 20+، npm و Redis. راه‌اندازی Postgres طبق متن قدیمی با schema فعلی SQLite سازگار نیست؛ پیش از استقرار، تصمیم مالک بک‌اند در `.issue/06` لازم است.
+**پیش‌نیازها:** Node.js 20+، npm، MySQL 8 و Redis (یا Docker Compose که هر سه را بالا می‌آورد).
 
 ### ۵.۱ بک‌اند
 
@@ -68,7 +68,7 @@ Dr.Gupet/
 
 ```bash
 cd backend
-docker compose up -d              # سرویس‌های PostgreSQL 16 و Redis 7؛ Prisma فعلاً SQLite است
+docker compose up -d              # سرویس‌های MySQL 8.4، Redis 7 و بک‌اند
 npm ci
 cp .env.example .env              # مقادیر را برای محیط خود تنظیم کنید
 npm run prisma:generate

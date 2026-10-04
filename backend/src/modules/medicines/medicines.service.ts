@@ -25,8 +25,8 @@ export class MedicinesService {
 
     if (q) {
       where.OR = [
-        { name: { contains: normalizeFa(q), mode: 'insensitive' } },
-        { activeIngredient: { contains: normalizeFa(q), mode: 'insensitive' } },
+        { name: { contains: normalizeFa(q) } },
+        { activeIngredient: { contains: normalizeFa(q) } },
       ];
     }
 
@@ -121,8 +121,8 @@ export class MedicinesService {
     if (isActive !== undefined) where.isActive = isActive;
     if (q) {
       where.OR = [
-        { name: { contains: normalizeFa(q), mode: 'insensitive' } },
-        { activeIngredient: { contains: normalizeFa(q), mode: 'insensitive' } },
+        { name: { contains: normalizeFa(q) } },
+        { activeIngredient: { contains: normalizeFa(q) } },
       ];
     }
 

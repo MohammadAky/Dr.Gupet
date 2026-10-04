@@ -24,14 +24,14 @@ export class ClinicsService {
     const where: any = { isActive: true };
 
     if (q) {
-      where.name = { contains: normalizeFa(q), mode: 'insensitive' };
+      where.name = { contains: normalizeFa(q) };
     }
     if (city) {
-      where.city = { contains: normalizeFa(city), mode: 'insensitive' };
+      where.city = { contains: normalizeFa(city) };
     }
 
     if (province) {
-      where.province = { contains: normalizeFa(province), mode: 'insensitive' };
+      where.province = { contains: normalizeFa(province) };
     }
 
     if (is24h !== undefined) {
@@ -191,9 +191,9 @@ export class ClinicsService {
     const where: any = {};
     if (isActive !== undefined) where.isActive = isActive;
     if (isVerified !== undefined) where.isVerified = isVerified;
-    if (q) where.name = { contains: normalizeFa(q), mode: 'insensitive' };
-    if (city) where.city = { contains: normalizeFa(city), mode: 'insensitive' };
-    if (province) where.province = { contains: normalizeFa(province), mode: 'insensitive' };
+    if (q) where.name = { contains: normalizeFa(q) };
+    if (city) where.city = { contains: normalizeFa(city) };
+    if (province) where.province = { contains: normalizeFa(province) };
 
     const [clinics, total] = await Promise.all([
       this.prisma.clinic.findMany({

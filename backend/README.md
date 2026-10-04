@@ -7,11 +7,11 @@
 ## ۱. راه‌اندازی
 
 ```bash
-docker compose up -d           # Redis 7 + بک‌اند (SQLite در volume)
+docker compose up -d           # MySQL 8 + Redis 7 + بک‌اند
 npm ci
 cp .env.example .env
 npm run prisma:generate
-npm run prisma:migrate         # SQLite (فایل dev.db)
+npm run prisma:migrate         # MySQL (مهاجرت‌های committed در prisma/migrations)
 npm run prisma:seed            # seed idempotent (upsert با slug/فیلدهای یکتا)
 npm run start:dev              # http://localhost:3000/api/v1
 ```
@@ -141,7 +141,7 @@ Clinic   (کلینیک‌ها — فهرست عمومی)
 NODE_ENV=development
 PORT=3000
 CORS_ORIGINS=http://localhost:5173
-DATABASE_URL="file:./dev.db"    # SQLite (پایدار در volume داکر؛ نگهداری فایل دیتابیس)
+DATABASE_URL="mysql://pet:pet@localhost:3306/pet_db"   # MySQL 8 (utf8mb4)
 REDIS_URL=redis://localhost:6379
 JWT_ACCESS_SECRET=...            # هرگز در مخزن
 JWT_REFRESH_SECRET=...
@@ -163,7 +163,7 @@ ORDER_EXPIRE_MINUTES=30
 ADMIN_SEED_PHONE=09120000000
 ```
 
-`docker compose` سرویس‌های `redis:7` و بک‌اند را بالا می‌آورد. دیتابیس **SQLite** است (`file:./dev.db`) و فایل آن به‌همراه پوشهٔ `uploads` در volume‌های میزبان (`./data` و `./uploads`) نگهداری می‌شود تا با بازسازی کانتینر از بین نرود (ایشوز #۰۶). مهاجرت آینده به PostgreSQL از مسیر Prisma (`provider = "postgresql"`) انجام‌پذیر است؛ تا آن زمان SQLite مرجع است.
+`docker compose` سرویس‌های `mysql:8.4` (db/user/password: `pet_db`/`pet`/`pet`)، `redis:7` و بک‌اند را بالا می‌آورد. دیتابیس **MySQL 8** است (charset `utf8mb4` با collation `utf8mb4_unicode_ci` برای جستجوی بدون حساسیت به حروف)؛ داده در volume `mysql_data` و فایل‌های آپلودی در `./uploads` نگهداری می‌شوند. مهاجرت‌ها با `prisma migrate deploy` روی هر بوت اعمال می‌شوند. نکته‌های MySQL در کد رعایت شده: فیلدهای متنی بلند `@db.Text` هستند و queryها از `mode: 'insensitive'` (مخصوص PostgreSQL) استفاده نمی‌کنند — حساسیت به حروف با collation سی‌آی خودِ MySQL اداره می‌شود.
 
 ## ۶. قواعد کسب‌وکار
 
@@ -251,7 +251,7 @@ PENDING_PAYMENT ──پرداخت موفق──▶ PAID ──▶ PROCESSING �
 ## ۷. استراتژی تست
 
 - **تست واحد (Jest):** OtpService (هش، سقف‌ها، discard، همزمانی cooldown/verify)، جریان `requestOtp` (شکست ارسال باید OTP را دور بریزد)، انتخاب درایور `SmsService` + لاگ `SmsLog`، درایور sms.ir (payload/ retry/ خطاها با mock)، سخت‌سازی callback پرداخت (امضا/Status/race)، cancel/expire اتمیک سفارش، سهمیهٔ آپلود، `POST /admin/users`، خنثی‌سازی CSV، جستجوهای admin/public، CouponsService، OrderStockService، سبد خرید/پت/آدرس/علاقه‌مندی، ابزارهای `phone`/`slugify`/`normalizeFa`.
-- **تست E2E (Supertest):** با SQLite (فایل تستی اختصاصی) + Redis واقعی (docker compose)؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
+- **تست E2E (Supertest):** با MySQL (دیتابیس تستی اختصاصی) + Redis واقعی (docker compose)؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
 - سناریوهای حتمی: جریان کامل خرید؛ جداسازی مالکیت بین دو کاربر؛ همزمانی آخرین موجودی؛ سقف‌های کوپن؛ idempotency کال‌بک پرداخت؛ دسترسی غیرمجاز/مسدود.
 - چک‌لیست تست دستی و پذیرش: [`docs/TEST_CHECKLIST.md`](docs/TEST_CHECKLIST.md).
 

@@ -1,5 +1,16 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Production launch: MySQL 8 (2026-10-04)
+
+### Changed
+- **Database switched from SQLite to MySQL 8** for the production launch:
+  - `datasource` provider → `mysql` (`utf8mb4` / `utf8mb4_unicode_ci`).
+  - Fresh single baseline migration `20261004000000_init` (all SQLite migrations removed — a MySQL server applies it from scratch via `prisma migrate deploy`).
+  - Long-content columns moved to `@db.Text` (addresses, descriptions, `addressSnapshot`, `refundNote`, `SmsLog.error`, …) so nothing truncates against MySQL's default `VARCHAR(191)`.
+  - Removed every `mode: 'insensitive'` from queries (unsupported on MySQL; case-insensitivity comes from the CI collation).
+  - `docker-compose.yml` now runs `mysql:8.4` (healthchecked, `mysql_data` volume) + Redis + backend; the SQLite `dev.db` volume is gone.
+- Docs (`README`, `backend/README`, `.issue/README`) aligned with the MySQL reality.
+
 ## [Unreleased] - Modular SMS layer + OTP delivery safety (2026-10-03)
 
 ### Added
