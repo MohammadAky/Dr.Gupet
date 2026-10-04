@@ -4,7 +4,7 @@
 
 - GitHub `MohammadAky/Dr.Gupet` `main` is the project source of truth. Before a development phase, inspect the current remote head and incoming changes; preserve uncommitted local work. A local checkout is a workspace, not evidence that GitHub has the same state.
 - The repository is a monorepo: `backend/` (NestJS API) and `frontend/` (React SPA). Keep each change scoped to the side it belongs to; report backend needs from frontend work (and vice versa) instead of silently editing the other side.
-- Product scope, setup and the development path live in the root `README.md`. Backend API contract and business rules live in `backend/README.md`. Frontend conventions live in `frontend/README.md`, `frontend/docs/DECISIONS.md` (accepted technical decisions) and `frontend/docs/DESIGN_SYSTEM.md` (visual contract and asset provenance). If current code and documentation disagree, verify the implementation and record evidence before changing status.
+- Product scope, setup, server deployment (Docker + `scripts/`), the API contract and business rules live in the root `README.md` (the single project README). Frontend conventions live in `frontend/docs/DECISIONS.md` (accepted technical decisions) and `frontend/docs/DESIGN_SYSTEM.md` (visual contract and asset provenance). If current code and documentation disagree, verify the implementation and record evidence before changing status.
 - For visual frontend changes, use the personal Codex skill `dr-gupet-frontend-design` when available. Its guidance lives outside this repository. The versioned repository documents and owner instructions remain authoritative.
 
 ## Working agreement

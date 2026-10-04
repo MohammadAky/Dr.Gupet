@@ -1,5 +1,18 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Server ops: `scripts/` + single README (2026-10-04)
+
+### Added
+- **`scripts/` folder for the server** (root, `set -euo pipefail`, Persian logs):
+  - `setup.sh` (one-time): install Docker + Compose plugin + nginx + certbot, generate strong `backend/.env` (JWT/OTP/DB secrets via `openssl rand`, `OTP_HASH_SECRET` included), `docker compose build/up`, health wait, idempotent `prisma:seed`, optional `--with-front` builds, then SSL. Flags: `--domain` (required), `--admin-domain`, `--email`, `--phone`, `--with-front`, `--skip-ssl`.
+  - `update.sh` (every code change): `git pull --ff-only` (aborts on dirty tree unless `--force`), rebuild backend image (Docker layer cache), `up -d` (migrations auto on boot), health check, optional `--seed`, `--with-front`, `docker image prune`.
+  - `ssl.sh` + `scripts/nginx/site.conf.template` (`__SERVER_NAME__`/`__DIST_DIR__`/`__SITE__` placeholders): per-domain nginx block proxying `/api/`, `/docs`, `/uploads/` to `127.0.0.1:3000` (same-origin per domain → no CORS), SPA `try_files`, then `certbot --nginx --redirect` + `renew --dry-run`.
+### Changed
+- `docker-compose.yml` hardened: `env_file: .env`, `MYSQL_PASSWORD`/`MYSQL_ROOT_PASSWORD` interpolated from `.env` (defaults `pet`/`root`), ports bound to `127.0.0.1`, healthchecks (mysql `mysqladmin ping`, redis `redis-cli ping`, backend `wget /api/v1/health`), `depends_on: service_healthy`.
+- `ts-node`/`typescript` moved to `dependencies` so `prisma:seed` runs inside the production image.
+### Docs
+- Consolidated to ONE root `README.md` (setup, Docker explainer, scripts, SSL, env vars, API contracts, business rules, OTP/SMS architecture, admin API, testing, ops). `backend/README.md`, `admin/README.md`, `frontend/README.md` removed; `.issue/README.md` → `.issue/STATUS.md`.
+
 ## [Unreleased] - Production launch: MySQL 8 (2026-10-04)
 
 ### Changed

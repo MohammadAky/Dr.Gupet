@@ -1,0 +1,44 @@
+# قالب پیکربندی nginx — توسط scripts/ssl.sh رندر می‌شود
+# جای‌نگهدارها: __SERVER_NAME__  __DIST_DIR__  __SITE__
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __SERVER_NAME__;
+
+    # حداکثر حجم آپلود (با UPLOAD_MAX_MB در بک‌اند هماهنگ بماند)
+    client_max_body_size 16m;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+
+    # ---- API بک‌اند (کانتینر روی 127.0.0.1:3000) ----
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # ---- Swagger (فقط در محیط توسعه بالا می‌آید؛ در production بک‌اند 404 می‌دهد) ----
+    location /docs {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ---- فایل‌های آپلودی (توسط خود بک‌اند سرو می‌شوند) ----
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ---- وب‌اپ __SITE__ (SPA — بارگذاری مستقیم مسیرها هم index می‌گیرد) ----
+    location / {
+        root __DIST_DIR__;
+        try_files $uri $uri/ /index.html;
+    }
+}

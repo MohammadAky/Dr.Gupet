@@ -9,30 +9,36 @@ services:
     environment:
       MYSQL_DATABASE: pet_db
       MYSQL_USER: pet
-      MYSQL_PASSWORD: pet
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pet}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
     ports:
-      - '3306:3306'
+      - '127.0.0.1:3306:3306'
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-ppet']
+      test: ['CMD-SHELL', 'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 12
 
   redis:
     image: redis:7-alpine
     container_name: pet_redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
-  # Backend persists uploaded files in the `uploads` volume. All structured
-  # data lives in MySQL (volume `mysql_data`) — nothing is stored inside the
-  # container itself, so containers can be rebuilt freely.
+  # Backend: every env var from backend/.env is loaded (env_file) and the three
+  # container-specific values below override host-oriented addresses.
+  # `prisma migrate deploy` runs on every boot (see Dockerfile) — schema
+  # migrations are applied automatically after each `update.sh`.
   backend:
     build: .
     container_name: pet_backend
@@ -41,15 +47,23 @@ services:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: 'mysql://pet:pet@mysql:3306/pet_db'
+      DATABASE_URL: 'mysql://pet:${MYSQL_PASSWORD:-pet}@mysql:3306/pet_db'
       REDIS_URL: 'redis://redis:6379'
       UPLOAD_DIR: '/app/uploads'
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     volumes:
       - ./uploads:/app/uploads
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/v1/health']
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 volumes:
   mysql_data:
