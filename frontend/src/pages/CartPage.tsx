@@ -84,8 +84,19 @@ export function CartPage() {
 
   const view = cart.data;
   const hasProblem = view?.items.some((item) => !item.available) ?? false;
+  const serverShipping = view?.estimate?.shippingCost;
+  const validServerShipping =
+    typeof serverShipping === 'number' &&
+    Number.isSafeInteger(serverShipping) &&
+    serverShipping >= 0
+      ? serverShipping
+      : null;
   const shippingEstimate =
-    view && view.itemsTotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_COST;
+    validServerShipping !== null
+      ? validServerShipping
+      : view && view.itemsTotal >= FREE_SHIPPING_THRESHOLD
+        ? 0
+        : SHIPPING_FLAT_COST;
 
   function submitCoupon(event: FormEvent) {
     event.preventDefault();
@@ -168,10 +179,17 @@ export function CartPage() {
           <dl>
             <dt>جمع کالاها</dt>
             <dd dir="ltr">{formatToman(view.itemsTotal)}</dd>
-            <dt>هزینهٔ ارسال (تخمینی)</dt>
+            <dt>
+              هزینهٔ ارسال ({validServerShipping !== null ? 'تخمین سرور' : 'تخمین محلیِ جایگزین'})
+            </dt>
             <dd dir="ltr">{shippingEstimate === 0 ? 'رایگان' : formatToman(shippingEstimate)}</dd>
           </dl>
-          <p>مبلغ نهایی پس از اعمال کد تخفیف در مرحلهٔ سفارش محاسبه می‌شود.</p>
+          <p>
+            {validServerShipping !== null
+              ? view.estimate?.note
+              : 'این عدد تنها تخمین محلی است؛ نسخهٔ فعلی پاسخ سبد خرید، تخمین سرور را ارائه نکرد.'}{' '}
+            مبلغ قطعی پس از اعمال کد تخفیف در مرحلهٔ سفارش محاسبه می‌شود.
+          </p>
 
           {notice && <p role="alert">{notice}</p>}
 

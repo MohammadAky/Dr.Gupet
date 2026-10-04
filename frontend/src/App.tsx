@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shopApi } from './api/endpoints-shop';
 import { queryKeys } from './api/query-keys';
@@ -7,19 +7,33 @@ import { useAuth } from './auth/auth-provider';
 import { Footer } from './components/layout/Footer';
 import { Header } from './components/layout/Header';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
+import { ThemeToggle } from './components/layout/ThemeToggle';
 import { ConsentBanner } from './privacy/ConsentBanner';
 
 export function Shell() {
-  const { status, user, logout, previewMode } = useAuth();
+  const { status, user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    queueMicrotask(() => setMenuOpen(false));
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [menuOpen]);
+
   const cart = useQuery({
     queryKey: queryKeys.cart,
     queryFn: () => shopApi.cart(),
-    enabled: status === 'authed' && !previewMode,
+    enabled: status === 'authed',
   });
   const cartCount = status === 'authed' ? (cart.data?.items.length ?? 0) : 0;
 
@@ -30,9 +44,9 @@ export function Shell() {
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setMenuOpen(false);
     const query = search.trim();
     navigate(query ? `/products?q=${encodeURIComponent(query)}` : '/products');
-    setMenuOpen(false);
   }
 
   return (
@@ -51,27 +65,20 @@ export function Shell() {
         menuOpen={menuOpen}
         onSearchChange={setSearch}
         onSearchSubmit={submitSearch}
-        onMenuToggle={() => setMenuOpen((current) => !current)}
+        onMenuToggle={() => setMenuOpen((open) => !open)}
         onMenuClose={() => setMenuOpen(false)}
         onLogout={() => void handleLogout()}
       />
       <main
+        key={location.pathname}
         id="main-content"
         className={`app-main${location.pathname === '/' ? '' : ' content-page'}`}
       >
-        {previewMode && (
-          <p className="preview-session-note" role="status">
-            حالت نمایشی محلی — اطلاعات حساب و عملیات خصوصی به بک‌اند متصل نیستند.
-          </p>
-        )}
         <Outlet />
       </main>
-      <Footer onNavigate={() => setMenuOpen(false)} />
-      <MobileBottomNav
-        status={status}
-        cartCount={cartCount}
-        onNavigate={() => setMenuOpen(false)}
-      />
+      <Footer />
+      <MobileBottomNav status={status} />
+      <ThemeToggle />
       <ConsentBanner />
     </div>
   );

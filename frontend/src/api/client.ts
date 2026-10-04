@@ -71,7 +71,9 @@ async function doRequest<T>(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const init: RequestInit = { method, headers };
+  // The API contract uses Bearer tokens, not browser cookies. Keep this true
+  // when the API is placed behind a same-origin production proxy.
+  const init: RequestInit = { method, headers, credentials: 'omit' };
   if (formData) {
     init.body = formData;
   } else if (body !== undefined) {

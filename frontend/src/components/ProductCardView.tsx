@@ -33,7 +33,14 @@ export function ProductCardView({
         <h3>{card.name}</h3>
         <p className="product-card__brand">{card.brand.name}</p>
         <div className="product-card__bottom">
-          <p className="product-card__price">{formatToman(card.minPrice)}</p>
+          <div className="product-card__prices">
+            {typeof card.compareAtPrice === 'number' && card.compareAtPrice > card.minPrice && (
+              <del className="product-card__compare" aria-label="قیمت پیشین">
+                {formatToman(card.compareAtPrice)}
+              </del>
+            )}
+            <p className="product-card__price">{formatToman(card.minPrice)}</p>
+          </div>
           <span className={`stock-pill${card.inStock ? '' : ' stock-pill--out'}`}>
             {card.inStock ? 'موجود' : 'ناموجود'}
           </span>

@@ -1,5 +1,4 @@
 import { request, requestData } from './client';
-import { API_BASE_URL } from '../lib/env';
 import { safePaymentUrl } from '../lib/security';
 import type {
   Brand,
@@ -56,9 +55,10 @@ export interface PharmacyFilters {
   city?: string;
   province?: string;
   is24h?: boolean;
+  onDuty?: boolean;
 }
 
-export type ClinicFilters = PharmacyFilters;
+export type ClinicFilters = Omit<PharmacyFilters, 'onDuty'>;
 
 export interface CreateOrderInput {
   addressId: number;
@@ -156,7 +156,7 @@ export const shopApi = {
       method: 'POST',
       body: { orderId },
     });
-    const paymentUrl = safePaymentUrl(result.paymentUrl, API_BASE_URL, import.meta.env.DEV);
+    const paymentUrl = safePaymentUrl(result.paymentUrl);
     if (!paymentUrl)
       throw new Error('آدرس درگاه پرداخت معتبر نیست. پرداخت را از بخش سفارش‌ها دوباره بررسی کنید.');
     return { paymentUrl };

@@ -14,7 +14,7 @@ export const phoneSchema = z
 export const otpCodeSchema = z
   .string()
   .transform((value) => normalizeOtpCode(value))
-  .refine((value): value is string => value !== null, 'کد ۵ رقمی را وارد کنید');
+  .refine((value): value is string => value !== null, 'کد ۵ یا ۶ رقمی را وارد کنید');
 
 export const profileSchema = z.object({
   firstName: z.string().max(50, 'حداکثر ۵۰ کاراکتر').nullable(),

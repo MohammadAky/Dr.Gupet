@@ -15,15 +15,10 @@ import { tokenStorage } from '../lib/storage';
 import { useQueryClient } from '@tanstack/react-query';
 
 export type AuthStatus = 'loading' | 'guest' | 'authed';
-export const LOCAL_PREVIEW_LOGIN =
-  import.meta.env.DEV &&
-  (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 
 interface AuthContextValue {
   status: AuthStatus;
   user: UserProfile | null;
-  previewMode: boolean;
-  previewLogin(phone: string): void;
   /** OTP verify → tokens persisted → profile loaded. */
   verifyOtp(phone: string, code: string): Promise<{ isNewUser: boolean }>;
   logout(): Promise<void>;
@@ -39,7 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
-  const [previewMode, setPreviewMode] = useState(false);
 
   const getAccessToken = useCallback(() => accessTokenRef.current, []);
 
@@ -86,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     setUser(null);
     setStatus('guest');
-    setPreviewMode(false);
   }, [queryClient]);
 
   const loadProfile = useCallback(async (): Promise<boolean> => {
@@ -133,32 +126,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       accessTokenRef.current = result.accessToken;
       tokenStorage.set(result.refreshToken);
-      await loadProfile();
+      if (!(await loadProfile())) {
+        throw new Error('تأیید شماره انجام شد، اما دریافت حساب ممکن نشد. دوباره وارد شوید.');
+      }
       return { isNewUser: result.isNewUser };
     },
     [loadProfile, queryClient],
-  );
-
-  const previewLogin = useCallback(
-    (phone: string) => {
-      if (!LOCAL_PREVIEW_LOGIN) return;
-      queryClient.clear();
-      accessTokenRef.current = null;
-      tokenStorage.clear();
-      setPreviewMode(true);
-      setUser({
-        id: 0,
-        firstName: 'کاربر نمایشی',
-        lastName: null,
-        phone,
-        avatar: null,
-        role: 'USER',
-        createdAt: new Date(0).toISOString(),
-        updatedAt: new Date(0).toISOString(),
-      });
-      setStatus('authed');
-    },
-    [queryClient],
   );
 
   const logout = useCallback(async () => {
@@ -179,8 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyProfile = useCallback((profile: UserProfile) => setUser(profile), []);
 
   const value = useMemo(
-    () => ({ status, user, previewMode, previewLogin, verifyOtp, logout, applyProfile }),
-    [status, user, previewMode, previewLogin, verifyOtp, logout, applyProfile],
+    () => ({ status, user, verifyOtp, logout, applyProfile }),
+    [status, user, verifyOtp, logout, applyProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -30,6 +30,7 @@ export type SortOption = 'newest' | 'price_asc' | 'price_desc';
 /** POST /auth/otp/request */
 export interface OtpRequestResult {
   expiresIn: number;
+  cooldownSeconds: number;
 }
 
 /** The user object returned by POST /auth/otp/verify. */
@@ -154,6 +155,8 @@ export interface ProductCard {
   brand: { id: number; name: string };
   image: string | null;
   minPrice: number;
+  /** Present on GET /products; favorites/recommendations may omit it. */
+  compareAtPrice?: number | null;
   inStock: boolean;
   lifeStage: LifeStage;
   sizeClass: SizeClass;
@@ -215,6 +218,12 @@ export interface CartItemView {
 export interface CartView {
   items: CartItemView[];
   itemsTotal: number;
+  estimate?: {
+    itemsTotal: number;
+    shippingCost: number;
+    freeShippingThreshold: number;
+    note: string;
+  };
 }
 
 /** POST /coupons/validate — finalAmount excludes shipping (BE-REQ-04). */
@@ -336,6 +345,7 @@ export interface Pharmacy {
   address: string;
   phone: string | null;
   is24h: boolean;
+  onDuty?: boolean;
   isVerified: boolean;
 }
 

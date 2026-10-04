@@ -46,34 +46,22 @@ describe('sanitizeInternalRedirect', () => {
 });
 
 describe('safePaymentUrl', () => {
-  const api = 'http://localhost:3000/api/v1';
-
-  it('accepts the current gateway and development mock destinations', () => {
-    expect(safePaymentUrl('https://sandbox.zarinpal.com/pg/StartPay/A123', api, false)).toBe(
-      'https://sandbox.zarinpal.com/pg/StartPay/A123',
-    );
-    expect(safePaymentUrl('https://www.zarinpal.com/pg/StartPay/A123', api, false)).toBe(
+  it('accepts the live gateway destination', () => {
+    expect(safePaymentUrl('https://www.zarinpal.com/pg/StartPay/A123')).toBe(
       'https://www.zarinpal.com/pg/StartPay/A123',
     );
-    expect(
-      safePaymentUrl('http://localhost:3000/api/v1/payments/mock-pay?orderId=1', api, true),
-    ).toBe('http://localhost:3000/api/v1/payments/mock-pay?orderId=1');
   });
 
   it.each([
     'javascript:alert(1)',
     'https://evil.example/pg/StartPay/A123',
     'https://sandbox.zarinpal.com.evil.example/pg/StartPay/A123',
+    'https://sandbox.zarinpal.com/pg/StartPay/A123',
+    'http://localhost:3000/api/v1/payments/mock-pay?orderId=1',
     'https://sandbox.zarinpal.com@evil.example/pg/StartPay/A123',
     'http://www.zarinpal.com/pg/StartPay/A123',
     'https://www.zarinpal.com/other/A123',
   ])('rejects untrusted payment destination %s', (url) => {
-    expect(safePaymentUrl(url, api, true)).toBeNull();
-  });
-
-  it('rejects the mock gateway outside local development', () => {
-    expect(
-      safePaymentUrl('http://localhost:3000/api/v1/payments/mock-pay?orderId=1', api, false),
-    ).toBeNull();
+    expect(safePaymentUrl(url)).toBeNull();
   });
 });

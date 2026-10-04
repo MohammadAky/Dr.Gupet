@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
-import { periodQuery, sampleSalesReport } from "./period";
+import { periodQuery, tehranDayKey } from "./period";
 
-it("requests exact local calendar ranges with a bounded ISO end", () => {
-  const now = new Date(2026, 9, 1, 13, 20);
+it("requests Tehran calendar ranges with an explicit zone and bounded ISO end", () => {
+  const now = new Date("2026-10-01T09:50:00.000Z");
   for (const [period, days] of [
     ["today", 1],
     ["7d", 7],
@@ -11,18 +11,15 @@ it("requests exact local calendar ranges with a bounded ISO end", () => {
   ] as const) {
     const params = new URLSearchParams(periodQuery(period, now).split("?")[1]);
     const from = new Date(params.get("from") || "");
-    const expected = new Date(now);
-    expected.setHours(0, 0, 0, 0);
-    expected.setDate(expected.getDate() - days + 1);
+    const expected = new Date("2026-09-30T20:30:00.000Z");
+    expected.setUTCDate(expected.getUTCDate() - days + 1);
     expect(from.toISOString()).toBe(expected.toISOString());
     expect(params.get("to")).toBe(now.toISOString());
+    expect(params.get("tz")).toBe("Asia/Tehran");
   }
 });
 
-it("keeps local demo totals consistent with its shown range", () => {
-  const report = sampleSalesReport("7d", new Date(2026, 9, 1));
-  expect(report.byDay).toHaveLength(7);
-  expect(report.totals.revenue).toBe(
-    report.byDay.reduce((sum, day) => sum + day.revenue, 0),
-  );
+it("uses Tehran's day boundary independent of the browser time zone", () => {
+  expect(tehranDayKey(new Date("2026-09-30T20:29:59.000Z"))).toBe("2026-09-30");
+  expect(tehranDayKey(new Date("2026-09-30T20:30:00.000Z"))).toBe("2026-10-01");
 });

@@ -17,3 +17,22 @@
   --radius-lg: 32px;
   --shadow-card: 0 14px 36px rgb(18 47 18 / 8%);
 }
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* The theme only stores the visual choice. Authentication and consent stay untouched. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --cream: #0e1811;
+  --sand: #17251a;
+  --paper: #19251c;
+  --ink: #f2f5ef;
+  --muted: #b9cbb7;
+  --line: #35493a;
+  --forest-soft: #bfd6b8;
+  --gold-soft: #3c341e;
+  --shadow-card: 0 14px 36px rgb(0 0 0 / 24%);
+}

@@ -96,31 +96,52 @@
 
 ## DEC-015: Local account preview while OTP is unavailable
 
-- **Status:** OWNER-DIRECTED FOR LOCAL REVIEW
+- **Status:** SUPERSEDED BY DEC-020 ON 2026-10-02
 - **Date:** 2026-09-27
 - **Decision:** On `localhost` / `127.0.0.1` in Vite development only, entering any nonempty phone text opens a temporary account preview without requesting or verifying an OTP. Keep the real OTP path in production builds. The preview creates no token, is not persisted across reloads, and is visibly marked as a demo.
 - **Consequences:** The account shell and profile layout can be reviewed without SMS. Private API operations still require a real backend session and must not be represented as working in the preview. Remove or revisit this temporary mode when the owner provides the SMS integration.
 
 ## DEC-016: Independent admin frontend and safe local preview
 
-- **Status:** OWNER AUTHORIZED COMMIT 2026-10-01; LIVE API ACCEPTANCE PENDING
+- **Status:** ADMIN ARCHITECTURE RETAINED; LOCAL PREVIEW SUPERSEDED BY DEC-020; LIVE API ACCEPTANCE PENDING
 - **Date:** 2026-09-30
 - **Decision:** Build the new administration interface as an independent `admin/` React/Vite app, as specified in the root README. Its network calls live in its own central `admin/src/api/client.ts`; it uses the existing backend OTP endpoints and checks `GET /admin/me` before rendering private screens. Both admin tokens remain only in memory, so a reload requires login again. The visual preview uses explicit sample data only when Vite development runs on localhost and never sends admin writes.
 - **Consequences:** The customer app stays separate. The admin app uses the approved brand assets and design tokens from the customer frontend, with no new image rights. The development server proxies `/api` to avoid changing backend CORS; production needs a same-origin proxy or an explicitly allowed admin origin. A live backend and admin OTP session are required before acceptance of API functionality. Security tests must cover non-admin rejection, RAM-only tokens, disabled production demo, and no new cookies.
 
-## DEC-017: حالت روشن/تاریک و بازطراحی موکول‌شدهٔ سایت
+## DEC-017: حالت روشن/تاریک و بازطراحی سایت
 
-- **Status:** ADMIN THEME IMPLEMENTED; CUSTOMER REDESIGN DEFERRED BY OWNER
+- **Status:** ADMIN THEME IMPLEMENTED; CUSTOMER REDESIGN IN LOCAL REVIEW
 - **Date:** 2026-10-01
-- **Decision:** کلید دایره‌ای ماه/خورشید در پنل ادمین ترجیح `light`/`dark` را فقط برای ظاهر در ذخیره‌سازی محلی نگه می‌دارد. بازطراحی سایت اصلی و تم آن در کار محلی باقی می‌مانند و به درخواست مالک در کامیت فوری فرانت ادمین گنجانده نمی‌شوند. منابع MotionSite، MotionSites AI و 21st.dev فقط برای الهام بررسی شدند؛ کد/تصویر ثالث وارد پروژه نشد. SkillSpector در فضای شخصی نصب شد؛ اسکن کامل مهارت‌های خارجی و نصب آن‌ها به زمان ادامهٔ بازطراحی موکول شد.
-- **Consequences:** هیچ وابستگی تازه یا اسکریپت خارجی برای تم پنل لازم نیست. قراردادهای ورود، توکن، کوکی، API و پول ثابت می‌مانند. سایت اصلی قبل از ارسال جداگانه به بازبینی بصری نیاز دارد.
+- **Decision:** کلید دایره‌ای ماه/خورشید در پنل ادمین و سایت اصلی ترجیح `light`/`dark` را فقط برای ظاهر در ذخیره‌سازی محلی نگه می‌دارد. مالک پس از ارسال فوری قبلی، بازطراحی سایت و پنل را دوباره در فاز فعلی خواست. CSS موقت `redesign.css` در فایل‌های موجود ادغام و حذف شد. منابع MotionSite، MotionSites AI و 21st.dev برای الگوی تعامل بررسی شدند؛ کد/تصویر ثالث وارد پروژه نشد. مهارت‌های طراحی در پوشهٔ شخصی Codex نصب شده‌اند و عضو ریپازیتوری نیستند؛ بررسی SkillSpector بنا به درخواست مالک در چت جدا ادامه می‌یابد.
+- **Consequences:** هیچ وابستگی یا اسکریپت خارجی برای تم لازم نیست. قراردادهای ورود، توکن، کوکی، API و پول حفظ می‌شوند. بازطراحی فعلی پیش از کامیت و پوش به بازبینی مالک نیاز دارد.
 
 ## DEC-018: بازه‌های گزارش فروش پنل ادمین
 
 - **Status:** IMPLEMENTED FOR LOCAL REVIEW; LIVE API ACCEPTANCE PENDING
 - **Date:** 2026-10-01
 - **Decision:** انتخاب «امروز»، ۷، ۱۴ یا ۳۰ روز اخیر فقط فروش و نمودار فروش را با `GET /admin/reports/sales` و محدودهٔ ISO مشخص تغییر می‌دهد. شاخص‌های وضعیت و تعداد کل کاربران از `GET /admin/dashboard` مستقل‌اند. نمونهٔ محلی هر بازه دادهٔ ساختگی جداگانه دارد. برای «امروز» نمودار یک ستون از مجموع بازه نشان می‌دهد.
-- **Consequences:** بک‌اند روزهای نمودار را با UTC گروه‌بندی می‌کند، در حالی که درخواست از نیمه‌شب محلی مرورگر آغاز می‌شود. جمع بازه درست است ولی تفکیک روزانه ممکن است با تقویم محلی هم‌مرز نباشد. اصلاح قرارداد timezone نیاز بک‌اند است؛ فرانت ادعای صحت روزانهٔ محلی یا آزمون زنده ندارد.
+- **Consequences:** بک‌اند در `3bb1b99` پارامتر `tz` را پذیرفت. کاندید فعلی فرانت محدوده را از نیمه‌شب `Asia/Tehran` می‌سازد و `tz=Asia/Tehran` را صریح می‌فرستد. محاسبهٔ بازه در تست خودکار بررسی شد؛ صحت نمودار با API زنده هنوز پذیرفته نشده است.
+
+## DEC-019: درج مرحله‌ای محصول در پنل ادمین
+
+- **Status:** IMPLEMENTED FOR LOCAL REVIEW; LIVE API ACCEPTANCE PENDING
+- **Date:** 2026-10-01
+- **Decision:** فرم ادمین بدون وابستگی تازه از API موجود برای محصول پایه، نخستین واریانت، تصویر اختیاری و برچسب استفاده می‌کند. محصول پایه را غیرفعال می‌سازد و انتشار را پس از موفقیت تمام مرحله‌های انتخابی انجام می‌دهد. شکست مرحله‌ای شناسهٔ محصول غیرفعال را به مدیر نشان می‌دهد تا در جزئیات تکمیل شود. پیش‌نمایش محلی عملیات نوشتن ندارد.
+- **Consequences:** API فعلی تراکنش سراسری برای این چند endpoint ندارد. ثبت ناقص ممکن است محصول پیش‌نویس بر جای بگذارد؛ این رفتار در UI آشکار است و فروشگاه محصول ناقص را منتشر نمی‌کند. پذیرش نهایی نیازمند بک‌اند زنده، حساب `ADMIN`، آپلود واقعی و آزمون نقش/کوکی/refresh است.
+
+## DEC-020: مسیر واقعی برای ورود و داده در همهٔ محیط‌ها
+
+- **Status:** OWNER-DIRECTED; IMPLEMENTED FOR LOCAL REVIEW; LIVE API ACCEPTANCE PENDING
+- **Date:** 2026-10-02
+- **Decision:** مالک حالت نمایشی را برای ورود، داده و مدیریت حذف کرد. فرانت مشتری در لوکال هم فقط شمارهٔ معتبر را به `POST /auth/otp/request` می‌فرستد و پس از `POST /auth/otp/verify` و دریافت نشست معتبر وارد حساب می‌شود. `?demo=1` کلینیک، ورود بدون OTP و مسیر `/dev/ui` حذف شدند. پنل ادمین نیز دیگر ورود یا دادهٔ نمایشی ندارد؛ نمایش بخش خصوصی به OTP واقعی، `GET /admin/me` و نقش `ADMIN` وابسته است. پرداخت مشتری فقط آدرس HTTPS درگاه واقعی `www.zarinpal.com` را می‌پذیرد، نه درگاه ساختگی یا sandbox. حالت‌های loading/empty/error برای پاسخ واقعی API باقی می‌مانند.
+- **Consequences:** ارسال پیامک، تنظیم درگاه، استقرار پایدار API و تست نوشتن/آپلود/پرداخت با دادهٔ واقعی بر عهدهٔ بک‌اند و محیط استقرار است؛ تست محلی بدون این سرویس‌ها پذیرش زنده نیست. قرارداد فعلی API از Bearer token استفاده می‌کند، بنابراین فرانت مشتری برای همهٔ fetchها `credentials: 'omit'` می‌فرستد تا حتی پشت proxy هم کوکی مرورگر به API نرود. تصمیم DEC-003 دربارهٔ refresh token در `localStorage` پابرجاست و ریسک XSS آن پیش از انتشار عمومی نیاز به بررسی است. در موبایل جستجو و سبد در نوار بالا، حساب فقط در نوار پایین، و ناوبری صفحه‌ها به‌صورت نوار افقی قابل پیمایش است؛ کلید تم شناور در پایین چپ و جدا از نوارهاست. بازبینی مالک و آزمون API زنده پیش از commit/push و انتشار لازم‌اند.
+
+## DEC-021: منوی همبرگری موبایل و جست‌وجوی مستقل
+
+- **Status:** OWNER-DIRECTED; IMPLEMENTED FOR LOCAL REVIEW
+- **Date:** 2026-10-02
+- **Decision:** مالک روشن کرد که منوی همبرگری موبایل باید باقی بماند. آیکون جست‌وجو مستقل از آن و کنار سبد خرید در نوار بالا قرار می‌گیرد؛ فیلد جست‌وجو با لمس آیکون باز می‌شود و داخل منوی همبرگری نیست. لینک‌های ناوبری در همان منوی همبرگری هستند. ورود و حساب فقط در نوار پایین موبایل دیده می‌شوند و کلید تم شناور پایین چپ باقی می‌ماند.
+- **Consequences:** بخش ناوبری افقی در DEC-020 با این تصمیم جایگزین شده است. باز و بسته شدن منو و جست‌وجو، Escape، صفحه‌کلید و چیدمان موبایل باید در پیش‌نمایش بررسی شوند.
 
 ## Open owner and release decisions
 

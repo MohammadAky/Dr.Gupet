@@ -12,7 +12,7 @@ import { safeImageUrl } from '../lib/image-url';
 
 /** Profile (F3): name + avatar editing; the phone number is read-only. */
 export function ProfilePage() {
-  const { user, status, applyProfile, previewMode } = useAuth();
+  const { user, status, applyProfile } = useAuth();
 
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName, setLastName] = useState(user?.lastName ?? '');
@@ -41,10 +41,6 @@ export function ProfilePage() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (previewMode) {
-      setNotice('ذخیره‌سازی در حالت نمایشی فعال نیست.');
-      return;
-    }
     const errors: Record<string, string> = {};
     if (firstName.trim().length > 50) errors.firstName = 'حداکثر ۵۰ کاراکتر';
     if (lastName.trim().length > 50) errors.lastName = 'حداکثر ۵۰ کاراکتر';
@@ -61,10 +57,6 @@ export function ProfilePage() {
 
   function pickFile(file: File | undefined) {
     if (!file) return;
-    if (previewMode) {
-      setNotice('آپلود در حالت نمایشی فعال نیست.');
-      return;
-    }
     const problem = validateUploadFile(file);
     if (problem) {
       setNotice(problem);

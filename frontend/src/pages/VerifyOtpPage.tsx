@@ -5,10 +5,9 @@ import { api } from '../api/endpoints';
 import { useAuth } from '../auth/auth-provider';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
-import { OTP_RESEND_COOLDOWN_SECONDS } from '../lib/constants';
 import { otpCodeSchema, phoneSchema } from '../lib/schemas';
 import { sanitizeInternalRedirect } from '../lib/security';
-import { clearOtpPhone, readOtpPhone } from '../auth/otp-flow';
+import { clearOtpPhone, readOtpCooldown, readOtpPhone, storeOtpCooldown } from '../auth/otp-flow';
 
 /** Step 2 of login — POST /auth/otp/verify, then the session is restored via GET /users/me. */
 export function VerifyOtpPage() {
@@ -22,17 +21,20 @@ export function VerifyOtpPage() {
 
   const [code, setCode] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>();
-  const [cooldown, setCooldown] = useState(OTP_RESEND_COOLDOWN_SECONDS);
+  const [cooldown, setCooldown] = useState(() => readOtpCooldown(phone));
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const timer = window.setInterval(() => setCooldown((value) => Math.max(0, value - 1)), 1000);
+    const timer = window.setInterval(() => setCooldown(readOtpCooldown(phone)), 1000);
     return () => window.clearInterval(timer);
-  }, [cooldown]);
+  }, [cooldown, phone]);
 
   const resend = useMutation({
     mutationFn: () => api.requestOtp(phone),
-    onSuccess: () => setCooldown(OTP_RESEND_COOLDOWN_SECONDS),
+    onSuccess: (result) => {
+      storeOtpCooldown(phone, result.cooldownSeconds);
+      setCooldown(readOtpCooldown(phone));
+    },
   });
 
   const login = useMutation({
@@ -64,14 +66,14 @@ export function VerifyOtpPage() {
       </p>
 
       <form onSubmit={handleSubmit} noValidate>
-        <Field label="کد ۵ رقمی" htmlFor="otp" error={fieldError}>
+        <Field label="کد ۵ یا ۶ رقمی" htmlFor="otp" error={fieldError}>
           <input
             id="otp"
             name="otp"
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={5}
+            maxLength={6}
             dir="ltr"
             value={code}
             onChange={(event) => setCode(event.target.value)}

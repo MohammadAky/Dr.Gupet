@@ -19,14 +19,17 @@ describe('schemas', () => {
   });
 
   describe('otpCodeSchema', () => {
-    it('accepts 5 digits', () => {
+    it('accepts 5 or 6 digits', () => {
       expect(otpCodeSchema.parse('12345')).toBe('12345');
       expect(otpCodeSchema.parse('۱۲۳۴۵')).toBe('12345');
+      expect(otpCodeSchema.parse('123456')).toBe('123456');
+      expect(otpCodeSchema.parse('۱۲۳۴۵۶')).toBe('123456');
     });
 
-    it('rejects anything not 5 digits', () => {
+    it('rejects invalid code lengths and embedded nondigits', () => {
       expect(otpCodeSchema.safeParse('1234').success).toBe(false);
-      expect(otpCodeSchema.safeParse('123456').success).toBe(false);
+      expect(otpCodeSchema.safeParse('1234567').success).toBe(false);
+      expect(otpCodeSchema.safeParse('12a345').success).toBe(false);
     });
   });
 

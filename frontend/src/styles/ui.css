@@ -536,3 +536,93 @@ textarea.ui-control {
     animation: none;
   }
 }
+
+/* Shared UI states inherit the editorial surfaces without changing behavior. */
+.ui-card,
+.ui-state,
+.ui-dialog__panel,
+.ui-toast {
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+}
+.ui-control {
+  min-height: 46px;
+  border-radius: 13px;
+}
+.ui-button {
+  min-height: 46px;
+}
+.ui-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.ui-card {
+  padding: clamp(20px, 2.3vw, 30px);
+}
+.ui-state {
+  padding: clamp(22px, 3vw, 36px);
+}
+.ui-dialog__panel {
+  border-radius: 28px;
+}
+:root[data-theme='dark'] .ui-card,
+:root[data-theme='dark'] .ui-state,
+:root[data-theme='dark'] .ui-dialog__panel,
+:root[data-theme='dark'] .ui-dialog__close,
+:root[data-theme='dark'] .ui-toast,
+:root[data-theme='dark'] .ui-control,
+:root[data-theme='dark'] .ui-tabs [role='tab'],
+:root[data-theme='dark'] .ui-pagination__item button,
+:root[data-theme='dark'] .ui-button--secondary {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme='dark'] .ui-card h3,
+:root[data-theme='dark'] .ui-state h3,
+:root[data-theme='dark'] .ui-field > label {
+  color: var(--ink);
+}
+:root[data-theme='dark'] .ui-card p,
+:root[data-theme='dark'] .ui-state p,
+:root[data-theme='dark'] .ui-field small {
+  color: var(--muted);
+}
+:root[data-theme='dark'] .ui-badge--neutral {
+  background: #2a3b2d;
+  color: #e1efe0;
+}
+:root[data-theme='dark'] .ui-badge--success,
+:root[data-theme='dark'] .ui-alert--success {
+  background: #193a29;
+  color: #c7ead1;
+}
+:root[data-theme='dark'] .ui-badge--warning,
+:root[data-theme='dark'] .ui-alert--warning {
+  background: #3b311c;
+  color: #f1e1b6;
+}
+:root[data-theme='dark'] .ui-badge--danger,
+:root[data-theme='dark'] .ui-alert--error {
+  background: #3d2423;
+  color: #f4cac7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* One brief cue on route changes; query updates and form edits keep the page steady. */
+@media (prefers-reduced-motion: no-preference) {
+  .app-main.content-page {
+    animation: site-route-enter 180ms var(--ease-out);
+  }
+}
+@keyframes site-route-enter {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 1;
+  }
+}

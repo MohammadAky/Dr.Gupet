@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import type { AuthStatus } from '../../auth/auth-provider';
 
@@ -36,11 +36,7 @@ function Icon({ name }: { name: 'search' | 'cart' | 'user' | 'menu' }) {
         <path d="M4 21a8 8 0 0 1 16 0" />
       </>
     ),
-    menu: (
-      <>
-        <path d="M4 6h16M4 12h16M4 18h16" />
-      </>
-    ),
+    menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   };
   return (
     <svg
@@ -71,26 +67,28 @@ export function Header({
   onMenuClose,
   onLogout,
 }: HeaderProps) {
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (mobileSearchOpen) mobileSearchRef.current?.focus();
+  }, [mobileSearchOpen]);
+
+  function submitMobileSearch(event: FormEvent<HTMLFormElement>) {
+    onSearchSubmit(event);
+    setMobileSearchOpen(false);
+  }
+
   return (
     <header className="app-header">
       <div className="header-main site-container">
         <div className="header-brand">
-          <button
-            type="button"
-            className="mobile-toggle"
-            aria-expanded={menuOpen}
-            aria-controls="main-navigation"
-            aria-label={menuOpen ? 'بستن فهرست' : 'باز کردن فهرست'}
-            onClick={onMenuToggle}
-          >
+          <button type="button" className="mobile-toggle" aria-expanded={menuOpen}
+            aria-controls="main-navigation" aria-label={menuOpen ? 'بستن فهرست' : 'باز کردن فهرست'}
+            onClick={() => { setMobileSearchOpen(false); onMenuToggle(); }}>
             <Icon name="menu" />
           </button>
-          <Link
-            to="/"
-            className="app-logo"
-            aria-label="دکتر گوپت، صفحهٔ اصلی"
-            onClick={onMenuClose}
-          >
+          <Link to="/" className="app-logo" aria-label="دکتر گوپت، صفحهٔ اصلی" onClick={onMenuClose}>
             <img src="/brand/logo.jpg" alt="" width="55" height="55" />
             <span>
               دکتر گوپت<small>DR. GUPET</small>
@@ -109,9 +107,23 @@ export function Header({
           </button>
         </form>
         <div className="header-actions">
+          <button
+            className="mobile-search-trigger"
+            type="button"
+            aria-label={mobileSearchOpen ? 'بستن جستجو' : 'باز کردن جستجو'}
+            aria-expanded={mobileSearchOpen}
+            aria-controls="mobile-site-search"
+            onClick={() => { onMenuClose(); setMobileSearchOpen((open) => !open); }}
+          >
+            <Icon name="search" />
+          </button>
           {status === 'authed' ? (
             <>
-              <Link to="/profile" aria-label={userName ? `${userName}، حساب من` : 'حساب من'}>
+              <Link
+                className="header-account-link"
+                to="/profile"
+                aria-label={userName ? `${userName}، حساب من` : 'حساب من'}
+              >
                 <Icon name="user" />
                 <span className="header-label">{userName ?? 'حساب من'}</span>
               </Link>
@@ -120,7 +132,7 @@ export function Header({
               </button>
             </>
           ) : (
-            <Link to="/login" aria-label="ورود">
+            <Link className="header-account-link" to="/login" aria-label="ورود">
               <Icon name="user" />
               <span className="header-label">ورود</span>
             </Link>
@@ -132,11 +144,23 @@ export function Header({
           </Link>
         </div>
       </div>
-      <nav
-        id="main-navigation"
-        className={`app-nav${menuOpen ? ' is-open' : ''}`}
-        aria-label="ناوبری اصلی"
+      <form
+        id="mobile-site-search"
+        className="mobile-search site-container"
+        role="search"
+        onSubmit={submitMobileSearch}
+        hidden={!mobileSearchOpen}
       >
+        <input
+          ref={mobileSearchRef}
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          aria-label="جستجوی محصولات در موبایل"
+          placeholder="جستجوی محصول یا برند"
+        />
+        <button type="submit">جستجو</button>
+      </form>
+      <nav id="main-navigation" className={`app-nav${menuOpen ? ' is-open' : ''}`} aria-label="ناوبری اصلی">
         <div className="app-nav__inner site-container" onClick={onMenuClose}>
           <NavLink to="/" end>
             صفحهٔ اصلی
@@ -154,15 +178,6 @@ export function Header({
             </button>
           )}
         </div>
-        <form className="mobile-search site-container" role="search" onSubmit={onSearchSubmit}>
-          <input
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            aria-label="جستجوی محصولات در موبایل"
-            placeholder="جستجوی محصول یا برند"
-          />
-          <button type="submit">جستجو</button>
-        </form>
       </nav>
     </header>
   );
