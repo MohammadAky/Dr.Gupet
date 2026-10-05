@@ -1,5 +1,14 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Compose cleanup + resilient image pulls + correct --root handoff (2026-10-05)
+
+### Fixed
+- Removed obsolete `version: '3.8'` from `docker-compose.yml` (compose v2 warning).
+- `setup.sh` now passes `--root "$ROOT_DIR"` to `ssl.sh`, so installs outside `/opt/drgupet` (e.g. `/root/Dr.Gupet`) get correct nginx `root` paths for the SPA builds.
+- `setup.sh` retries `docker compose pull mysql redis` 3× and, on failure (Docker Hub 403/rate-limit), prints actionable fixes (registry mirror, `docker save|load`, daemon proxy) instead of dying silently.
+### Docs
+- `DEPLOY.md`: new section «Docker Hub blocked (403) / image pull failures» (mirror daemon.json, save/load, proxy, retry); troubleshooting table row added.
+
 ## [Unreleased] - English ops scripts + hardening for small VMs + DEPLOY.md (2026-10-05)
 
 ### Changed

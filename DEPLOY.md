@@ -160,6 +160,7 @@ gunzip < db.sql.gz | docker exec -i pet_mysql mysql -u pet -p pet_db
 | Setup "stuck" at the SSL step | DNS not pointing at the server yet — the script now skips and tells you; run `scripts/ssl.sh` after DNS propagates |
 | Setup "stuck" at frontend builds | On 1 GB VMs `npm ci` + Vite can take 5–10 min per app — it is working; swap is enabled by setup.sh to prevent OOM |
 | First `docker compose build` is slow | Normal on 1 vCPU (10–20 min). Later runs use the Docker cache (seconds) |
+| `docker compose pull` fails with **403 Forbidden** (cloudfront) | See [Docker Hub blocked (403)](#docker-hub-blocked-403--image-pull-failures) below |
 | Site returns 502 | Backend container is down → `docker compose -f backend/docker-compose.yml logs backend` |
 | Backend keeps restarting | Missing required env in `backend/.env` (see the `env.validation` message in the logs) |
 | OTP SMS not arriving | Check `GET /admin/sms/logs`, `SMS_API_KEY` / `SMS_IR_TEMPLATE_ID`, and the `SmsLog` table |
@@ -167,3 +168,69 @@ gunzip < db.sql.gz | docker exec -i pet_mysql mysql -u pet -p pet_db
 | Out of disk | `docker system prune`, old backups in `/backups`, `docker image prune -f` |
 
 More detail (env vars, API contracts, business rules): the root [`README.md`](README.md).
+
+## 10. Docker Hub blocked (403) / image pull failures
+
+Symptom while pulling `mysql:8.4` / `redis:7-alpine`:
+
+```text
+unknown: failed to copy: httpReadSeeker: failed open: unexpected status from GET
+request to https://production.cloudfront.docker.com/... : 403 Forbidden
+```
+
+This is a **network/registry restriction** (Docker Hub rate limit or regional blocking),
+not a bug in the scripts. The backend image builds fine — only the prebuilt images fail.
+Pick ONE of these fixes, then re-run `sudo ./scripts/setup.sh ...` (it is idempotent):
+
+**A. Registry mirror (fastest):** add a pull-through mirror to the Docker daemon:
+
+```bash
+sudo tee /etc/docker/daemon.json <<'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run"
+  ]
+}
+EOF
+sudo systemctl restart docker
+cd /root/Dr.Gupet && docker compose -f backend/docker-compose.yml pull
+```
+
+> Mirrors are third parties: they can serve tampered images. Prefer trusted mirrors,
+> or use option B below for full control. Availability of public mirrors changes over
+> time — if one is down, try another.
+
+**B. `docker save` / `docker load` (most reliable):** on ANY machine that can reach
+Docker Hub (laptop, another VPS):
+
+```bash
+docker pull mysql:8.4 redis:7-alpine
+docker save mysql:8.4 redis:7-alpine | gzip > pet-images.tar.gz
+```
+
+Copy the file to the server (`scp`), then:
+
+```bash
+gunzip -c pet-images.tar.gz | docker load
+```
+
+**C. Proxy for the Docker daemon** (if you already run a VPN/proxy on the server):
+
+```bash
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo tee /etc/systemd/system/docker.service.d/proxy.conf <<'EOF'
+[Service]
+Environment="HTTPS_PROXY=http://127.0.0.1:PORT"
+Environment="NO_PROXY=localhost,127.0.0.1"
+EOF
+sudo systemctl daemon-reload && sudo systemctl restart docker
+```
+
+**D. Just retry:** `failed open` errors are sometimes transient CDN hiccups:
+
+```bash
+for i in 1 2 3; do docker compose -f backend/docker-compose.yml pull && break; sleep 10; done
+```
+
+`setup.sh` already retries the pull 3 times and prints these hints automatically.

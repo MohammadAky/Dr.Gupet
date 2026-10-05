@@ -141,6 +141,23 @@ mkdir -p "$ROOT_DIR/backend/uploads"
 # ---------- 5) build image + start stack ----------
 step "Building the backend image and starting MySQL + Redis + backend"
 info "First build takes a while on small VMs — progress below is normal, it is NOT stuck"
+
+info "Pulling base images (mysql:8.4, redis:7-alpine) with retries..."
+PULLED=0
+for attempt in 1 2 3; do
+  if compose pull mysql redis; then PULLED=1; break; fi
+  warn "Image pull failed (attempt $attempt/3) — retrying in 10s..."
+  sleep 10
+done
+if [[ $PULLED -eq 0 ]]; then
+  warn "Could not pull images from Docker Hub (403/timeouts are usually network restrictions)."
+  warn "Fixes (pick one, then re-run this script):"
+  warn "  1) Configure a registry mirror in /etc/docker/daemon.json and 'systemctl restart docker'"
+  warn "     (see DEPLOY.md, section 'Docker Hub blocked (403)')"
+  warn "  2) Load the images from a machine that can reach Docker Hub: docker save | docker load"
+  die "docker compose pull failed for mysql/redis"
+fi
+
 compose build backend
 compose up -d
 info "Stack is up"
@@ -186,7 +203,7 @@ if [[ $SKIP_SSL -eq 1 || -z "$DOMAIN" ]]; then
   [[ $SKIP_SSL -eq 1 ]] && warn "SSL skipped by request — later: sudo ./scripts/ssl.sh --domain $DOMAIN"
 else
   step "Activating SSL (skips cleanly if DNS is not ready yet)"
-  SSL_ARGS=(--domain "$DOMAIN")
+  SSL_ARGS=(--domain "$DOMAIN" --root "$ROOT_DIR")
   [[ -n "$ADMIN_DOMAIN" ]] && SSL_ARGS+=(--admin-domain "$ADMIN_DOMAIN")
   [[ -n "$EMAIL" ]] && SSL_ARGS+=(--email "$EMAIL")
   "$ROOT_DIR/scripts/ssl.sh" "${SSL_ARGS[@]}" \

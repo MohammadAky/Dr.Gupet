@@ -190,7 +190,8 @@ curl https://shop.example.com/api/v1/health     # باید پاسخ سلامت �
 - روی سرورهای ۱ هسته‌ای/۱GB، ساخت اول ایمیج و build فرانت‌ها ۵ تا ۲۰ دقیقه طول می‌کشد — طبیعی است؛ `setup.sh` برای جلوگیری از OOM خودش swap می‌سازد.
 - `update.sh` بدون `--seed` هم اجرا می‌شود — seed فقط با فلگ `--seed` (idempotent است و داده را overwrite نمی‌کند).
 - هر سه اسکریپت **root** می‌خواهند (`sudo`).
-- مسیر پیش‌فرض کد `/opt/drgupet` است؛ اگر جای دیگری clone کردید، در `ssl.sh` با `--root` بدهید.
+- مسیر کد مهم نیست — `setup.sh` خودش مسیر ریشهٔ پروژه را به `ssl.sh` پاس می‌دهد؛ اگر `ssl.sh` را تنها اجرا می‌کنید و کد جایی غیر از `/opt/drgupet` است، `--root /root/Dr.Gupet` بدهید.
+- اگر pull ایمیج‌های mysql/redis با خطای **403 Forbidden** مواجه شد (محدودیت داکرهاب)، بخش «Docker Hub blocked (403)» در [`DEPLOY.md`](DEPLOY.md) را ببینید (mirror / docker save-load).
 
 ## ۸. SSL — فعال‌سازی HTTPS
 
