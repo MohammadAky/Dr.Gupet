@@ -85,8 +85,18 @@ for i in $(seq 1 60); do
     info "Backend is healthy ✅"
     break
   fi
+  STATE="$(docker inspect -f '{{.State.Status}}' pet_backend 2>/dev/null || echo missing)"
+  RESTARTS="$(docker inspect -f '{{.RestartCount}}' pet_backend 2>/dev/null || echo 0)"
+  if [[ "$STATE" == "restarting" && "${RESTARTS:-0}" -ge 2 ]]; then
+    warn "Backend is crash-looping (restart #${RESTARTS}) — logs below"
+    compose ps || true
+    compose logs --tail=40 backend || true
+    die "Backend keeps restarting after the update — fix backend/.env / migration issues and re-run"
+  fi
   if [[ $i -eq 60 ]]; then
-    die "Backend did not become healthy — check: docker compose -f backend/docker-compose.yml logs --tail=50 backend"
+    compose ps || true
+    compose logs --tail=40 backend || true
+    die "Backend did not become healthy — see the logs above"
   fi
   [[ $((i % 10)) -eq 0 ]] && warn "Still waiting... ($((i*3))s)"
   sleep 3

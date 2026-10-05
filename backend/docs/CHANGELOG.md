@@ -1,5 +1,17 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Interactive setup wizard + backend boot fix (2026-10-05)
+
+### Fixed
+- **Backend crash-loop on first boot (production image)**: `prisma` CLI moved from `devDependencies` to `dependencies`, and the Dockerfile CMD now runs `./node_modules/.bin/prisma migrate deploy` (NOT `npx` — the production stage installs with `npm ci --omit=dev`, so `npx prisma` had no local binary and tried to download Prisma at startup). This was the cause of setup hanging at "Waiting for backend health".
+- `setup.sh` health wait now detects crash-looping (`docker inspect` restart count) and dumps container status + last 40 backend log lines automatically, then stops with a pointed message; same diagnostics added to `update.sh`.
+- `set_env` in `setup.sh` escapes sed-replacement metacharacters (`\`, `&`, `|`) so API keys with special characters are written safely.
+### Added
+- **Interactive configuration wizard in `setup.sh` (step-by-step prompts)**: store domain, admin domain, email, admin phone, SMS provider (console / sms.ir + API key, template, line), payment provider (mock / zarinpal + merchant id, sandbox). Everything is written into `backend/.env` in one run — no separate hand-editing. Flags pre-fill answers; `--non-interactive` for automation (safe test defaults). `NODE_ENV=production` is set only when BOTH real providers are configured (the backend refuses production with mock/console drivers).
+### Changed
+- `setup.sh` re-runs update wizard keys in an existing `backend/.env` while keeping generated secrets (idempotent and re-runnable to fix settings). Dockerfile `npm ci --only=production` → `npm ci --omit=dev`.
+- `DEPLOY.md` / `README.md`: wizard usage, 10-step breakdown, and a troubleshooting entry for "Waiting for backend health" hangs.
+
 ## [Unreleased] - Compose cleanup + resilient image pulls + correct --root handoff (2026-10-05)
 
 ### Fixed

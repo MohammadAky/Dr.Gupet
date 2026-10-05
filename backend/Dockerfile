@@ -29,7 +29,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install production dependencies only
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy Prisma schema and generated client
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
@@ -51,5 +51,6 @@ EXPOSE 3000
 # NOTE: all structured data lives in the external MySQL database
 # (DATABASE_URL, e.g. mysql://user:pass@mysql:3306/pet_db) — only uploaded
 # files (/app/uploads) need a mounted volume. `prisma migrate deploy` applies
-# the committed migrations on every boot.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
+# the committed migrations on every boot. The local binary is used (NOT npx)
+# so the container never needs network access at startup.
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main"]

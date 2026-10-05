@@ -9,13 +9,12 @@ All scripts in [`scripts/`](scripts/) are English, non-interactive, and safe to 
 sudo apt-get update && sudo apt-get install -y git
 git clone https://github.com/MohammadAky/Dr.Gupet.git /opt/drgupet
 cd /opt/drgupet
-sudo ./scripts/setup.sh \
-  --domain shop.example.com \
-  --admin-domain admin.example.com \
-  --email you@example.com \
-  --phone 0912xxxxxxxx \
-  --with-front
+sudo ./scripts/setup.sh
 ```
+
+The setup script **asks for everything step-by-step** (domain, admin domain, email,
+admin phone, SMS provider, payment provider) and writes the whole `backend/.env` for
+you. Use flags (`--domain`, `--phone`, …) or `--non-interactive` for automation.
 
 ---
 
@@ -50,33 +49,53 @@ issuance cleanly** if records are missing — you can finish SSL later.
 ## 3. One-time setup — `scripts/setup.sh`
 
 ```bash
-sudo ./scripts/setup.sh --domain shop.example.com \
-     [--admin-domain admin.example.com] \
-     [--email you@example.com] \
-     [--phone 0912xxxxxxxx] \
-     [--with-front] [--skip-ssl]
+sudo ./scripts/setup.sh
 ```
+
+**The script asks everything step-by-step** (just press Enter for defaults):
+
+1. Store domain (`shop.example.com`) — empty skips SSL
+2. Admin panel domain (`admin.shop.example.com`)
+3. Email for Let's Encrypt expiry notices
+4. Admin login phone — OTP codes for the admin panel are sent here
+5. **SMS provider** — `console` (test: codes in backend logs) or `sms.ir`
+   (real SMS: API key + template id + line number)
+6. **Payment provider** — `mock` (test: fake gateway) or `zarinpal`
+   (real: merchant id + sandbox yes/no)
+7. Summary → confirm → everything is written into `backend/.env` for you
+
+Flags pre-fill the answers (nothing is asked twice):
 
 | Flag | Meaning |
 |---|---|
-| `--domain` | Public store domain (fills `PUBLIC_BASE_URL`, CORS, payment URLs in `.env`) |
+| `--domain` | Public store domain (fills `PUBLIC_BASE_URL`, CORS, payment URLs) |
 | `--admin-domain` | Admin panel subdomain (separate nginx site + certificate) |
-| `--email` | Let's Encrypt expiry notifications (optional; no prompt if omitted) |
+| `--email` | Let's Encrypt expiry notifications |
 | `--phone` | `ADMIN_SEED_PHONE` — the admin login number (OTP codes go here) |
 | `--with-front` | Build `frontend/dist` + `admin/dist` on this server (needs Node 20+) |
-| `--skip-ssl` | Skip step 9 entirely |
+| `--skip-ssl` | Skip the SSL step |
+| `--non-interactive` | Never prompt (automation/CI). Missing values fall back to safe **test** defaults (console SMS, mock payments, `NODE_ENV=development`) |
 
-What the 9 steps do:
+> **Production note:** the backend **refuses to boot** with `NODE_ENV=production`
+> unless real credentials are set (`smsir` + `zarinpal` + `OTP_HASH_SECRET`).
+> The wizard only sets `NODE_ENV=production` when you provide both real providers;
+> otherwise it uses `development` so the stack boots with test drivers. You can
+> upgrade later: edit `backend/.env`, then `sudo ./scripts/update.sh`.
+
+What the 10 steps do:
 
 1. Check arguments
-2. Enable swap on small VMs (< 2 GB RAM)
-3. Install Docker, Docker Compose, nginx, certbot
-4. Generate `backend/.env` with strong random secrets (idempotent — never overwrites)
-5. Build the backend image and start MySQL + Redis + backend
-6. Wait for `GET /api/v1/health`
-7. Seed reference data + the admin user (`ADMIN_SEED_PHONE`)
-8. Optional: build the frontends
-9. Optional: SSL — skips with instructions when DNS is not ready
+2. Configuration wizard (above)
+3. Enable swap on small VMs (< 2 GB RAM)
+4. Install Docker, Docker Compose, nginx, certbot
+5. Generate `backend/.env` (strong secrets once; wizard answers always re-applied)
+6. Build the backend image and start MySQL + Redis + backend
+7. Wait for `GET /api/v1/health` — **on failure it prints container status and the
+   last backend log lines automatically** and stops early if the backend is
+   crash-looping
+8. Seed reference data + the admin user (`ADMIN_SEED_PHONE`)
+9. Optional: build the frontends
+10. Optional: SSL — skips with instructions when DNS is not ready
 
 **Set `--phone` to a real number you control** — with `SMS_DRIVER=smsir` the OTP login
 code for the admin panel is sent by real SMS to that number.
@@ -157,7 +176,8 @@ gunzip < db.sql.gz | docker exec -i pet_mysql mysql -u pet -p pet_db
 
 | Symptom | Fix |
 |---|---|
-| Setup "stuck" at the SSL step | DNS not pointing at the server yet — the script now skips and tells you; run `scripts/ssl.sh` after DNS propagates |
+| Setup hangs at **"Waiting for backend health"** | The backend is crash-looping — the script now prints container status + last log lines automatically. Typical causes: `NODE_ENV=production` without smsir/zarinpal credentials (re-run setup and answer the wizard, or edit `backend/.env`), wrong `MYSQL_PASSWORD`/`DATABASE_URL`, or a failed migration. Manual check: `docker compose -f backend/docker-compose.yml logs --tail=40 backend` |
+| Setup "stuck" at the SSL step | DNS not pointing at the server yet — the script skips and tells you; run `scripts/ssl.sh` after DNS propagates |
 | Setup "stuck" at frontend builds | On 1 GB VMs `npm ci` + Vite can take 5–10 min per app — it is working; swap is enabled by setup.sh to prevent OOM |
 | First `docker compose build` is slow | Normal on 1 vCPU (10–20 min). Later runs use the Docker cache (seconds) |
 | `docker compose pull` fails with **403 Forbidden** (cloudfront) | See [Docker Hub blocked (403)](#docker-hub-blocked-403--image-pull-failures) below |
