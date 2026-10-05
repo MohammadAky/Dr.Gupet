@@ -176,6 +176,7 @@ gunzip < db.sql.gz | docker exec -i pet_mysql mysql -u pet -p pet_db
 
 | Symptom | Fix |
 |---|---|
+| Backend crash-loop with `Prisma failed to detect the libssl/openssl version` and/or `Could not parse schema engine response ... "Error load"...` | Prisma engine/openssl mismatch on Alpine — **fixed in the current `backend/Dockerfile`** (installs the `openssl` CLI in both build stages so Prisma picks the OpenSSL 3 engines). `git pull` then `sudo ./scripts/update.sh` to rebuild the image |
 | Setup hangs at **"Waiting for backend health"** | The backend is crash-looping — the script now prints container status + last log lines automatically. Typical causes: `NODE_ENV=production` without smsir/zarinpal credentials (re-run setup and answer the wizard, or edit `backend/.env`), wrong `MYSQL_PASSWORD`/`DATABASE_URL`, or a failed migration. Manual check: `docker compose -f backend/docker-compose.yml logs --tail=40 backend` |
 | Setup "stuck" at the SSL step | DNS not pointing at the server yet — the script skips and tells you; run `scripts/ssl.sh` after DNS propagates |
 | Setup "stuck" at frontend builds | On 1 GB VMs `npm ci` + Vite can take 5–10 min per app — it is working; swap is enabled by setup.sh to prevent OOM |

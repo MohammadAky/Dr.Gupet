@@ -1,5 +1,10 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Fix Prisma/openssl crash-loop on Alpine (2026-10-05)
+
+### Fixed
+- **Backend crash-loop in the production container** (`Prisma failed to detect the libssl/openssl version ... Defaulting to "openssl-1.1.x"` then `Could not parse schema engine response: ... "Error load"... is not valid JSON`): `node:20-alpine` ships no `openssl` CLI, so Prisma's engine detection failed and selected OpenSSL 1.1 engines that cannot load against Alpine's OpenSSL 3. Both Dockerfile stages now `apk add --no-cache openssl`, making detection pick the correct `openssl-3.0.x` musl engines. Builder uses `./node_modules/.bin/prisma generate` (no npx).
+
 ## [Unreleased] - Interactive setup wizard + backend boot fix (2026-10-05)
 
 ### Fixed

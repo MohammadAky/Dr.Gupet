@@ -3,6 +3,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# The openssl CLI is REQUIRED for Prisma engine detection on Alpine:
+# without it Prisma warns "failed to detect the libssl/openssl version",
+# defaults to openssl-1.1.x engines, and then crashes with
+# "Could not parse schema engine response ... \"Error load\"...".
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package.json package-lock.json* ./
 
@@ -15,7 +21,7 @@ COPY src ./src/
 COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 
 # Build the application
 RUN npm run build
