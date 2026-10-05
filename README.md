@@ -142,7 +142,9 @@ src/
 
 ## ۶. استقرار روی سرور — قدم‌به‌قدم
 
-**پیش‌نیاز:** یک سرور Ubuntu/Debian با IP عمومی و دسترسی `sudo` (ترجیحاً ۱GB+ رم).
+> 📄 **راهنمای کامل و گام‌به‌قدم دیپلوی (انگلیسی، مناسب اجرا روی سرور): [`DEPLOY.md`](DEPLOY.md)** — شامل جدول سخت‌افزار (روی سرور ۱GB/۱هسته‌ای هم کار می‌کند)، DNS، عیب‌یابی و بکاپ. اسکریپت‌های `scripts/` کاملاً انگلیسی و non-interactive‌اند (هرگز منتظر تایپ شما نمی‌مانند).
+
+**پیش‌نیاز:** یک سرور Ubuntu/Debian با IP عمومی و دسترسی `sudo` (حداقل ۱GB رم / ۱ هسته — `setup.sh` روی سرورهای کم‌حافظه خودش swap اضافه می‌کند؛ ۲GB رم توصیه می‌شود).
 
 **۱) دریافت کد:**
 ```bash
@@ -183,8 +185,10 @@ curl https://shop.example.com/api/v1/health     # باید پاسخ سلامت �
 | `ssl.sh` | موقع فعال‌سازی/تمدید دستی SSL | نصب nginx/certbot، رندر قالب `scripts/nginx/site.conf.template` برای دامنه‌ها، صدور گواهی Let's Encrypt با redirect خودکار HTTP→HTTPS، تست تمدید خودکار |
 
 نکته‌های مهم:
-- `setup.sh` **idempotent** است؛ اگر `.env` باشد دست نمی‌زند و از اول secret نمی‌سازد.
-- `update.sh` بدون `--seed` اجرا نمی‌شود؟ می‌شود — seed فقط با فلگ `--seed` (idempotent است و داده را overwrite نمی‌کند).
+- `setup.sh` **idempotent** است؛ اگر `.env` باشد دست نمی‌زند و از اول secret نمی‌سازد. مراحل با شمارهٔ صریح `[n/9]` چاپ می‌شوند و هیچ‌جا منتظر ورودی کیبورد نمی‌ماند.
+- اگر DNS هنوز به سرور اشاره نکرده باشد، مرحلهٔ SSL (۹/۹) **تمیز رد می‌شود** (به‌جای گیر کردن) و می‌گوید بعداً `ssl.sh` را اجرا کنید.
+- روی سرورهای ۱ هسته‌ای/۱GB، ساخت اول ایمیج و build فرانت‌ها ۵ تا ۲۰ دقیقه طول می‌کشد — طبیعی است؛ `setup.sh` برای جلوگیری از OOM خودش swap می‌سازد.
+- `update.sh` بدون `--seed` هم اجرا می‌شود — seed فقط با فلگ `--seed` (idempotent است و داده را overwrite نمی‌کند).
 - هر سه اسکریپت **root** می‌خواهند (`sudo`).
 - مسیر پیش‌فرض کد `/opt/drgupet` است؛ اگر جای دیگری clone کردید، در `ssl.sh` با `--root` بدهید.
 
@@ -400,6 +404,7 @@ tar czf /backups/uploads-$(date +%F).tar.gz -C /opt/drgupet/backend uploads
 
 | سند | محتوا |
 |---|---|
+| [`DEPLOY.md`](DEPLOY.md) | راهنمای دیپلوی گام‌به‌قدم سرور (انگلیسی) |
 | [`backend/docs/SMS_IR_API.md`](backend/docs/SMS_IR_API.md) | مرجع کامل REST پیامک sms.ir (برای توسعه بدون دسترسی وب) |
 | [`backend/docs/CHANGELOG.md`](backend/docs/CHANGELOG.md) | تغییرات نسخه‌ها |
 | [`backend/docs/TEST_CHECKLIST.md`](backend/docs/TEST_CHECKLIST.md) | چک‌لیست تست دستی/پذیرش |

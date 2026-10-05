@@ -1,5 +1,15 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - English ops scripts + hardening for small VMs + DEPLOY.md (2026-10-05)
+
+### Changed
+- **All `scripts/` fully translated to English** (messages, comments, `--help`): `setup.sh`, `update.sh`, `ssl.sh`, `scripts/nginx/site.conf.template`. All scripts are now strictly non-interactive (safe under nohup/tmux).
+- **Setup no longer hangs on the final (SSL) step**: `ssl.sh` pre-checks DNS against the server's public IP and **skips certificate issuance with clear instructions** when records are missing; certbot runs under `timeout` and never prompts (`--register-unsafely-without-email` when `--email` is omitted — the interactive email `read` prompt is gone).
+- **Small-VM support (1 GB RAM / 1 vCPU)**: `setup.sh` enables a 1 GB swap file when RAM < 2 GB; frontend builds run with `NODE_OPTIONS=--max-old-space-size=768`; step progress is printed as explicit `[n/N]` counters with "still waiting" heartbeats on health checks (90×3s backend, 60×3s update).
+- nginx template: `root` lifted to server level, immutable caching for `/assets/`.
+### Added
+- **`DEPLOY.md`** — English deployment runbook (requirements, DNS, one-time setup, update flow, SSL, verification, backups, common commands, troubleshooting incl. the small-VM timing expectations).
+
 ## [Unreleased] - Server ops: `scripts/` + single README (2026-10-04)
 
 ### Added

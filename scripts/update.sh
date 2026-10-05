@@ -1,34 +1,40 @@
 #!/usr/bin/env bash
 # =====================================================================
-# update.sh — تازه‌سازی سرویس بعد از تغییر کد
+# update.sh — refresh the deployment after a code change
 #
 #   sudo ./scripts/update.sh [--seed] [--with-front] [--force]
 #
-# کارهایی که می‌کند:
-#   ۱) git pull (فقط fast-forward؛ با تغییرات محلی commit‌نشده متوقف می‌شود)
-#   ۲) ساخت دوبارهٔ ایمیج بک‌اند (با cache — اگر وابستگی‌ها عوض نشده باشند سریع است)
-#   ۳) docker compose up -d → فقط کانتینرهای تغییرکرده بازساخته می‌شوند
-#      (مهاجرت دیتابیس خودکار روی بوت اجرا می‌شود)
-#   ۴) بررسی سلامت + نمایش وضعیت
-#   ۵) (اختیاری --seed) اجرای مجدد seed بی‌خطر
-#   ۶) (اختیاری --with-front) ساخت دوبارهٔ frontend/dist و admin/dist
+# What it does (6 steps):
+#   1) git pull (fast-forward only; stops on uncommitted local changes)
+#   2) Rebuild the backend image (Docker layer cache keeps this fast)
+#   3) docker compose up -d — only changed containers are replaced
+#      (database migrations run automatically on boot)
+#   4) Health check
+#   5) Optional (--seed): re-run the idempotent seed
+#   6) Optional (--with-front): rebuild frontend/dist and admin/dist
 #
-# نکته: توقف سرویس فقط چند ثانیه است (بازساخت کانتینر بک‌اند).
+# Notes:
+#   * Downtime is a few seconds (backend container swap).
+#   * Idempotent and safe to re-run.
 # =====================================================================
 set -euo pipefail
 
+# ---------- logging helpers ----------
 if [[ -t 1 ]]; then
   G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; B=$'\e[1m'; N=$'\e[0m'
 else
   G=''; Y=''; R=''; B=''; N=''
 fi
+TOTAL_STEPS=6; STEP_NO=0
 info()  { echo "${G}[✓]${N} $*"; }
-step()  { echo "${B}▸ $*${N}"; }
+step()  { STEP_NO=$((STEP_NO+1)); echo; echo "${B}[${STEP_NO}/${TOTAL_STEPS}]${N} $*"; }
 warn()  { echo "${Y}[!]${N} $*"; }
 die()   { echo "${R}[✗]${N} $*" >&2; exit 1; }
+usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "$0"; }
 
-[[ $EUID -eq 0 ]] || die "این اسکریپت باید با root اجرا شود: sudo ./scripts/update.sh"
-
+# ---------- arguments ----------
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then usage; exit 0; fi
+step "Checking arguments"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/backend/docker-compose.yml"
 
@@ -38,73 +44,84 @@ while [[ $# -gt 0 ]]; do
     --seed)       DO_SEED=1; shift ;;
     --with-front) WITH_FRONT=1; shift ;;
     --force)      FORCE=1; shift ;;
-    -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -20; exit 0 ;;
-    *) die "آرگومان ناشناخته: $1 (راهنما: --help)" ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "Unknown argument: $1 (see --help)" ;;
   esac
 done
+[[ $EUID -eq 0 ]] || die "This script must run as root: sudo ./scripts/update.sh"
 
 compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 
-# ---------- ۱) دریافت آخرین کد ----------
-step "دریافت آخرین کد از git"
+# ---------- 1) pull latest code ----------
+step "Fetching the latest code from git"
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain)" ]]; then
   [[ $FORCE -eq 1 ]] \
-    && warn "تغییرات محلی commit‌نشده دارید (--force) — با pull ادامه می‌دهم" \
-    || die "تغییرات محلی commit‌نشده دارید؛ اول commit/push کنید یا --force بزنید"
+    && warn "You have uncommitted local changes (--force) — continuing with pull" \
+    || die "Uncommitted local changes found — commit/stash them first, or use --force"
 fi
 
 git -C "$ROOT_DIR" fetch origin --quiet
 BEHIND="$(git -C "$ROOT_DIR" rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0)"
 if [[ "$BEHIND" == "0" ]]; then
-  info "کد از قبل به‌روز است ($(git -C "$ROOT_DIR" log -1 --format='%h %s'))"
+  info "Already up to date ($(git -C "$ROOT_DIR" log -1 --format='%h %s'))"
 else
   git -C "$ROOT_DIR" pull --ff-only origin "$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
-  info "$BEHIND کامیت جدید دریافت شد: $(git -C "$ROOT_DIR" log -1 --format='%h %s')"
+  info "Pulled $BEHIND new commit(s): $(git -C "$ROOT_DIR" log -1 --format='%h %s')"
 fi
 
-# ---------- ۲) ساخت ایمیج ----------
-step "ساخت ایمیج بک‌اند (کش Docker)"
+# ---------- 2) rebuild backend image ----------
+step "Rebuilding the backend image (Docker cache)"
 compose build backend
 
-# ---------- ۳) اجرای نسخهٔ جدید ----------
-step "تازه‌سازی کانتینرها (مهاجرت دیتابیس خودکار روی بوت)"
+# ---------- 3) apply the new version ----------
+step "Recreating changed containers (DB migrations run automatically on boot)"
 compose up -d
-info "سرویس‌ها تازه شدند"
+info "Services refreshed"
 
-# ---------- ۴) بررسی سلامت ----------
-step "بررسی سلامت بک‌اند"
-for i in $(seq 1 40); do
-  if curl -fsS http://127.0.0.1:3000/api/v1/health >/dev/null 2>&1; then
-    info "بک‌اند سالم است ✅"
+# ---------- 4) health check ----------
+step "Checking backend health"
+for i in $(seq 1 60); do
+  if curl -fsS --max-time 3 http://127.0.0.1:3000/api/v1/health >/dev/null 2>&1; then
+    info "Backend is healthy ✅"
     break
   fi
-  [[ $i -eq 40 ]] && die "بک‌اند سالم نشد — لاگ: docker compose -f backend/docker-compose.yml logs --tail=50 backend"
+  if [[ $i -eq 60 ]]; then
+    die "Backend did not become healthy — check: docker compose -f backend/docker-compose.yml logs --tail=50 backend"
+  fi
+  [[ $((i % 10)) -eq 0 ]] && warn "Still waiting... ($((i*3))s)"
   sleep 3
 done
 
-# ---------- ۵) seed (اختیاری؛ بی‌خطر/upsert) ----------
+# ---------- 5) optional seed ----------
 if [[ $DO_SEED -eq 1 ]]; then
-  step "اجرای seed (idempotent)"
+  step "Running seed (idempotent)"
   compose exec -T backend npm run prisma:seed
+else
+  step "Skipping seed (use --seed to run it)"
 fi
 
-# ---------- ۶) فرانت‌ها (اختیاری) ----------
+# ---------- 6) optional frontend rebuild ----------
 if [[ $WITH_FRONT -eq 1 ]]; then
-  step "ساخت دوبارهٔ frontend/dist و admin/dist"
+  step "Rebuilding frontend/dist and admin/dist"
   if command -v npm >/dev/null; then
-    (cd "$ROOT_DIR/frontend" && npm ci && npm run build)
-    (cd "$ROOT_DIR/admin" && npm ci && npm run build)
-    info "خروجی فرانت‌ها تازه شد (nginx نیازی به reload ندارد)"
+    export NODE_OPTIONS=--max-old-space-size=768
+    info "Building frontend..."
+    (cd "$ROOT_DIR/frontend" && npm ci --no-audit --no-fund && npm run build)
+    info "Building admin panel..."
+    (cd "$ROOT_DIR/admin" && npm ci --no-audit --no-fund && npm run build)
+    info "Frontend builds are fresh (no nginx reload needed)"
   else
-    warn "npm روی سرور نیست — فرانت‌ها را در CI بسازید یا Node 20+ نصب کنید"
+    warn "npm not found on this server — build the frontends in CI or install Node 20+"
   fi
+else
+  step "Skipping frontend rebuilds (use --with-front after UI changes)"
 fi
 
-# ---------- پاک‌سازی ----------
+# ---------- cleanup ----------
 docker image prune -f >/dev/null
 
 echo
-info "تازه‌سازی کامل شد ✅"
+info "Update finished ✅"
 compose ps
 echo
-echo "لاگ زنده:  docker compose -f backend/docker-compose.yml logs -f backend"
+echo "Live logs:  docker compose -f backend/docker-compose.yml logs -f backend"

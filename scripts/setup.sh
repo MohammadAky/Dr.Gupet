@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# setup.sh — راه‌اندازی اولیهٔ سرور (فقط یک‌بار؛ اجرای مجدد بی‌خطر است)
+# setup.sh — one-time server setup for Dr. Gupet
 #
 #   sudo ./scripts/setup.sh --domain shop.example.com \
 #        [--admin-domain admin.example.com] \
@@ -8,34 +8,45 @@
 #        [--phone 09120000000] \
 #        [--with-front] [--skip-ssl]
 #
-# کارهایی که می‌کند:
-#   ۱) نصب Docker (+ Compose) و nginx و certbot در صورت نبود
-#   ۲) ساخت backend/.env با secretهای قوی (JWT، OTP، رمز MySQL) و تنظیم دامنه‌ها
-#   ۳) ساخت و بالا آوردن پشته (MySQL + Redis + بک‌اند) با docker compose
-#   ۴) صبر تا سلامت بک‌اند + اجرای seed (داده‌های مرجع و ادمین)
-#   ۵) (اختیاری --with-front) ساخت خروجی فرانت‌اند و پنل ادمین
-#   ۶) (اختیاری) فراخوانی scripts/ssl.sh برای HTTPS
+# What it does (9 steps):
+#   1) Check arguments
+#   2) Enable swap on small VMs (< 2 GB RAM) so builds never stall
+#   3) Install Docker, Docker Compose, nginx and certbot
+#   4) Generate backend/.env with strong random secrets
+#   5) Build the backend image and start the stack (MySQL + Redis + backend)
+#   6) Wait for backend health (GET /api/v1/health)
+#   7) Seed reference data + the admin user (ADMIN_SEED_PHONE)
+#   8) Optional (--with-front): build frontend/ and admin/ (Node 20+)
+#   9) Optional: activate SSL — skips cleanly when DNS is not ready
+#
+# Notes:
+#   * Never prompts for input: safe to run unattended (nohup/tmux).
+#   * Idempotent: an existing backend/.env is left untouched.
+#   * The first backend image build can take 5-15 minutes on a 1 vCPU VM.
 # =====================================================================
 set -euo pipefail
 
+# ---------- logging helpers ----------
 if [[ -t 1 ]]; then
   G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; B=$'\e[1m'; N=$'\e[0m'
 else
   G=''; Y=''; R=''; B=''; N=''
 fi
+TOTAL_STEPS=9; STEP_NO=0
 info()  { echo "${G}[✓]${N} $*"; }
-step()  { echo "${B}▸ $*${N}"; }
+step()  { STEP_NO=$((STEP_NO+1)); echo; echo "${B}[${STEP_NO}/${TOTAL_STEPS}]${N} $*"; }
 warn()  { echo "${Y}[!]${N} $*"; }
 die()   { echo "${R}[✗]${N} $*" >&2; exit 1; }
+usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "$0"; }
 
-[[ $EUID -eq 0 ]] || die "این اسکریپت باید با root اجرا شود: sudo ./scripts/setup.sh"
-
+# ---------- 1) arguments ----------
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then usage; exit 0; fi
+step "Checking arguments"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/backend/docker-compose.yml"
 ENV_FILE="$ROOT_DIR/backend/.env"
 ENV_EXAMPLE="$ROOT_DIR/backend/.env.example"
 
-# ---------- آرگومان‌ها ----------
 DOMAIN="" ADMIN_DOMAIN="" EMAIL="" PHONE="09120000000" WITH_FRONT=0 SKIP_SSL=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,35 +56,51 @@ while [[ $# -gt 0 ]]; do
     --phone)        PHONE="${2:?}"; shift 2 ;;
     --with-front)   WITH_FRONT=1; shift ;;
     --skip-ssl)     SKIP_SSL=1; shift ;;
-    -h|--help)      grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -20; exit 0 ;;
-    *) die "آرگومان ناشناخته: $1 (راهنما: --help)" ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "Unknown argument: $1 (see --help)" ;;
   esac
 done
+[[ $EUID -eq 0 ]] || die "This script must run as root: sudo ./scripts/setup.sh"
+[[ -n "$DOMAIN" || $SKIP_SSL -eq 1 ]] || warn "No --domain given — URLs in .env stay on example.com and SSL is skipped"
 
 compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 
-# ---------- ۱) نصب Docker و nginx ----------
-step "بررسی/نصب Docker، Compose، nginx و certbot"
+# ---------- 2) swap for small VMs ----------
+step "Checking RAM / swap (1 GB VMs need swap for Docker + npm builds)"
+MEM_KB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)"
+if [[ "$MEM_KB" -lt 2000000 ]] && ! swapon --show | grep -q .; then
+  fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  info "1 GB swap enabled (RAM: $((MEM_KB/1024)) MB)"
+else
+  info "No swap change needed (RAM: $((MEM_KB/1024)) MB)"
+fi
+
+# ---------- 3) install Docker + nginx + certbot ----------
+step "Installing Docker, Docker Compose, nginx and certbot"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl gnupg openssl nginx certbot python3-certbot-nginx
 
 if ! command -v docker >/dev/null; then
-  step "نصب Docker (اسکریپت رسمی)"
+  info "Installing Docker (official get.docker.com script)"
   curl -fsSL https://get.docker.com | sh
   systemctl enable --now docker
 fi
 docker compose version >/dev/null 2>&1 \
   || apt-get install -y -qq docker-compose-plugin
-info "Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compose آماده است"
+info "Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compose ready"
 
-# ---------- ۲) ساخت فایل .env ----------
-step "آماده‌سازی backend/.env"
+# ---------- 4) generate backend/.env ----------
+step "Preparing backend/.env"
 if [[ -f "$ENV_FILE" ]]; then
-  warn "backend/.env از قبل وجود دارد — دست نمی‌خورد (در صورت نیاز دستی ویرایش کنید)"
+  warn "backend/.env already exists — left untouched (edit it manually if needed)"
 else
   cp "$ENV_EXAMPLE" "$ENV_FILE"
-  # secretهای قوی
+
   JWT_ACCESS_SECRET="$(openssl rand -hex 32)"
   JWT_REFRESH_SECRET="$(openssl rand -hex 32)"
   OTP_HASH_SECRET="$(openssl rand -hex 32)"
@@ -87,10 +114,10 @@ else
     -e "s|^ADMIN_SEED_PHONE=.*|ADMIN_SEED_PHONE=$PHONE|" \
     "$ENV_FILE"
 
-  # رمزهای MySQL برای interpolation در docker-compose
+  # MySQL passwords for interpolation in docker-compose.yml
   cat >> "$ENV_FILE" <<EOF
 
-# --- ساخته‌شده توسط scripts/setup.sh ---
+# --- generated by scripts/setup.sh ---
 MYSQL_PASSWORD=$MYSQL_PASSWORD
 MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
 EOF
@@ -106,56 +133,69 @@ EOF
       "$ENV_FILE"
   fi
   chmod 600 "$ENV_FILE"
-  info "backend/.env ساخته شد (secretها تولید شدند؛ فقط مالک فایل می‌خواند)"
+  info "backend/.env created (strong secrets generated; readable by owner only)"
 fi
 
 mkdir -p "$ROOT_DIR/backend/uploads"
 
-# ---------- ۳) ساخت و اجرای پشته ----------
-step "ساخت ایمیج بک‌اند و بالا آوردن پشته (MySQL + Redis + بک‌اند)"
-compose build
+# ---------- 5) build image + start stack ----------
+step "Building the backend image and starting MySQL + Redis + backend"
+info "First build takes a while on small VMs — progress below is normal, it is NOT stuck"
+compose build backend
 compose up -d
-info "کانتینرها در حال بالا آمدن هستند"
+info "Stack is up"
 
-# ---------- ۴) انتظار برای سلامت + seed ----------
-step "انتظار برای سلامت بک‌اند (GET /api/v1/health)"
-for i in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:3000/api/v1/health >/dev/null 2>&1; then
-    info "بک‌اند سالم است"
+# ---------- 6) wait for backend health ----------
+step "Waiting for backend health (GET /api/v1/health)"
+for i in $(seq 1 90); do
+  if curl -fsS --max-time 3 http://127.0.0.1:3000/api/v1/health >/dev/null 2>&1; then
+    info "Backend is healthy"
     break
   fi
-  [[ $i -eq 60 ]] && die "بک‌اند سالم نشد — لاگ: docker compose -f backend/docker-compose.yml logs backend"
+  if [[ $i -eq 90 ]]; then
+    die "Backend did not become healthy — check: docker compose -f backend/docker-compose.yml logs backend"
+  fi
+  [[ $((i % 10)) -eq 0 ]] && warn "Still waiting... ($((i*3))s) — first boot runs migrations"
   sleep 3
 done
 
-step "اجرای seed (داده‌های مرجع + کاربر ادمین از ADMIN_SEED_PHONE)"
-compose exec -T backend npm run prisma:seed || warn "seed ناموفق بود — بعداً دستی اجرا کنید"
+# ---------- 7) seed ----------
+step "Seeding reference data + admin user (ADMIN_SEED_PHONE)"
+compose exec -T backend npm run prisma:seed || warn "Seed failed — run it later: docker compose -f backend/docker-compose.yml exec backend npm run prisma:seed"
 
-# ---------- ۵) فرانت‌اند و پنل (اختیاری) ----------
+# ---------- 8) optional frontend builds ----------
 if [[ $WITH_FRONT -eq 1 ]]; then
-  step "ساخت خروجی فرانت‌اند و پنل ادمین (نیازمند Node 20+)"
+  step "Building frontend/dist and admin/dist (Node 20+)"
   if command -v npm >/dev/null; then
-    (cd "$ROOT_DIR/frontend" && npm ci && npm run build)
-    (cd "$ROOT_DIR/admin" && npm ci && npm run build)
-    info "frontend/dist و admin/dist ساخته شدند"
+    export NODE_OPTIONS=--max-old-space-size=768
+    info "Building frontend..."
+    (cd "$ROOT_DIR/frontend" && npm ci --no-audit --no-fund && npm run build)
+    info "Building admin panel..."
+    (cd "$ROOT_DIR/admin" && npm ci --no-audit --no-fund && npm run build)
+    info "frontend/dist and admin/dist are ready"
   else
-    warn "npm پیدا نشد — فرانت‌ها را بعداً روی همین سرور یا CI بسازید"
+    warn "npm not found — build the frontends later (or in CI) and re-run scripts/ssl.sh"
   fi
+else
+  step "Skipping frontend builds (use --with-front to build them here)"
 fi
 
-# ---------- ۶) SSL ----------
-if [[ $SKIP_SSL -eq 0 && -n "$DOMAIN" ]]; then
-  step "فعال‌سازی SSL"
+# ---------- 9) optional SSL ----------
+if [[ $SKIP_SSL -eq 1 || -z "$DOMAIN" ]]; then
+  step "Skipping SSL"
+  [[ $SKIP_SSL -eq 1 ]] && warn "SSL skipped by request — later: sudo ./scripts/ssl.sh --domain $DOMAIN"
+else
+  step "Activating SSL (skips cleanly if DNS is not ready yet)"
   SSL_ARGS=(--domain "$DOMAIN")
   [[ -n "$ADMIN_DOMAIN" ]] && SSL_ARGS+=(--admin-domain "$ADMIN_DOMAIN")
   [[ -n "$EMAIL" ]] && SSL_ARGS+=(--email "$EMAIL")
-  "$ROOT_DIR/scripts/ssl.sh" "${SSL_ARGS[@]}"
-elif [[ $SKIP_SSL -eq 1 ]]; then
-  warn "SSL به‌درخواست شما رد شد — بعداً: sudo ./scripts/ssl.sh --domain $DOMAIN"
+  "$ROOT_DIR/scripts/ssl.sh" "${SSL_ARGS[@]}" \
+    || warn "SSL activation failed — fix the issue and re-run: sudo ./scripts/ssl.sh --domain $DOMAIN"
 fi
 
 echo
-info "راه‌اندازی کامل شد ✅"
-echo "  ${B}وضعیت:${N}      cd $ROOT_DIR && docker compose -f backend/docker-compose.yml ps"
-echo "  ${B}لاگ‌ها:${N}      docker compose -f backend/docker-compose.yml logs -f backend"
-echo "  ${B}به‌روزرسانی:${N} sudo $ROOT_DIR/scripts/update.sh"
+info "Setup finished ✅"
+echo "  ${B}Status:${N}   cd $ROOT_DIR && docker compose -f backend/docker-compose.yml ps"
+echo "  ${B}Logs:${N}     docker compose -f backend/docker-compose.yml logs -f backend"
+echo "  ${B}Update:${N}   sudo $ROOT_DIR/scripts/update.sh"
+echo "  ${B}Guide:${N}    $ROOT_DIR/DEPLOY.md"
