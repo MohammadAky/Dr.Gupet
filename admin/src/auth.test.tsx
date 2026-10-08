@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { useState } from "react";
 import { AuthProvider, useAuth } from "./auth";
+vi.hoisted(() => { vi.stubEnv("VITE_API_BASE_URL", "/api/v1"); });
 
 function response(data: unknown, status = 200): Response {
   return new Response(
@@ -58,6 +59,7 @@ function Harness() {
           .catch((error: Error) => setResult(error.message))
       }>parallel</button>
       <button onClick={auth.logout}>logout</button>
+      <button onClick={() => void auth.loginPassword("kian", "test password").then(() => setResult("ok")).catch((error: Error) => setResult(error.message))}>password login</button>
       <span data-testid="result">{result}</span>
     </div>
   );
@@ -77,6 +79,29 @@ afterEach(() => {
 });
 
 describe("admin identity and browser storage", () => {
+  it("requires the live admin identity gate for password login and keeps credentials and tokens out of storage", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(response({ accessToken: "password-a", refreshToken: "password-r" }))
+      .mockResolvedValueOnce(response({ id: 1, username: "kian", phone: "09120000000", role: "ADMIN" }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(screen.getByText("password login"));
+    await waitFor(() => expect(screen.getByTestId("mode").textContent).toBe("admin"));
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/v1/auth/password/login", "/api/v1/admin/me"]);
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ username: "kian", password: "test password" });
+    expect(fetchMock.mock.calls[1]![1].headers.Authorization).toBe("Bearer password-a");
+    expect(localStorage.length).toBe(0); expect(sessionStorage.length).toBe(0); expect(document.cookie).toBe("");
+  });
+
+  it("ignores a password login response after logout", async () => {
+    let finish!: (value: Response) => void;
+    const fetchMock = vi.fn().mockImplementation(() => new Promise<Response>((resolve) => { finish = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(screen.getByText("password login")); fireEvent.click(screen.getByText("logout"));
+    finish(response({ accessToken: "late-a", refreshToken: "late-r" }));
+    await waitFor(() => expect(screen.getByTestId("result").textContent).toContain("ورود لغو شد"));
+    expect(screen.getByTestId("mode").textContent).toBe("guest"); expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("rejects a non-admin response before exposing the dashboard", async () => {
     const fetchMock = vi
       .fn()

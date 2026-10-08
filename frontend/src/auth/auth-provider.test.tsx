@@ -11,7 +11,15 @@ import { AuthProvider, useAuth } from './auth-provider';
 
 vi.mock('../api/client', () => ({ setAuthBridge: vi.fn() }));
 vi.mock('../api/endpoints', () => ({
-  api: { refresh: vi.fn(), me: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() },
+  api: {
+    refresh: vi.fn(),
+    me: vi.fn(),
+    verifyOtp: vi.fn(),
+    logout: vi.fn(),
+    loginPassword: vi.fn(),
+    registerPassword: vi.fn(),
+    changePassword: vi.fn(),
+  },
 }));
 
 const profile = {
@@ -19,6 +27,7 @@ const profile = {
   firstName: 'کاربر',
   lastName: null,
   phone: '09123456789',
+  username: null,
   avatar: null,
   role: 'USER' as const,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -257,6 +266,44 @@ describe('AuthProvider identity boundaries', () => {
       isNewUser: false,
     };
   }
+
+  it('clears the previous identity cache for password login and rotates the session after password change', async () => {
+    await mountSession();
+    queryClient.setQueryData(queryKeys.cart, { account: 'previous' });
+    vi.mocked(api.loginPassword).mockResolvedValue(loginResult(1));
+    await act(async () =>
+      currentAuth.loginPassword({ username: 'kian', password: 'test password' }),
+    );
+    expect(queryClient.getQueryData(queryKeys.cart)).toBeUndefined();
+    expect(tokenStorage.get()).toBe('refresh-1');
+    vi.mocked(api.changePassword).mockResolvedValue({
+      ...loginResult(1),
+      refreshToken: 'changed-refresh',
+    });
+    await act(async () => currentAuth.changePassword('test password', 'new test password'));
+    expect(api.changePassword).toHaveBeenCalledWith({
+      currentPassword: 'test password',
+      newPassword: 'new test password',
+    });
+    expect(tokenStorage.get()).toBe('changed-refresh');
+    expect(container.querySelector('output')?.textContent).toBe('authed:1');
+  });
+
+  it('rejects delayed password login after logout without storing tokens', async () => {
+    await mountSession();
+    const login = deferred<ReturnType<typeof loginResult>>();
+    vi.mocked(api.loginPassword).mockReturnValue(login.promise);
+    const attempt = currentAuth.loginPassword({ username: 'kian', password: 'test password' });
+    const assertion = expect(attempt).rejects.toThrow('ورود لغو شد');
+    await act(async () => currentAuth.logout());
+    await act(async () => {
+      login.resolve(loginResult(1));
+      await assertion;
+    });
+    expect(tokenStorage.get()).toBeNull();
+    expect(api.me).not.toHaveBeenCalled();
+    expect(container.querySelector('output')?.textContent).toBe('guest:');
+  });
 
   it('does not restore a delayed bootstrap profile after logout', async () => {
     tokenStorage.set('old-refresh');

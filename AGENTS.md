@@ -15,3 +15,12 @@
 - User-facing copy is Persian except the owner-directed English first-visit cookie notice (DEC-011); the interface is RTL, and code identifiers are English. Apply the project's design tokens, accessibility rules, privacy controls, and asset-provenance rules.
 - Never commit secrets, tokens, `.env` files, or machine-local paths. `.env.example` documents variables; real values stay ignored.
 - Preview the finished work for the owner and receive approval **before any commit, push, PR, or publication**. Record test results and outstanding limitations with the preview. This explicit owner instruction overrides any default commit-per-phase timing.
+
+## Release consistency
+
+- Keep the local checkout, GitHub `main`, and VPS on the same owner-approved release revision. Before reconciliation, inspect their differences, preserve uncommitted work, and save diffs and backups before replacing files or builds.
+- Test changes locally, present the results for owner approval, then commit and push the approved changes to `main`. Deploy that exact Git SHA and build frontend, admin, and backend from it; verify the deployed revision instead of assuming a pull or restart synchronized the release.
+- Back up the database before deployment and apply required migrations only. Never run demo seeds automatically during a production release.
+- Keep secrets in each environment's private configuration; never synchronize `.env` files or credentials through Git.
+- After deployment, verify health, customer and admin authentication, SMS provider behavior, and role access against the live release. Record failed, blocked, and untested checks honestly; mocks do not establish live acceptance.
+- Make source changes in the local review workflow; do not make unattended edits directly to live source. Preserve the previous release SHA and builds for rollback, and confirm database compatibility before restoring them.

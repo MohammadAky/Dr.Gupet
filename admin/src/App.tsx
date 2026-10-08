@@ -10,6 +10,8 @@ import { Operations } from "./Operations";
 import { Reports } from "./Reports";
 import { type DashboardData } from "./dashboard-data";
 import { ThemeToggle } from "./ThemeToggle";
+import { PasswordInput } from "./PasswordInput";
+import { normalizeUsername } from "./password";
 import {
   periodLabels,
   periodQuery,
@@ -54,7 +56,10 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function Login() {
-  const { requestOtp, verifyOtp } = useAuth();
+  const { requestOtp, verifyOtp, loginPassword } = useAuth();
+  const [method, setMethod] = useState<"password" | "otp">("password");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -124,8 +129,23 @@ function Login() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending.current || (step === "phone" && remaining > 0)) return;
+    if (pending.current || (method === "otp" && step === "phone" && remaining > 0)) return;
     setError("");
+    if (method === "password") {
+      if (!/^[a-z0-9_.]{3,32}$/.test(normalizeUsername(username)) || !password) {
+        setError("نام کاربری و رمز عبور را وارد کنید."); return;
+      }
+      pending.current = true; setBusy(true);
+      try {
+        await loginPassword(normalizeUsername(username), password);
+        if (mounted.current) setPassword("");
+      } catch {
+        if (mounted.current) setError("ورود انجام نشد. اطلاعات و دسترسی حساب را بررسی کنید یا دوباره تلاش کنید.");
+      } finally {
+        pending.current = false; if (mounted.current) setBusy(false);
+      }
+      return;
+    }
     const normalizedPhone = normalizeDigits(phone);
     if (!/^09\d{9}$/.test(normalizedPhone)) {
       setError("شمارهٔ موبایل را به صورت ۰۹ و ۹ رقم بعدی وارد کنید.");
@@ -168,13 +188,25 @@ function Login() {
       <section className="login-card" aria-labelledby="login-title">
         <span className="eyebrow">ورود امن</span>
         <h2 id="login-title">ورود مدیر</h2>
+        <div className="auth-methods" role="group" aria-label="روش ورود">
+          <button type="button" aria-pressed={method === "password"} disabled={busy}
+            onClick={() => { setMethod("password"); setError(""); setNotice(""); setCode(""); }}>نام کاربری و رمز</button>
+          <button type="button" aria-pressed={method === "otp"} disabled={busy}
+            onClick={() => { setMethod("otp"); setPassword(""); setError(""); setNotice(""); }}>کد پیامکی</button>
+        </div>
         <p>
-          {step === "phone"
+          {method === "password" ? "نام کاربری و رمز حساب مدیر را وارد کنید." : step === "phone"
             ? "شمارهٔ حساب مدیر را وارد کنید تا کد یک‌بارمصرف دریافت شود."
             : `کد ارسال‌شده به ${phone} را وارد کنید.`}
         </p>
-        <form onSubmit={(event) => void submit(event)}>
-          {step === "phone" ? (
+        <form onSubmit={(event) => void submit(event)} noValidate>
+          {method === "password" ? <>
+            <label htmlFor="admin-username">نام کاربری</label>
+            <input id="admin-username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} dir="ltr"
+              value={username} disabled={busy} onChange={(event) => setUsername(event.target.value)} />
+            <label htmlFor="admin-password">رمز عبور</label>
+            <PasswordInput id="admin-password" value={password} onChange={setPassword} disabled={busy} autoComplete="current-password" />
+          </> : step === "phone" ? (
             <label>
               شمارهٔ موبایل
               <input
@@ -209,27 +241,29 @@ function Login() {
             </p>
           )}
           {notice && <p className="login-notice" role="status">{notice}</p>}
+          {method === "password" && <button type="button" className="button button--text" disabled={busy}
+            onClick={() => { setMethod("otp"); setPassword(""); setError(""); }}>رمز را فراموش کرده‌اید؟ ورود با کد پیامکی</button>}
           <button
             type="submit"
             className="button button--primary"
-            disabled={busy || (step === "phone" && remaining > 0)}
+            disabled={busy || (method === "otp" && step === "phone" && remaining > 0)}
           >
             {busy
               ? "در حال بررسی…"
-              : step === "phone"
+              : method === "password" ? "ورود به پنل" : step === "phone"
                 ? "دریافت کد"
                 : "ورود به پنل"}
           </button>
-          {step === "code" && (
+          {method === "otp" && step === "code" && (
             <button type="button" className="button button--text"
               disabled={busy || remaining > 0} onClick={() => void resend()}>
               {remaining > 0 ? `ارسال مجدد تا ${number.format(remaining)} ثانیه دیگر` : "ارسال مجدد کد"}
             </button>
           )}
-          {step === "phone" && remaining > 0 && (
+          {method === "otp" && step === "phone" && remaining > 0 && (
             <p className="login-notice">ارسال مجدد تا {number.format(remaining)} ثانیه دیگر</p>
           )}
-          {step === "code" && (
+          {method === "otp" && step === "code" && (
             <button
               type="button"
               className="button button--text"

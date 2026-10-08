@@ -1,7 +1,7 @@
 # Dr. Gupet — Deployment Guide
 
 Step-by-step runbook to deploy and operate Dr. Gupet on a fresh server.
-All scripts in [`scripts/`](scripts/) are English, non-interactive, and safe to re-run.
+Scripts in [`scripts/`](scripts/) are English. Setup is a one-time interactive wizard; updates require an approved full Git SHA and a clean checkout.
 
 **TL;DR on a fresh Ubuntu/Debian server:**
 
@@ -59,8 +59,8 @@ sudo ./scripts/setup.sh
 3. Email for Let's Encrypt expiry notices
 4. Admin login phone — OTP codes for the admin panel are sent here
 5. **SMS provider** — `console` (test: codes in backend logs) or `sms.ir`
-   (real SMS: API key + template id + line number)
-6. **Payment provider** — `mock` (test: fake gateway) or `zarinpal`
+   (real SMS: API key + template id; line number is only for bulk notifications)
+6. **Payment provider** — `disabled` (default), `zarinpal`, or local-only `mock`
    (real: merchant id + sandbox yes/no)
 7. Summary → confirm → everything is written into `backend/.env` for you
 
@@ -74,13 +74,12 @@ Flags pre-fill the answers (nothing is asked twice):
 | `--phone` | `ADMIN_SEED_PHONE` — the admin login number (OTP codes go here) |
 | `--with-front` | Build `frontend/dist` + `admin/dist` on this server (needs Node 20+) |
 | `--skip-ssl` | Skip the SSL step |
-| `--non-interactive` | Never prompt (automation/CI). Missing values fall back to safe **test** defaults (console SMS, mock payments, `NODE_ENV=development`) |
+| `--non-interactive` | Never prompt. Public-domain setup fails if real SMS credentials are not supplied; it never publishes development auth |
 
 > **Production note:** the backend **refuses to boot** with `NODE_ENV=production`
-> unless real credentials are set (`smsir` + `zarinpal` + `OTP_HASH_SECRET`).
-> The wizard only sets `NODE_ENV=production` when you provide both real providers;
-> otherwise it uses `development` so the stack boots with test drivers. You can
-> upgrade later: edit `backend/.env`, then `sudo ./scripts/update.sh`.
+> unless real SMS credentials and `OTP_HASH_SECRET` are set, with payments either
+> `disabled` or a licensed `zarinpal` gateway. Public setup rejects mock payments,
+> console SMS and Zarinpal sandbox; it clears fixed development OTPs.
 
 What the 10 steps do:
 
@@ -88,35 +87,46 @@ What the 10 steps do:
 2. Configuration wizard (above)
 3. Enable swap on small VMs (< 2 GB RAM)
 4. Install Docker, Docker Compose, nginx, certbot
-5. Generate `backend/.env` (strong secrets once; wizard answers always re-applied)
+5. Generate a new private `backend/.env`; an existing file stops setup
 6. Build the backend image and start MySQL + Redis + backend
 7. Wait for `GET /api/v1/health` — **on failure it prints container status and the
    last backend log lines automatically** and stops early if the backend is
    crash-looping
-8. Seed reference data + the admin user (`ADMIN_SEED_PHONE`)
+8. Local-only demo seed; provision approved data and the first admin separately in production
 9. Optional: build the frontends
 10. Optional: SSL — skips with instructions when DNS is not ready
 
 **Set `--phone` to a real number you control** — with `SMS_DRIVER=smsir` the OTP login
 code for the admin panel is sent by real SMS to that number.
 
-If the script fails at some step, fix the cause and simply re-run it: every step is
-idempotent. `backend/.env` is created only once, so re-runs keep your secrets.
+An existing `backend/.env` stops setup before changes. Preserve it, diagnose the
+failed step, and use the update workflow for an existing deployment. Do not run
+the demo seed on production or assume `ADMIN_SEED_PHONE` alone creates an admin.
 
 ## 4. After every code change — `scripts/update.sh`
 
 ```bash
 cd /opt/drgupet
-sudo ./scripts/update.sh [--seed] [--with-front] [--force]
+sudo ./scripts/update.sh --revision FULL_APPROVED_GIT_SHA --with-front
 ```
 
-1. `git pull` (fast-forward only; refuses dirty trees unless `--force`)
-2. Rebuild the backend image (Docker cache keeps this fast)
+1. Require clean `main`, fetch `origin/main`, verify the approved SHA is published,
+   and advance only by fast-forward. There is no dirty-tree bypass.
+2. Preserve a private MySQL dump, rollback image, previous SHA and existing dist
+   builds. Build both SPAs with `/api/v1` before replacing the backend image.
 3. `docker compose up -d` — only changed containers are replaced; **DB migrations run
    automatically on boot**; downtime is a few seconds
 4. Health check
-5. `--seed`: re-run the idempotent seed (e.g. after changing `ADMIN_SEED_PHONE`)
-6. `--with-front`: rebuild the SPA bundles (after UI changes)
+5. Demo seed is prohibited with production configuration; reviewed migrations only.
+6. `--with-front` is required when frontend/admin sources changed. Check the actual
+   Nginx root: an externally staged release must be promoted separately; rebuilding
+   checkout dist does not update that directory. Verify deployed assets and API,
+   customer/admin OTP, current roles and refresh/logout after release.
+
+The mandatory workflow for both apps and API is local tests, owner approval,
+commit/push to `main`, then deploy that exact SHA. Do not copy uncommitted source
+onto VPS. Credentials stay private per environment, never in Git. Preserve the
+previous release and confirm schema compatibility before any rollback.
 
 ## 5. SSL — `scripts/ssl.sh`
 
@@ -176,8 +186,8 @@ gunzip < db.sql.gz | docker exec -i pet_mysql mysql -u pet -p pet_db
 
 | Symptom | Fix |
 |---|---|
-| Backend crash-loop with `Prisma failed to detect the libssl/openssl version` and/or `Could not parse schema engine response ... "Error load"...` | Prisma engine/openssl mismatch on Alpine — **fixed in the current `backend/Dockerfile`** (installs the `openssl` CLI in both build stages so Prisma picks the OpenSSL 3 engines). `git pull` then `sudo ./scripts/update.sh` to rebuild the image |
-| Setup hangs at **"Waiting for backend health"** | The backend is crash-looping — the script now prints container status + last log lines automatically. Typical causes: `NODE_ENV=production` without smsir/zarinpal credentials (re-run setup and answer the wizard, or edit `backend/.env`), wrong `MYSQL_PASSWORD`/`DATABASE_URL`, or a failed migration. Manual check: `docker compose -f backend/docker-compose.yml logs --tail=40 backend` |
+| Backend crash-loop with OpenSSL/Prisma engine errors | OpenSSL is now installed in both Docker stages. Preserve server changes, publish the approved correction to main, and rebuild using `update.sh --revision FULL_APPROVED_GIT_SHA` |
+| Setup waits for backend health | Inspect private settings, production sms.ir credentials, disabled/licensed payments, database auth and migration errors. Preserve the existing `.env`; do not rerun initial setup. Check `docker compose -f backend/docker-compose.yml logs --tail=40 backend` |
 | Setup "stuck" at the SSL step | DNS not pointing at the server yet — the script skips and tells you; run `scripts/ssl.sh` after DNS propagates |
 | Setup "stuck" at frontend builds | On 1 GB VMs `npm ci` + Vite can take 5–10 min per app — it is working; swap is enabled by setup.sh to prevent OOM |
 | First `docker compose build` is slow | Normal on 1 vCPU (10–20 min). Later runs use the Docker cache (seconds) |
@@ -201,7 +211,7 @@ request to https://production.cloudfront.docker.com/... : 403 Forbidden
 
 This is a **network/registry restriction** (Docker Hub rate limit or regional blocking),
 not a bug in the scripts. The backend image builds fine — only the prebuilt images fail.
-Pick ONE of these fixes, then re-run `sudo ./scripts/setup.sh ...` (it is idempotent):
+Pick ONE fix, preserve the existing deployment, then resume the failed image pull/build step; do not rerun initial setup over an existing `.env`:
 
 **A. Registry mirror (fastest):** add a pull-through mirror to the Docker daemon:
 

@@ -192,6 +192,44 @@ button:disabled {
 .login-card .button--text {
   color: var(--title);
 }
+.auth-methods {
+  display: flex;
+  gap: 8px;
+  margin-block: 18px;
+}
+.auth-methods button {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--title);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.auth-methods button[aria-pressed="true"] {
+  border-color: var(--forest);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+.password-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.password-input input { flex: 1 1 145px; min-width: 0; width: 100%; }
+.password-input button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--title);
+  background: var(--paper);
+  cursor: pointer;
+  padding: 6px 10px;
+}
+.credential-hint { flex-basis: 100%; color: var(--muted); font-size: 12px; margin: 0; }
+.credential-panel { border-block: 1px solid var(--line); padding-block: 18px; margin-block: 18px; }
+.credential-panel > p { color: var(--muted); }
 .login-notice {
   margin: 0;
   color: var(--muted);

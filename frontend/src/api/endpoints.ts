@@ -21,6 +21,17 @@ export interface UpdateProfileInput {
   avatar?: string;
 }
 
+export interface PasswordCredentials {
+  username: string;
+  password: string;
+}
+export interface PasswordRegistration extends PasswordCredentials {
+  phone: string;
+  code: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 export interface CreateAddressInput {
   title: string;
   receiverName: string;
@@ -70,6 +81,32 @@ export const api = {
       body: { phone, code },
       auth: false,
     }),
+
+  loginPassword: (body: PasswordCredentials) =>
+    requestData<AuthResult>('/auth/password/login', { method: 'POST', body, auth: false }),
+
+  registerPassword: (body: PasswordRegistration) =>
+    requestData<AuthResult>('/auth/password/register', { method: 'POST', body, auth: false }),
+
+  requestRegistrationOtp: (phone: string) =>
+    requestData<OtpRequestResult>('/auth/password/register/request-otp', {
+      method: 'POST',
+      body: { phone },
+      auth: false,
+    }),
+
+  requestPasswordReset: (body: { username: string; phone: string }) =>
+    requestData<OtpRequestResult>('/auth/password/forgot/request', {
+      method: 'POST',
+      body,
+      auth: false,
+    }),
+
+  resetPassword: (body: { username: string; phone: string; code: string; newPassword: string }) =>
+    requestData<{ ok: true }>('/auth/password/forgot/reset', { method: 'POST', body, auth: false }),
+
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    requestData<AuthResult>('/auth/password/change', { method: 'POST', body }),
 
   refresh: (refreshToken: string) =>
     requestData<TokenPair>('/auth/refresh', {

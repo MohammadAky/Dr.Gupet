@@ -7,6 +7,7 @@ import { RedisService } from '../../redis/redis.service';
 import { SmsService } from '../../sms/sms.service';
 import { OtpService } from './otp/otp.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
+import { AUTH_USER_SELECT, AuthUser, safeSessionUser } from './auth-user';
 
 @Injectable()
 export class AuthService {
@@ -64,16 +65,7 @@ export class AuthService {
     let isNewUser = false;
     let user = await this.prisma.user.findUnique({
       where: { phone },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        avatar: true,
-        role: true,
-        status: true,
-        isPhoneVerified: true,
-      },
+      select: AUTH_USER_SELECT,
     });
 
     if (!user) {
@@ -84,48 +76,28 @@ export class AuthService {
           isPhoneVerified: true,
           cart: { create: {} },
         },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          avatar: true,
-          role: true,
-          status: true,
-          isPhoneVerified: true,
-        },
+        select: AUTH_USER_SELECT,
       });
     } else if (!user.isPhoneVerified) {
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: { isPhoneVerified: true },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          avatar: true,
-          role: true,
-          status: true,
-          isPhoneVerified: true,
-        },
+        select: AUTH_USER_SELECT,
       });
     }
 
-    // Check if blocked
-    if (user.status === 'BLOCKED') {
+    return this.issueSession(user, isNewUser);
+  }
+
+  /** All real authentication methods share the existing JWT/Redis session flow. */
+  async issueSession(user: AuthUser, isNewUser = false) {
+    if (user.deletedAt || user.status !== 'ACTIVE') {
       throw new AppException('USER_BLOCKED', 'حساب کاربری شما مسدود شده است', 403);
     }
-
-    // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.role);
-
-    // Return user without sensitive fields
-    const { status: _, role: __, isPhoneVerified: ___, ...safeUser } = user;
-
+    const tokens = await this.generateTokens(user.id, user.role, user.sessionVersion ?? 0);
     return {
       ...tokens,
-      user: safeUser,
+      user: safeSessionUser(user),
       isNewUser,
     };
   }
@@ -156,15 +128,18 @@ export class AuthService {
       // Load user
       const user = await this.prisma.user.findUnique({
         where: { id: userId, deletedAt: null },
-        select: { id: true, role: true, status: true },
+        select: { id: true, role: true, status: true, sessionVersion: true },
       });
 
       if (!user || user.status === 'BLOCKED') {
         throw new AppException('USER_BLOCKED', 'حساب کاربری شما مسدود شده است', 403);
       }
+      if ((payload.sv ?? 0) !== (user.sessionVersion ?? 0)) {
+        throw new UnauthorizedException();
+      }
 
       // Generate new tokens
-      return this.generateTokens(user.id, user.role);
+      return this.generateTokens(user.id, user.role, user.sessionVersion ?? 0);
     } catch (error) {
       if (error instanceof AppException) throw error;
       throw new UnauthorizedException();
@@ -193,13 +168,14 @@ export class AuthService {
   private async generateTokens(
     userId: number,
     role: string,
+    sessionVersion: number,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const accessTtl = this.configService.get<string>('jwt.accessTtl') || '15m';
     const refreshTtl = this.configService.get<string>('jwt.refreshTtl') || '30d';
 
     // Access token
     const accessToken = this.jwtService.sign(
-      { sub: userId, role },
+      { sub: userId, role, sv: sessionVersion },
       {
         secret: this.configService.get<string>('jwt.accessSecret'),
         expiresIn: accessTtl,
@@ -209,7 +185,7 @@ export class AuthService {
     // Refresh token
     const jti = crypto.randomUUID();
     const refreshToken = this.jwtService.sign(
-      { sub: userId, jti },
+      { sub: userId, jti, sv: sessionVersion },
       {
         secret: this.configService.get<string>('jwt.refreshSecret'),
         expiresIn: refreshTtl,

@@ -6,6 +6,7 @@ import { PaymentGateway } from './gateways/payment-gateway.interface';
 import { MockPaymentGateway } from './gateways/mock.gateway';
 import { ZarinpalPaymentGateway } from './gateways/zarinpal.gateway';
 import { SmsService } from '../../sms/sms.service';
+import { AppException } from '../../common/filters/all-exceptions.filter';
 
 export type CallbackOutcome = 'paid' | 'failed' | 'review';
 
@@ -19,7 +20,7 @@ export interface CallbackResult {
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-  private readonly gateway: PaymentGateway;
+  private readonly gateway: PaymentGateway | null;
   private readonly driver: string;
 
   constructor(
@@ -30,8 +31,8 @@ export class PaymentsService {
     // Strict driver selection (issues #01, #05): unknown drivers are refused
     // everywhere, and the mock driver is refused in production.
     const driver = this.configService.get<string>('payment.driver') || 'mock';
-    if (driver !== 'mock' && driver !== 'zarinpal') {
-      throw new Error(`Unknown PAYMENT_DRIVER "${driver}" — expected "mock" or "zarinpal"`);
+    if (driver !== 'mock' && driver !== 'zarinpal' && driver !== 'disabled') {
+      throw new Error(`Unknown PAYMENT_DRIVER "${driver}" — expected "mock", "zarinpal" or "disabled"`);
     }
     const nodeEnv = this.configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
     if (driver === 'mock' && nodeEnv === 'production') {
@@ -50,12 +51,25 @@ export class PaymentsService {
         this.configService.get<string>('payment.zarinpalApiBase'),
         this.configService.get<string>('payment.zarinpalStartPayBase'),
       );
-    } else {
+    } else if (driver === 'mock') {
       this.gateway = new MockPaymentGateway(
         this.configService.get<string>('payment.mockPayUrl') ||
           'http://localhost:3000/api/v1/payments/mock-pay',
       );
+    } else {
+      this.gateway = null;
     }
+  }
+
+  assertPaymentsAvailable(): void {
+    this.getAvailableGateway();
+  }
+
+  private getAvailableGateway(): PaymentGateway {
+    if (!this.gateway) {
+      throw new AppException('PAYMENT_UNAVAILABLE', 'پرداخت آنلاین در حال حاضر در دسترس نیست', 503);
+    }
+    return this.gateway;
   }
 
   private parseBool(value: unknown): boolean {
@@ -86,6 +100,7 @@ export class PaymentsService {
    * Start payment for an order
    */
   async startPayment(userId: number, orderId: number) {
+    const gateway = this.getAvailableGateway();
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
@@ -115,7 +130,7 @@ export class PaymentsService {
     const sig = this.callbackSig(payment.id, order.id);
     const callbackUrl = `${callbackBase}${sep}paymentId=${payment.id}&sig=${sig}`;
 
-    const result = await this.gateway.request({
+    const result = await gateway.request({
       amount: order.finalAmount,
       orderId: order.id,
       paymentId: payment.id,
@@ -146,6 +161,7 @@ export class PaymentsService {
     paymentId: number,
     opts: { statusRaw?: string; sig?: string; adminReconcile?: boolean },
   ): Promise<CallbackResult> {
+    const gateway = this.getAvailableGateway();
     if (!Number.isInteger(paymentId) || paymentId <= 0) {
       throw new NotFoundException('پرداخت یافت نشد');
     }
@@ -197,7 +213,7 @@ export class PaymentsService {
     // Server-to-server verification with the gateway.
     let verified = false;
     try {
-      const verifyResult = await this.gateway.verify(payment.gatewayRef || '', payment.amount);
+      const verifyResult = await gateway.verify(payment.gatewayRef || '', payment.amount);
       verified = verifyResult.success;
     } catch (error) {
       this.logger.error(`payment verify call failed: ${(error as Error).message}`);

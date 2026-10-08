@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App";
+vi.hoisted(() => { vi.stubEnv("VITE_API_BASE_URL", "/api/v1"); });
 
 function response(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(status < 400
@@ -40,6 +41,7 @@ it("requires OTP and refuses a non-admin identity", async () => {
     .mockResolvedValueOnce(response({ id: 3, phone: "09120000000", role: "USER" }));
   vi.stubGlobal("fetch", fetchMock);
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "کد پیامکی" }));
   fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "۰۹۱۲۰۰۰۰۰۰۰" } });
   fireEvent.click(screen.getByRole("button", { name: "دریافت کد" }));
   expect(await screen.findByLabelText("کد تأیید")).toBeTruthy();
@@ -54,8 +56,28 @@ it("requires OTP and refuses a non-admin identity", async () => {
   expect(document.cookie).toBe("");
 });
 
+it("defaults to password login, submits once and keeps a non-admin account out of the workspace", async () => {
+  let finish!: (value: Response) => void;
+  const fetchMock = vi.fn().mockImplementationOnce(() => new Promise<Response>((resolve) => { finish = resolve; }))
+    .mockResolvedValueOnce(response({ id: 3, username: "kian", phone: "09120000000", role: "USER" }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("نام کاربری"), { target: { value: " Kian " } });
+  fireEvent.change(screen.getByLabelText("رمز عبور"), { target: { value: " raw password " } });
+  const form = screen.getByLabelText("نام کاربری").closest("form")!;
+  fireEvent.submit(form); fireEvent.submit(form);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0]![0]).toBe("/api/v1/auth/password/login");
+  expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ username: "kian", password: " raw password " });
+  await act(async () => finish(response({ accessToken: "a", refreshToken: "r" })));
+  expect(screen.getByRole("alert").textContent).toContain("اطلاعات و دسترسی حساب را بررسی کنید");
+  expect(screen.queryByRole("heading", { name: "نمای کلی" })).toBeNull();
+  expect(screen.getByRole("heading", { name: "ورود مدیر" })).toBeTruthy();
+});
+
 async function requestAdminCode() {
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "کد پیامکی" }));
   fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "۰۹۱۲۰۰۰۰۰۰۰" } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "دریافت کد" })); });
 }
@@ -146,6 +168,7 @@ it("does not send duplicate initial requests or resend during OTP verification",
     .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishVerify = resolve; }));
   vi.stubGlobal("fetch", fetchMock);
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "کد پیامکی" }));
   fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "09120000000" } });
   const form = screen.getByLabelText("شمارهٔ موبایل").closest("form")!;
   fireEvent.submit(form);
@@ -207,6 +230,7 @@ function adminResponses() {
 
 async function loginAdmin() {
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "کد پیامکی" }));
   fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "۰۹۱۲۰۰۰۰۰۰۰" } });
   fireEvent.click(screen.getByRole("button", { name: "دریافت کد" }));
   await screen.findByLabelText("کد تأیید");

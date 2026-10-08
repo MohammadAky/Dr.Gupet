@@ -45,6 +45,39 @@ describe('SmsIrDriver', () => {
     global.fetch = originalFetch;
   });
 
+  describe('SMS destination configuration', () => {
+    it.each([undefined, '', 'https://api.sms.ir/v1', 'https://api.sms.ir/v1/'])(
+      'uses the canonical Verify URL for base %s',
+      async (baseUrl) => {
+        fetchMock.mockResolvedValue(jsonResponse({ status: 1, message: 'موفق', data: {} }));
+        const driver = makeDriver({ 'sms.baseUrl': baseUrl });
+
+        await driver.sendOtp('09121234567', '123456');
+
+        expect(lastCall().url).toBe('https://api.sms.ir/v1/send/verify');
+      },
+    );
+
+    it.each([
+      'http://api.sms.ir/v1',
+      'https://example.test/v1',
+      'https://api.sms.ir.example.test/v1',
+      'https://user:password@api.sms.ir/v1',
+      'https://api.sms.ir:8443/v1',
+      'https://api.sms.ir/v1?route=bulk',
+      'https://api.sms.ir/v1#bulk',
+      'https://api.sms.ir/v1/send/bulk?',
+      'https://api.sms.ir/v1/send/bulk#',
+      'https://api.sms.ir/v1/send/bulk',
+      'https://api.sms.ir/v1/send/verify',
+      'https://api.sms.ir/v2',
+      'not-a-url',
+    ])('rejects unsafe base %s before any network call', (baseUrl) => {
+      expect(() => makeDriver({ 'sms.baseUrl': baseUrl })).toThrow('SMS_IR_BASE_URL');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('sendOtp (POST /send/verify)', () => {
     it('sends the template payload with a normalized mobile and X-API-KEY header', async () => {
       fetchMock.mockResolvedValue(
@@ -58,11 +91,33 @@ describe('SmsIrDriver', () => {
       const { url, init, body } = lastCall();
       expect(url).toBe('https://api.sms.ir/v1/send/verify');
       expect(init.method).toBe('POST');
+      expect(init.redirect).toBe('error');
       expect((init.headers as Record<string, string>)['X-API-KEY']).toBe('test-api-key');
       expect(body).toEqual({
         mobile: '09121234567',
         templateId: 123456,
         parameters: [{ name: 'Code', value: '123456' }],
+      });
+    });
+
+    it('uses the configured template parameter and does not require a bulk line', async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ status: 1, message: 'موفق', data: { messageId: 42 } }),
+      );
+      const driver = makeDriver({
+        'sms.templateId': '448272',
+        'sms.paramName': 'OtpCode',
+        'sms.lineNumber': undefined,
+      });
+
+      await expect(driver.sendOtp('09121234567', '123456')).resolves.toEqual({ messageId: 42 });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(lastCall().url).toBe('https://api.sms.ir/v1/send/verify');
+      expect(lastCall().body).toEqual({
+        mobile: '09121234567',
+        templateId: 448272,
+        parameters: [{ name: 'OtpCode', value: '123456' }],
       });
     });
 
@@ -107,6 +162,7 @@ describe('SmsIrDriver', () => {
 
       await expect(driver.sendOtp('09121234567', '123456')).rejects.toThrow('status=113');
       expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(lastCall().url).toBe('https://api.sms.ir/v1/send/verify');
     });
 
     it('retries once on a transient status (20) and then succeeds', async () => {
@@ -131,6 +187,10 @@ describe('SmsIrDriver', () => {
         'sms.ir /send/verify failed',
       );
       expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+        'https://api.sms.ir/v1/send/verify',
+        'https://api.sms.ir/v1/send/verify',
+      ]);
     });
   });
 

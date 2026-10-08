@@ -51,7 +51,19 @@ export function Shell() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      onKeyDownCapture={(event) => {
+        event.currentTarget.dataset.routeMotion = 'instant';
+      }}
+      onPointerDownCapture={(event) => {
+        event.currentTarget.dataset.routeMotion = 'enter';
+      }}
+      onClickCapture={(event) => {
+        // Keyboard and assistive-tech activations have no pointer click count.
+        if (event.detail === 0) event.currentTarget.dataset.routeMotion = 'instant';
+      }}
+    >
       <PageMetadata />
       <a className="skip-link" href="#main-content">
         رفتن به محتوای اصلی

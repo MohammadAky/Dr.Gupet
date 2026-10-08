@@ -17,6 +17,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { PasswordService } from '../auth/password.service';
+import { AdminPasswordRegisterDto, PasswordCredentialDto } from '../auth/dto/password.dto';
 
 @ApiTags('Admin - Users')
 @Controller('admin/users')
@@ -27,7 +29,42 @@ export class AdminUsersController {
   constructor(
     private usersService: UsersService,
     private auditService: AuditService,
+    private passwords: PasswordService,
   ) {}
+
+  @Post('password-account')
+  @ApiOperation({ summary: 'Create a username/password account (admin only)' })
+  async createPasswordAccount(@Body() dto: AdminPasswordRegisterDto, @Req() req: any) {
+    const user = await this.passwords.createAccount(dto, dto.role ?? 'USER');
+    await this.auditService.record({
+      adminId: req.user.sub,
+      action: 'CREATE',
+      entity: 'User',
+      entityId: user.id,
+      summary: 'password account created',
+      ip: req.ip,
+    });
+    return this.passwords.adminAccountResponse(user);
+  }
+
+  @Post(':id/password-account')
+  @ApiOperation({ summary: 'Set/reset credentials for an explicit account (admin only)' })
+  async setPasswordAccount(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PasswordCredentialDto,
+    @Req() req: any,
+  ) {
+    const user = await this.passwords.setAccount(id, dto);
+    await this.auditService.record({
+      adminId: req.user.sub,
+      action: 'UPDATE',
+      entity: 'User',
+      entityId: id,
+      summary: 'password credentials changed; sessions revoked',
+      ip: req.ip,
+    });
+    return user;
+  }
 
   @Get()
   @ApiOperation({ summary: 'List users with search/filters (admin only)' })
@@ -91,7 +128,7 @@ export class AdminUsersController {
     },
     @Req() req: any,
   ) {
-    const user = await this.usersService.updateByAdmin(id, body);
+    const user = await this.usersService.updateByAdmin(id, body, req.user.sub);
     await this.auditService.record({
       adminId: req.user.sub,
       action: 'UPDATE',
@@ -108,7 +145,7 @@ export class AdminUsersController {
   @ApiResponse({ status: 200, description: 'User soft-deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-    const result = await this.usersService.softDeleteByAdmin(id);
+    const result = await this.usersService.softDeleteByAdmin(id, req.user.sub);
     await this.auditService.record({
       adminId: req.user.sub,
       action: 'DELETE',

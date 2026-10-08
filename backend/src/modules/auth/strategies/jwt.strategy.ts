@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: number; role: string }) {
+  async validate(payload: { sub: number; role: string; sv?: number }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub, deletedAt: null },
       select: {
@@ -28,6 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         firstName: true,
         lastName: true,
         phone: true,
+        sessionVersion: true,
       },
     });
 
@@ -37,6 +38,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (user.status === 'BLOCKED') {
       throw new AppException('USER_BLOCKED', 'حساب کاربری شما مسدود شده است', 403);
+    }
+    if ((payload.sv ?? 0) !== (user.sessionVersion ?? 0)) {
+      throw new UnauthorizedException();
     }
 
     // Single identity contract: request.user = { sub, role } (see JwtPayload)

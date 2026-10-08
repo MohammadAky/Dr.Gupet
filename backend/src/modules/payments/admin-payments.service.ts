@@ -91,6 +91,7 @@ export class AdminPaymentsService {
    * Reconcile a payment against the gateway (re-runs verify; idempotent)
    */
   async reconcile(id: number) {
+    this.paymentsService.assertPaymentsAvailable();
     const payment = await this.prisma.payment.findUnique({ where: { id } });
     if (!payment) {
       throw new NotFoundException('پرداخت یافت نشد');
@@ -109,6 +110,7 @@ export class AdminPaymentsService {
    * Manually mark a non-successful payment as failed
    */
   async markFailed(id: number) {
+    this.paymentsService.assertPaymentsAvailable();
     const payment = await this.prisma.payment.findUnique({ where: { id } });
     if (!payment) {
       throw new NotFoundException('پرداخت یافت نشد');

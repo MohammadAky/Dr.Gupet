@@ -13,6 +13,7 @@ interface SmsIrEnvelope<T = unknown> {
 const REQUEST_TIMEOUT_MS = 10_000;
 const TRANSIENT_RETRY_DELAY_MS = 300;
 const MAX_ATTEMPTS = 2; // 1 try + 1 retry, transient failures only (§8.4-3)
+const SMS_IR_BASE_URL = 'https://api.sms.ir/v1';
 
 /**
  * sms.ir driver — selected by `SMS_DRIVER=smsir`.
@@ -26,8 +27,17 @@ const MAX_ATTEMPTS = 2; // 1 try + 1 retry, transient failures only (§8.4-3)
 @Injectable()
 export class SmsIrDriver implements SmsDriver {
   private readonly logger = new Logger(SmsIrDriver.name);
+  private readonly baseUrl: string;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    const baseUrl = this.configService.get<string>('sms.baseUrl') || SMS_IR_BASE_URL;
+    // Reject endpoint paths, query/fragment suffixes and alternate origins before
+    // sending the private API key or OTP to a configured destination.
+    if (!/^https:\/\/api\.sms\.ir\/v1\/?$/.test(baseUrl)) {
+      throw new Error('SMS_IR_BASE_URL must be https://api.sms.ir/v1 (optional trailing slash)');
+    }
+    this.baseUrl = baseUrl.replace(/\/$/, '');
+  }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const apiKey = this.requireConfig('sms.apiKey', 'SMS_API_KEY');
@@ -71,9 +81,6 @@ export class SmsIrDriver implements SmsDriver {
     apiKey: string,
     body: Record<string, unknown>,
   ): Promise<unknown> {
-    const baseUrl = (
-      this.configService.get<string>('sms.baseUrl') || 'https://api.sms.ir/v1'
-    ).replace(/\/+$/, '');
     let lastFailure = 'unknown error';
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -83,8 +90,9 @@ export class SmsIrDriver implements SmsDriver {
 
       let response: Response;
       try {
-        response = await fetch(`${baseUrl}${path}`, {
+        response = await fetch(`${this.baseUrl}${path}`, {
           method: 'POST',
+          redirect: 'error',
           headers: {
             'X-API-KEY': apiKey,
             'Content-Type': 'application/json',

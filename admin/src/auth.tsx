@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -20,6 +21,7 @@ interface AuthValue {
   identity: AdminIdentity | null;
   requestOtp(phone: string): Promise<{ expiresIn: number; cooldownSeconds?: number }>;
   verifyOtp(phone: string, code: string): Promise<void>;
+  loginPassword(username: string, password: string): Promise<void>;
   read<T>(path: string): Promise<T>;
   request<T>(path: string, options?: Omit<Options, "token">): Promise<T>;
   download(path: string): Promise<Blob>;
@@ -33,6 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tokens = useRef<TokenPair | null>(null);
   const refreshFlight = useRef<Promise<TokenPair> | null>(null);
   const version = useRef(0);
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; version.current += 1; };
+  }, []);
 
   function clearSession() {
     version.current += 1;
@@ -46,20 +53,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return adminApi.requestOtp(phone);
   }
 
-  async function verifyOtp(phone: string, code: string) {
-    const pair = await adminApi.verifyOtp(phone, code);
+  async function establishSession(authenticate: () => Promise<TokenPair>) {
+    const startedAt = ++version.current;
+    const pair = await authenticate();
+    if (!mounted.current || version.current !== startedAt) throw new ApiError("ورود لغو شد.", 401);
     const person = await adminApi.me(pair.accessToken);
+    if (!mounted.current || version.current !== startedAt) throw new ApiError("ورود لغو شد.", 401);
     if (person.role !== "ADMIN") {
       throw new ApiError(
-        "این شماره به پنل مدیریت دسترسی ندارد.",
+        "این حساب به پنل مدیریت دسترسی ندارد.",
         403,
         "ADMIN_REQUIRED",
       );
     }
-    version.current += 1;
     tokens.current = pair;
     setIdentity(person);
     setMode("admin");
+  }
+
+  function verifyOtp(phone: string, code: string) {
+    return establishSession(() => adminApi.verifyOtp(phone, code));
+  }
+  function loginPassword(username: string, password: string) {
+    return establishSession(() => adminApi.loginPassword(username, password));
   }
 
   async function request<T>(path: string, options: Omit<Options, "token"> = {}): Promise<T> {
@@ -130,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         identity,
         requestOtp,
         verifyOtp,
+        loginPassword,
         read,
         request,
         download,

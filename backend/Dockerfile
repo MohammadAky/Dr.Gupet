@@ -31,6 +31,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Prisma must detect the same OpenSSL ABI in both build and runtime stages.
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package.json package-lock.json* ./
 

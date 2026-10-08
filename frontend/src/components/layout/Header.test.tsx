@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
 import { act, useState, type FormEvent } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { shopApi, type Page } from '../../api/endpoints-shop';
 import type { Medicine, Pharmacy, ProductCard } from '../../api/types';
 import { Header } from './Header';
+import { Shell } from '../../App';
+
+vi.mock('../../auth/auth-provider', () => ({
+  useAuth: () => ({ status: 'guest', user: null, logout: vi.fn() }),
+}));
 
 function CurrentPath() {
   const location = useLocation();
@@ -111,6 +117,51 @@ describe('mobile header controls', () => {
     expect(menu?.getAttribute('aria-expanded')).toBe('false');
     expect(search?.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('.mobile-search')?.hasAttribute('hidden')).toBe(false);
+  });
+
+  it('preserves page input on query changes and makes keyboard route changes immediate', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root.render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/products']}>
+          <Routes>
+            <Route element={<Shell />}>
+              <Route path="products" element={<>
+                <input aria-label="یادداشت آزمایشی" defaultValue="" />
+                <Link id="query-link" to="/products?q=غذا">جست‌وجو</Link>
+                <Link id="page-link" to="/clinics">کلینیک‌ها</Link>
+              </>} />
+              <Route path="clinics" element={<h1>فهرست کلینیک‌ها</h1>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    ));
+    const shell = container.querySelector<HTMLElement>('.app-shell')!;
+    const main = container.querySelector('main')!;
+    const input = main.querySelector('input')!;
+    input.value = 'یادداشت حفظ شود';
+    await act(async () => {
+      shell.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      container.querySelector('#query-link')!.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, button: 0 }),
+      );
+    });
+    expect(container.querySelector('main')).toBe(main);
+    expect(main.querySelector('input')).toBe(input);
+    expect(input.value).toBe('یادداشت حفظ شود');
+    expect(shell.dataset.routeMotion).toBe('enter');
+
+    await act(async () => {
+      const link = container.querySelector<HTMLAnchorElement>('#page-link')!;
+      link.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      link.click();
+    });
+    expect(container.querySelector('main')).not.toBe(main);
+    expect(shell.dataset.routeMotion).toBe('instant');
+    expect(container.querySelector('main')?.textContent).toBe('فهرست کلینیک‌ها');
+    expect(container.querySelector('.app-shell')).toBe(shell);
+    client.clear();
   });
 
   it('waits for three letters, then groups live API suggestions and navigates to exact detail routes', async () => {

@@ -3,6 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
 import { normalizePhone } from '../../common/utils/phone.util';
+import { Prisma } from '@prisma/client';
+import { withUsername } from '../auth/auth-user';
 
 const USER_SAFE_SELECT = {
   id: true,
@@ -16,6 +18,7 @@ const USER_SAFE_SELECT = {
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
+  passwordCredential: { select: { username: true } },
 } as const;
 
 @Injectable()
@@ -36,6 +39,7 @@ export class UsersService {
         avatar: true,
         createdAt: true,
         updatedAt: true,
+        passwordCredential: { select: { username: true } },
       },
     });
 
@@ -43,7 +47,7 @@ export class UsersService {
       throw new NotFoundException('کاربر یافت نشد');
     }
 
-    return user;
+    return withUsername(user);
   }
 
   /**
@@ -66,7 +70,7 @@ export class UsersService {
       throw new NotFoundException('کاربر یافت نشد');
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data,
       select: {
@@ -77,8 +81,10 @@ export class UsersService {
         avatar: true,
         createdAt: true,
         updatedAt: true,
+        passwordCredential: { select: { username: true } },
       },
     });
+    return withUsername(updated);
   }
 
   // -------------------------------------------------------------------
@@ -105,6 +111,7 @@ export class UsersService {
         { phone: { contains: term } },
         { firstName: { contains: term } },
         { lastName: { contains: term } },
+        { passwordCredential: { username: { contains: term.toLowerCase() } } },
       ];
     }
     if (role) where.role = role;
@@ -131,7 +138,7 @@ export class UsersService {
     ]);
 
     return {
-      data: users,
+      data: users.map(withUsername),
       meta: {
         page,
         limit,
@@ -196,7 +203,7 @@ export class UsersService {
       throw new NotFoundException('کاربر یافت نشد');
     }
 
-    return user;
+    return withUsername(user);
   }
 
   /**
@@ -225,7 +232,7 @@ export class UsersService {
       throw new AppException('CONFLICT', 'کاربری با این شماره موبایل وجود دارد', 409);
     }
 
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         phone,
         role,
@@ -234,6 +241,7 @@ export class UsersService {
       },
       select: USER_SAFE_SELECT,
     });
+    return withUsername(user);
   }
 
   /**
@@ -248,12 +256,8 @@ export class UsersService {
       role?: string;
       status?: string;
     },
+    actorId?: number,
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) {
-      throw new NotFoundException('کاربر یافت نشد');
-    }
-
     if (data.role != null && !['USER', 'ADMIN'].includes(data.role)) {
       throw new AppException('VALIDATION_ERROR', 'نقش نامعتبر است', 400);
     }
@@ -261,32 +265,38 @@ export class UsersService {
       throw new AppException('VALIDATION_ERROR', 'وضعیت نامعتبر است', 400);
     }
 
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        avatar: data.avatar,
-        role: data.role,
-        status: data.status,
+    return this.protectAdminAccess(
+      id,
+      actorId,
+      data.role === 'USER' || data.status === 'BLOCKED',
+      async (tx) => {
+        const user = await tx.user.update({
+          where: { id },
+          data: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            avatar: data.avatar,
+            role: data.role,
+            status: data.status,
+          },
+          select: USER_SAFE_SELECT,
+        });
+        return withUsername(user);
       },
-      select: USER_SAFE_SELECT,
-    });
+    );
   }
 
   /**
    * Soft-delete user (admin)
    */
-  async softDeleteByAdmin(id: number) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) {
-      throw new NotFoundException('کاربر یافت نشد');
-    }
-
-    await this.prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date(), status: 'BLOCKED' },
-    });
+  async softDeleteByAdmin(id: number, actorId?: number) {
+    await this.protectAdminAccess(id, actorId, true, (tx) =>
+      tx.user.update({
+        where: { id },
+        data: { deletedAt: new Date(), status: 'BLOCKED' },
+        select: { id: true },
+      }),
+    );
 
     return { deleted: true };
   }
@@ -303,10 +313,34 @@ export class UsersService {
       throw new AppException('CONFLICT', 'کاربر حذف نشده است', 409);
     }
 
-    return this.prisma.user.update({
+    const restored = await this.prisma.user.update({
       where: { id },
       data: { deletedAt: null, status: 'ACTIVE' },
       select: USER_SAFE_SELECT,
+    });
+    return withUsername(restored);
+  }
+
+  private async protectAdminAccess<T>(
+    id: number,
+    actorId: number | undefined,
+    removesAccess: boolean,
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    if (removesAccess && id === actorId) {
+      throw new AppException('CONFLICT', 'نمی‌توانید دسترسی مدیریتی خود را حذف کنید', 409);
+    }
+    return this.prisma.$transaction(async (tx) => {
+      // A locking read serializes concurrent demotion/block/delete operations.
+      const admins = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM User WHERE role = 'ADMIN' AND status = 'ACTIVE'
+        AND deletedAt IS NULL ORDER BY id FOR UPDATE`;
+      const user = await tx.user.findUnique({ where: { id }, select: { id: true } });
+      if (!user) throw new NotFoundException('کاربر یافت نشد');
+      if (removesAccess && admins.length === 1 && admins[0].id === id) {
+        throw new AppException('CONFLICT', 'حداقل یک مدیر فعال باید باقی بماند', 409);
+      }
+      return operation(tx);
     });
   }
 }

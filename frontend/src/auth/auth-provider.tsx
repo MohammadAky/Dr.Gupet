@@ -10,8 +10,8 @@ import {
   type ReactNode,
 } from 'react';
 import { setAuthBridge } from '../api/client';
-import { api } from '../api/endpoints';
-import type { UserProfile } from '../api/types';
+import { api, type PasswordCredentials, type PasswordRegistration } from '../api/endpoints';
+import type { AuthResult, UserProfile } from '../api/types';
 import { tokenStorage } from '../lib/storage';
 import { clearPendingOrder } from '../features/checkout/pending-order';
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,6 +23,9 @@ interface AuthContextValue {
   user: UserProfile | null;
   /** OTP verify → tokens persisted → profile loaded. */
   verifyOtp(phone: string, code: string): Promise<{ isNewUser: boolean }>;
+  loginPassword(credentials: PasswordCredentials): Promise<{ isNewUser: boolean }>;
+  registerPassword(credentials: PasswordRegistration): Promise<{ isNewUser: boolean }>;
+  changePassword(currentPassword: string, newPassword: string): Promise<{ isNewUser: boolean }>;
   logout(): Promise<void>;
   /** Patch the cached profile after a successful PATCH /users/me. */
   applyProfile(profile: UserProfile): void;
@@ -147,28 +150,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [rotateTokens, loadProfile, isCurrent]);
 
-  const verifyOtp = useCallback(
-    async (phone: string, code: string) => {
+  const establishSession = useCallback(
+    async (authenticate: () => Promise<AuthResult>, keepProfile = false) => {
       if (!mountedRef.current) throw new Error('ورود لغو شد. دوباره تلاش کنید.');
       const epoch = ++sessionEpochRef.current;
-      const result = await api.verifyOtp(phone, code);
+      const result = await authenticate();
       if (!isCurrent(epoch)) throw new Error('ورود لغو شد. دوباره تلاش کنید.');
       // All query keys are currently account-agnostic. Remove the previous
       // account's cached data before the new identity can render any page.
       queryClient.clear();
       clearPendingOrder();
-      userRef.current = null;
-      setUser(null);
-      setStatus('loading');
+      if (!keepProfile) {
+        userRef.current = null;
+        setUser(null);
+        setStatus('loading');
+      }
       accessTokenRef.current = result.accessToken;
       tokenStorage.set(result.refreshToken);
       if (!(await loadProfile(epoch))) {
-        throw new Error('تأیید شماره انجام شد، اما دریافت حساب ممکن نشد. دوباره وارد شوید.');
+        throw new Error('دریافت حساب ممکن نشد. دوباره وارد شوید.');
       }
       if (!isCurrent(epoch)) throw new Error('ورود لغو شد. دوباره تلاش کنید.');
       return { isNewUser: result.isNewUser };
     },
     [isCurrent, loadProfile, queryClient],
+  );
+
+  const verifyOtp = useCallback(
+    (phone: string, code: string) => establishSession(() => api.verifyOtp(phone, code)),
+    [establishSession],
+  );
+  const loginPassword = useCallback(
+    (credentials: PasswordCredentials) => establishSession(() => api.loginPassword(credentials)),
+    [establishSession],
+  );
+  const registerPassword = useCallback(
+    (credentials: PasswordRegistration) =>
+      establishSession(() => api.registerPassword(credentials)),
+    [establishSession],
+  );
+  const changePassword = useCallback(
+    (currentPassword: string, newPassword: string) =>
+      establishSession(() => api.changePassword({ currentPassword, newPassword }), true),
+    [establishSession],
   );
 
   const logout = useCallback(async () => {
@@ -193,8 +217,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, verifyOtp, logout, applyProfile }),
-    [status, user, verifyOtp, logout, applyProfile],
+    () => ({
+      status,
+      user,
+      verifyOtp,
+      loginPassword,
+      registerPassword,
+      changePassword,
+      logout,
+      applyProfile,
+    }),
+    [
+      status,
+      user,
+      verifyOtp,
+      loginPassword,
+      registerPassword,
+      changePassword,
+      logout,
+      applyProfile,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

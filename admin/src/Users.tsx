@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "./auth";
+import { PasswordInput } from "./PasswordInput";
+import { credentialError, normalizePhone, normalizeUsername, passwordHint, usernameHint } from "./password";
 import {
   errorMessage,
   formatDate,
@@ -19,6 +21,7 @@ type UserRow = {
   firstName: string | null;
   lastName: string | null;
   phone: string;
+  username: string | null;
   role: "USER" | "ADMIN";
   status: "ACTIVE" | "BLOCKED";
   deletedAt: string | null;
@@ -56,6 +59,50 @@ type UserDetail = UserRow & {
 const fullName = (user: UserRow) =>
   [user.firstName, user.lastName].filter(Boolean).join(" ") || "بدون نام";
 
+function CredentialAssignment({ user, onSaved }: { user: UserRow; onSaved(): void }) {
+  const { request, identity, logout } = useAuth();
+  const [username, setUsername] = useState(user.username ?? "");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (pending.current) return;
+    const problem = credentialError(username, password, confirm);
+    setError(problem); setNotice("");
+    if (problem) return;
+    pending.current = true; setBusy(true);
+    try {
+      await request(`/admin/users/${user.id}/password-account`, { method: "POST", body: { username: normalizeUsername(username), password } });
+      if (!mounted.current) return;
+      setPassword(""); setConfirm("");
+      if (identity?.id === user.id) { logout(); return; }
+      setNotice("اطلاعات ورود ذخیره شد؛ نشست‌های قبلی این کاربر پایان یافتند.");
+      onSaved();
+    } catch {
+      if (mounted.current) setError("ذخیرهٔ اطلاعات ورود انجام نشد. اطلاعات و دسترسی را بررسی کنید یا دوباره تلاش کنید.");
+    } finally { pending.current = false; if (mounted.current) setBusy(false); }
+  }
+  return <section className="credential-panel" aria-label="اطلاعات ورود کاربر">
+    <h3>{user.username ? "بازنشانی اطلاعات ورود" : "فعال‌سازی ورود با رمز"}</h3>
+    <p>برای همین کاربر با شمارهٔ <bdi>{user.phone}</bdi> ذخیره می‌شود. نشست‌های قبلی پایان می‌یابند.{identity?.id === user.id ? " پس از ذخیره باید دوباره وارد پنل شوید." : ""}</p>
+    <form className="manage-toolbar" onSubmit={(event) => void submit(event)} noValidate>
+      <label>نام کاربری<input name="username" dir="ltr" autoComplete="off" autoCapitalize="none" spellCheck={false} value={username} disabled={busy} onChange={(event) => setUsername(event.target.value)} /></label>
+      <p className="credential-hint">{usernameHint}</p>
+      <div><label htmlFor="assign-password">رمز عبور جدید</label><PasswordInput id="assign-password" value={password} onChange={setPassword} disabled={busy} /></div>
+      <div><label htmlFor="assign-confirm">تکرار رمز عبور جدید</label><PasswordInput id="assign-confirm" value={confirm} onChange={setConfirm} disabled={busy} /></div>
+      <p className="credential-hint">{passwordHint}</p>
+      <button className="manage-primary" type="submit" disabled={busy}>{busy ? "در حال ذخیره…" : "ذخیرهٔ اطلاعات ورود"}</button>
+      <Notice message={error} /><Notice message={notice} kind="success" />
+    </form>
+  </section>;
+}
+
 export function Users() {
   const { request, identity } = useAuth();
   const [page, setPage] = useState(1);
@@ -74,6 +121,11 @@ export function Users() {
   const [newFirstName, setNewFirstName] = useState("");
   const [newLastName, setNewLastName] = useState("");
   const [newRole, setNewRole] = useState<"USER" | "ADMIN">("USER");
+  const [accountKind, setAccountKind] = useState<"password" | "otp">("password");
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newConfirm, setNewConfirm] = useState("");
+  const createPending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -124,15 +176,22 @@ export function Users() {
   }
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || createPending.current) return;
+    if (!/^09\d{9}$/.test(normalizePhone(newPhone))) { setError("شمارهٔ موبایل معتبر وارد کنید."); return; }
+    if (accountKind === "password") {
+      const problem = credentialError(newUsername, newPassword, newConfirm);
+      if (problem) { setError(problem); return; }
+    }
+    createPending.current = true;
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      await request("/admin/users", {
+      await request(accountKind === "password" ? "/admin/users/password-account" : "/admin/users", {
         method: "POST",
         body: {
-          phone: newPhone.trim(),
+          phone: normalizePhone(newPhone),
+          ...(accountKind === "password" ? { username: normalizeUsername(newUsername), password: newPassword } : {}),
           role: newRole,
           firstName: newFirstName.trim() || undefined,
           lastName: newLastName.trim() || undefined,
@@ -140,6 +199,7 @@ export function Users() {
       });
       setRevision((value) => value + 1);
       setNewPhone("");
+      setNewUsername(""); setNewPassword(""); setNewConfirm("");
       setNewFirstName("");
       setNewLastName("");
       setNewRole("USER");
@@ -148,6 +208,7 @@ export function Users() {
     } catch (problem) {
       setError(errorMessage(problem));
     } finally {
+      createPending.current = false;
       setBusy(false);
     }
   }
@@ -169,13 +230,26 @@ export function Users() {
           <button
             type="button"
             className="manage-primary"
-            onClick={() => setCreating((value) => !value)}
+            disabled={busy}
+            onClick={() => { setCreating((value) => !value); setNewPassword(""); setNewConfirm(""); }}
           >
             {creating ? "بستن فرم" : "افزودن کاربر"}
           </button>
         </div>
         {creating && (
-          <form className="manage-toolbar" onSubmit={createUser}>
+          <form className="manage-toolbar" onSubmit={createUser} noValidate>
+            <label>روش ورود حساب
+              <select value={accountKind} disabled={busy} onChange={(event) => { setAccountKind(event.target.value as "password" | "otp"); setNewPassword(""); setNewConfirm(""); setError(""); }}>
+                <option value="password">نام کاربری و رمز عبور</option><option value="otp">کد پیامکی</option>
+              </select>
+            </label>
+            {accountKind === "password" ? <>
+              <label>نام کاربری<input name="username" dir="ltr" autoComplete="off" autoCapitalize="none" spellCheck={false} value={newUsername} disabled={busy} onChange={(event) => setNewUsername(event.target.value)} required /></label>
+              <p className="credential-hint">{usernameHint}</p>
+              <div><label htmlFor="create-password">رمز عبور</label><PasswordInput id="create-password" value={newPassword} onChange={setNewPassword} disabled={busy} /></div>
+              <div><label htmlFor="create-confirm">تکرار رمز عبور</label><PasswordInput id="create-confirm" value={newConfirm} onChange={setNewConfirm} disabled={busy} /></div>
+              <p className="credential-hint">{passwordHint}</p>
+            </> : null}
             <label>
               شماره موبایل
               <input
@@ -184,6 +258,8 @@ export function Users() {
                 onChange={(event) => setNewPhone(event.target.value)}
                 placeholder="09xxxxxxxxx"
                 required
+                disabled={busy}
+                type="tel"
               />
             </label>
             <label>
@@ -192,6 +268,8 @@ export function Users() {
                 value={newFirstName}
                 onChange={(event) => setNewFirstName(event.target.value)}
                 placeholder="نام"
+                maxLength={50}
+                disabled={busy}
               />
             </label>
             <label>
@@ -200,12 +278,15 @@ export function Users() {
                 value={newLastName}
                 onChange={(event) => setNewLastName(event.target.value)}
                 placeholder="نام خانوادگی"
+                maxLength={50}
+                disabled={busy}
               />
             </label>
             <label>
               نقش
               <select
                 value={newRole}
+                disabled={busy}
                 onChange={(event) =>
                   setNewRole(event.target.value as "USER" | "ADMIN")
                 }
@@ -225,7 +306,7 @@ export function Users() {
       <section className="manage-card" aria-label="فهرست کاربران">
         <form className="manage-toolbar" onSubmit={apply}>
           <label>
-            نام یا شماره
+            نام، نام کاربری یا شماره
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -277,7 +358,7 @@ export function Users() {
                 <thead>
                   <tr>
                     <th>کاربر</th>
-                    <th>شماره</th>
+                    <th>شماره / نام کاربری</th>
                     <th>نقش</th>
                     <th>وضعیت</th>
                     <th>سفارش / پت</th>
@@ -289,7 +370,7 @@ export function Users() {
                   {list.data.data.map((item) => (
                     <tr key={item.id}>
                       <td>{fullName(item)}</td>
-                      <td dir="ltr">{item.phone}</td>
+                      <td dir="ltr">{item.phone ?? item.username ?? `#${item.id}`}</td>
                       <td>{item.role === "ADMIN" ? "مدیر" : "کاربر"}</td>
                       <td>
                         {item.deletedAt
@@ -340,16 +421,17 @@ export function Users() {
           {user && (
             <>
               <h2>
-                {fullName(user)} · <span dir="ltr">{user.phone}</span>
+                {fullName(user)} · <span dir="ltr">{user.phone ?? user.username ?? `#${user.id}`}</span>
               </h2>
               <dl className="manage-facts">
+                <div><dt>نام کاربری</dt><dd dir="ltr">{user.username ?? "—"}</dd></div>
                 <div>
                   <dt>شناسه</dt>
                   <dd>{formatNumber(user.id)}</dd>
                 </div>
                 <div>
                   <dt>تأیید شماره</dt>
-                  <dd>{user.isPhoneVerified ? "تأییدشده" : "تأییدنشده"}</dd>
+                  <dd>{user.phone ? (user.isPhoneVerified ? "تأییدشده" : "تأییدنشده") : "شماره‌ای ثبت نشده"}</dd>
                 </div>
                 <div>
                   <dt>سفارش‌ها</dt>
@@ -360,6 +442,7 @@ export function Users() {
                   <dd>{formatNumber(user._count.addresses)}</dd>
                 </div>
               </dl>
+              {!user.deletedAt && <CredentialAssignment key={user.id} user={user} onSaved={() => setRevision((value) => value + 1)} />}
               <div className="manage-columns">
                 <div>
                   <h2>پت‌ها</h2>

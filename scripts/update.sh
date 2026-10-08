@@ -2,15 +2,15 @@
 # =====================================================================
 # update.sh — refresh the deployment after a code change
 #
-#   sudo ./scripts/update.sh [--seed] [--with-front] [--force]
+#   sudo ./scripts/update.sh --revision <approved-full-git-sha> [--seed] [--with-front]
 #
 # What it does (6 steps):
-#   1) git pull (fast-forward only; stops on uncommitted local changes)
+#   1) Advance main to an approved published SHA; stop on local divergence
 #   2) Rebuild the backend image (Docker layer cache keeps this fast)
 #   3) docker compose up -d — only changed containers are replaced
 #      (database migrations run automatically on boot)
 #   4) Health check
-#   5) Optional (--seed): re-run the idempotent seed
+#   5) Optional local seed; production demo seed is prohibited
 #   6) Optional (--with-front): rebuild frontend/dist and admin/dist
 #
 # Notes:
@@ -38,35 +38,76 @@ step "Checking arguments"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/backend/docker-compose.yml"
 
-DO_SEED=0 WITH_FRONT=0 FORCE=0
+DO_SEED=0 WITH_FRONT=0 APPROVED_REVISION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --seed)       DO_SEED=1; shift ;;
     --with-front) WITH_FRONT=1; shift ;;
-    --force)      FORCE=1; shift ;;
+    --revision)   APPROVED_REVISION="${2:?}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown argument: $1 (see --help)" ;;
   esac
 done
 [[ $EUID -eq 0 ]] || die "This script must run as root: sudo ./scripts/update.sh"
+[[ "$APPROVED_REVISION" =~ ^[0-9a-fA-F]{40}$ ]] || die "Pass the full owner-approved Git SHA with --revision."
+if [[ $WITH_FRONT -eq 1 ]]; then
+  command -v npm >/dev/null || die "npm is required for --with-front; deployment stopped before changes."
+  for site in frontend admin; do
+    [[ ! -L "$ROOT_DIR/$site/dist" ]] || die "External dist symlink detected; promote its release manually."
+    [[ ! -e "$ROOT_DIR/$site/dist.next" && ! -L "$ROOT_DIR/$site/dist.next" && ! -e "$ROOT_DIR/$site/dist.previous" && ! -L "$ROOT_DIR/$site/dist.previous" ]] || die "Previous frontend promotion files exist; preserve and reconcile them before retrying."
+  done
+fi
+PREVIOUS_REVISION="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
+compose() { docker compose -p backend --env-file "$ROOT_DIR/backend/.env" -f "$COMPOSE_FILE" "$@"; }
 
 # ---------- 1) pull latest code ----------
 step "Fetching the latest code from git"
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain)" ]]; then
-  [[ $FORCE -eq 1 ]] \
-    && warn "You have uncommitted local changes (--force) — continuing with pull" \
-    || die "Uncommitted local changes found — commit/stash them first, or use --force"
+  die "Uncommitted local changes found — preserve and reconcile them with main before deployment."
 fi
 
-git -C "$ROOT_DIR" fetch origin --quiet
-BEHIND="$(git -C "$ROOT_DIR" rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0)"
-if [[ "$BEHIND" == "0" ]]; then
-  info "Already up to date ($(git -C "$ROOT_DIR" log -1 --format='%h %s'))"
-else
-  git -C "$ROOT_DIR" pull --ff-only origin "$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
-  info "Pulled $BEHIND new commit(s): $(git -C "$ROOT_DIR" log -1 --format='%h %s')"
+[[ "$(git -C "$ROOT_DIR" branch --show-current)" == "main" ]] || die "Deployment checkout must be on main."
+git -C "$ROOT_DIR" fetch origin main --quiet
+APPROVED_REVISION="$(git -C "$ROOT_DIR" rev-parse --verify "$APPROVED_REVISION^{commit}")"
+git -C "$ROOT_DIR" merge-base --is-ancestor "$APPROVED_REVISION" origin/main || die "Approved revision is not published on origin/main."
+git -C "$ROOT_DIR" merge-base --is-ancestor HEAD "$APPROVED_REVISION" || die "Server has diverged from the approved revision; reconcile without overwriting it."
+if ! git -C "$ROOT_DIR" diff --quiet HEAD "$APPROVED_REVISION" -- frontend admin; then
+  [[ $WITH_FRONT -eq 1 ]] || die "This release changes the frontends; pass --with-front."
+fi
+if [[ $DO_SEED -eq 1 ]] && grep -Eq "^[[:space:]]*(export[[:space:]]+)?NODE_ENV[[:space:]]*=[[:space:]]*['\"]?production(['\"])?[[:space:]]*(#.*)?$" "$ROOT_DIR/backend/.env"; then
+  die "Production demo seed is prohibited; use a reviewed data migration instead."
+fi
+git -C "$ROOT_DIR" merge --ff-only "$APPROVED_REVISION"
+info "Deploying approved revision: $APPROVED_REVISION"
+
+# Preserve the database and the running image before migration/container changes.
+umask 077
+BACKUP_DIR="/var/backups/drgupet/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$BACKUP_DIR"
+compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -u root --single-transaction --routines --triggers --no-tablespaces "$MYSQL_DATABASE"' > "$BACKUP_DIR/database.sql"
+[[ -s "$BACKUP_DIR/database.sql" ]] || die "Database backup is empty; deployment stopped."
+CURRENT_IMAGE="$(docker inspect pet_backend --format '{{.Image}}')"
+docker tag "$CURRENT_IMAGE" "drgupet-backend:rollback-$(basename "$BACKUP_DIR")"
+printf '%s\n' "$APPROVED_REVISION" > "$BACKUP_DIR/target-revision"
+printf '%s\n' "$PREVIOUS_REVISION" > "$BACKUP_DIR/previous-revision"
+for site in frontend admin; do
+  [[ ! -d "$ROOT_DIR/$site/dist" ]] || cp -a "$ROOT_DIR/$site/dist" "$BACKUP_DIR/$site-dist"
+done
+info "Private database backup and rollback image preserved in $BACKUP_DIR"
+
+# Compile both apps before replacing the backend; a failed build aborts release.
+if [[ $WITH_FRONT -eq 1 ]]; then
+  export NODE_OPTIONS=--max-old-space-size=768
+  (umask 022; cd "$ROOT_DIR/frontend" && npm ci --no-audit --no-fund && VITE_API_BASE_URL=/api/v1 npm run build -- --outDir "$BACKUP_DIR/new-builds/frontend")
+  (umask 022; cd "$ROOT_DIR/admin" && npm ci --no-audit --no-fund && VITE_API_BASE_URL=/api/v1 npm run build -- --outDir "$BACKUP_DIR/new-builds/admin")
+  [[ -f "$BACKUP_DIR/new-builds/frontend/index.html" && -f "$BACKUP_DIR/new-builds/admin/index.html" ]] || die "Frontend build output missing; deployment stopped."
+fi
+[[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] || die "Source changed during build; deployment stopped."
+if [[ $WITH_FRONT -eq 1 ]]; then
+  for site in frontend admin; do
+    cp -a "$BACKUP_DIR/new-builds/$site" "$ROOT_DIR/$site/dist.next"
+  done
 fi
 
 # ---------- 2) rebuild backend image ----------
@@ -112,17 +153,22 @@ fi
 
 # ---------- 6) optional frontend rebuild ----------
 if [[ $WITH_FRONT -eq 1 ]]; then
-  step "Rebuilding frontend/dist and admin/dist"
-  if command -v npm >/dev/null; then
-    export NODE_OPTIONS=--max-old-space-size=768
-    info "Building frontend..."
-    (cd "$ROOT_DIR/frontend" && npm ci --no-audit --no-fund && npm run build)
-    info "Building admin panel..."
-    (cd "$ROOT_DIR/admin" && npm ci --no-audit --no-fund && npm run build)
-    info "Frontend builds are fresh (no nginx reload needed)"
-  else
-    warn "npm not found on this server — build the frontends in CI or install Node 20+"
-  fi
+  step "Both frontend builds completed before backend replacement"
+  for site in frontend admin; do
+    HAD_PREVIOUS=0
+    if [[ -d "$ROOT_DIR/$site/dist" ]]; then
+      mv "$ROOT_DIR/$site/dist" "$ROOT_DIR/$site/dist.previous"
+      HAD_PREVIOUS=1
+    fi
+    if ! mv "$ROOT_DIR/$site/dist.next" "$ROOT_DIR/$site/dist"; then
+      if [[ $HAD_PREVIOUS -eq 1 ]]; then
+        mv "$ROOT_DIR/$site/dist.previous" "$ROOT_DIR/$site/dist" || die "Frontend promotion and restoration failed; restore the preserved release manually."
+      fi
+      die "Frontend promotion failed; previous served files were preserved."
+    fi
+    [[ $HAD_PREVIOUS -eq 0 ]] || mv "$ROOT_DIR/$site/dist.previous" "$BACKUP_DIR/$site-before-promotion"
+  done
+  warn "Verify nginx serves these dist directories; external release paths must be promoted separately."
 else
   step "Skipping frontend rebuilds (use --with-front after UI changes)"
 fi

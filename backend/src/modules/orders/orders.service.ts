@@ -24,6 +24,10 @@ export class OrdersService {
    * Checkout from cart
    */
   async checkout(userId: number, data: { addressId: number; couponCode?: string; note?: string }) {
+    if (this.configService.get<string>('payment.driver') === 'disabled') {
+      throw new AppException('PAYMENT_UNAVAILABLE', 'پرداخت آنلاین هنوز فعال نشده است.', 503);
+    }
+
     // 1. Load cart
     const cart = await this.cartService.getCart(userId);
     if (cart.items.length === 0) {

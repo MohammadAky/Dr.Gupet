@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { MedicinesService } from './medicines.service';
 import { Public } from '../../common/decorators/public.decorator';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { MedicineQueryDto } from './dto/medicine-query.dto';
 
 @ApiTags('Medicines')
 @Controller('medicines')
@@ -16,7 +16,7 @@ export class MedicinesController {
   @ApiQuery({ name: 'petTypeId', required: false })
   @ApiQuery({ name: 'requiresPrescription', required: false })
   @ApiResponse({ status: 200, description: 'Medicines returned' })
-  async findAll(@Query() query: PaginationQueryDto & any) {
+  async findAll(@Query() query: MedicineQueryDto) {
     return this.medicinesService.findAll(query);
   }
 

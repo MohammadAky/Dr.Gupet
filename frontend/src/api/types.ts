@@ -39,6 +39,7 @@ export interface SessionUser {
   firstName: string | null;
   lastName: string | null;
   phone: string;
+  username: string | null;
   avatar: string | null;
   role: Role;
   status: UserStatus;
@@ -65,6 +66,7 @@ export interface UserProfile {
   firstName: string | null;
   lastName: string | null;
   phone: string;
+  username: string | null;
   avatar: string | null;
   role: Role;
   createdAt: string;

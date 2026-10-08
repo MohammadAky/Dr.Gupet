@@ -78,7 +78,7 @@ class EnvironmentVariables {
   @IsString()
   SMS_IR_LINE_NUMBER?: string;
 
-  @IsIn(['mock', 'zarinpal'])
+  @IsIn(['mock', 'zarinpal', 'disabled'])
   PAYMENT_DRIVER: string;
 
   @IsOptional()
@@ -152,8 +152,8 @@ export function validate(config: Record<string, unknown>) {
   // production, and real provider credentials must be present.
   const nodeEnv = validatedConfig.NODE_ENV;
   if (nodeEnv === Environment.Production) {
-    if (validatedConfig.PAYMENT_DRIVER !== 'zarinpal') {
-      throw new Error('PAYMENT_DRIVER must be "zarinpal" in production');
+    if (!['zarinpal', 'disabled'].includes(validatedConfig.PAYMENT_DRIVER)) {
+      throw new Error('PAYMENT_DRIVER must be "zarinpal" or "disabled" in production');
     }
     if (validatedConfig.SMS_DRIVER !== 'smsir') {
       throw new Error('SMS_DRIVER must be "smsir" in production');
@@ -161,7 +161,7 @@ export function validate(config: Record<string, unknown>) {
     if (!validatedConfig.SMS_API_KEY || !validatedConfig.SMS_IR_TEMPLATE_ID) {
       throw new Error('SMS_API_KEY and SMS_IR_TEMPLATE_ID are required in production');
     }
-    if (!validatedConfig.ZARINPAL_MERCHANT_ID) {
+    if (validatedConfig.PAYMENT_DRIVER === 'zarinpal' && !validatedConfig.ZARINPAL_MERCHANT_ID) {
       throw new Error('ZARINPAL_MERCHANT_ID is required in production');
     }
     if (!validatedConfig.OTP_HASH_SECRET) {

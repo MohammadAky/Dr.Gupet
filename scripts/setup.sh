@@ -12,24 +12,24 @@
 #   --with-front                   build frontend/ and admin/ here (Node 20+)
 #   --skip-ssl                     skip the SSL step
 #   --non-interactive              never prompt (for automation); missing values
-#                                  fall back to safe test defaults
+#                                  public deployment still requires real SMS
 #
 # What it does (10 steps):
 #   1) Check arguments
 #   2) Configuration wizard — domain, admin domain, email, admin phone,
-#      SMS provider (console / sms.ir + keys), payment (mock / zarinpal + keys)
+#      SMS provider, payment (disabled / zarinpal; mock is local only)
 #   3) Enable swap on small VMs (< 2 GB RAM) so builds never stall
 #   4) Install Docker, Docker Compose, nginx and certbot
 #   5) Generate backend/.env (strong secrets + all wizard answers)
 #   6) Build the backend image and start the stack (MySQL + Redis + backend)
 #   7) Wait for backend health — dumps container logs automatically on failure
-#   8) Seed reference data + the admin user (ADMIN_SEED_PHONE)
+#   8) Local-only seed; production data/admin provisioned separately
 #   9) Optional (--with-front): build frontend/ and admin/
 #  10) Optional: activate SSL — skips cleanly when DNS is not ready
 #
 # Notes:
-#   * Idempotent: secrets in an existing backend/.env are never overwritten;
-#     wizard answers update their specific keys so re-runs can fix settings.
+#   * One-time setup: an existing backend/.env stops the wizard before changes.
+#     Use update.sh with an approved revision for an existing deployment.
 #   * The first backend image build can take 5-20 minutes on a 1 vCPU VM.
 # =====================================================================
 set -euo pipefail
@@ -73,6 +73,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ $EUID -eq 0 ]] || die "This script must run as root: sudo ./scripts/setup.sh"
+[[ ! -f "$ENV_FILE" ]] || die "backend/.env already exists. Preserve this deployment and use update.sh --revision <approved-sha>; edit private settings separately."
 
 INTERACTIVE=0
 [[ $NON_INTERACTIVE -eq 0 && -t 0 ]] && INTERACTIVE=1
@@ -132,31 +133,46 @@ else
   SMS_DRIVER="console"
 fi
 
-choose2 PAY_CHOICE "Payment provider:" 1 \
-  "mock — TEST mode: fake payment page (no real money)" \
-  "zarinpal — real gateway (needs merchant id)"
+echo "Payment provider:"
+echo "  1) disabled — no checkout or payments until gateway licensing"
+echo "  2) zarinpal — real gateway (needs merchant id)"
+echo "  3) mock — local TEST mode only"
+PAY_CHOICE=1
+if [[ $INTERACTIVE -eq 1 ]]; then
+  read -rp "Choice [1]: " PAY_CHOICE || die "Cancelled"
+  PAY_CHOICE="${PAY_CHOICE:-1}"
+fi
+[[ "$PAY_CHOICE" =~ ^[123]$ ]] || die "Invalid payment provider choice"
 if [[ "$PAY_CHOICE" == "2" ]]; then
   PAYMENT_DRIVER="zarinpal"
   ask_secret ZARINPAL_MERCHANT_ID "Zarinpal merchant id"
   [[ -n "$ZARINPAL_MERCHANT_ID" ]] || die "zarinpal needs a merchant id"
   if [[ $INTERACTIVE -eq 1 ]]; then
-    read -rp "Enable Zarinpal SANDBOX (test) mode? [Y/n]: " _sb || die "Cancelled"
-    ZARINPAL_SANDBOX="true"; [[ "$_sb" =~ ^[Nn] ]] && ZARINPAL_SANDBOX="false"
+    read -rp "Enable Zarinpal SANDBOX (test) mode? [y/N]: " _sb || die "Cancelled"
+    ZARINPAL_SANDBOX="false"; [[ "$_sb" =~ ^[Yy] ]] && ZARINPAL_SANDBOX="true"
   else
-    ZARINPAL_SANDBOX="true"
+    ZARINPAL_SANDBOX="false"
   fi
-else
+elif [[ "$PAY_CHOICE" == "3" ]]; then
   PAYMENT_DRIVER="mock"
   ZARINPAL_SANDBOX="true"
+else
+  PAYMENT_DRIVER="disabled"
+  ZARINPAL_SANDBOX="false"
 fi
 
-# NODE_ENV=production is only valid with real providers (backend enforces this)
+# A public domain must never publish development authentication or mock payments.
 NODE_ENV_VALUE="development"
-if [[ "$SMS_DRIVER" == "smsir" && "$PAYMENT_DRIVER" == "zarinpal" ]]; then
+if [[ -n "$DOMAIN" && "$PAYMENT_DRIVER" == "zarinpal" && "$ZARINPAL_SANDBOX" == "true" ]]; then
+  die "Zarinpal sandbox is local only. Use disabled payments for a public site without a live gateway."
+fi
+if [[ "$SMS_DRIVER" == "smsir" && "$PAYMENT_DRIVER" != "mock" ]]; then
   NODE_ENV_VALUE="production"
+elif [[ -n "$DOMAIN" ]]; then
+  die "Public deployment requires sms.ir and disabled or zarinpal payments; test drivers are local only."
 else
   warn "Test drivers selected (SMS=$SMS_DRIVER, payment=$PAYMENT_DRIVER) -> NODE_ENV=development"
-  warn "The backend REFUSES to boot in production without smsir + zarinpal credentials."
+  warn "Development drivers are for local testing only."
   warn "You can upgrade later by editing backend/.env and running ./scripts/update.sh"
 fi
 
@@ -175,7 +191,7 @@ if [[ $INTERACTIVE -eq 1 ]]; then
   [[ "$_ok" =~ ^[Nn] ]] && die "Aborted by user"
 fi
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
+compose() { docker compose -p backend --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 # ---------- 3) swap for small VMs ----------
 step "Checking RAM / swap (1 GB VMs need swap for Docker + npm builds)"
@@ -241,7 +257,9 @@ set_env() {  # $1=key  $2=value
   fi
 }
 set_env NODE_ENV "$NODE_ENV_VALUE"
+set_env OTP_DEV_CODE ""
 set_env SMS_DRIVER "$SMS_DRIVER"
+set_env SMS_IR_BASE_URL "https://api.sms.ir/v1"
 set_env PAYMENT_DRIVER "$PAYMENT_DRIVER"
 set_env ZARINPAL_SANDBOX "$ZARINPAL_SANDBOX"
 set_env ADMIN_SEED_PHONE "$PHONE"
@@ -306,7 +324,7 @@ for i in $(seq 1 90); do
   if [[ "$STATE" == "restarting" && "${RESTARTS:-0}" -ge 2 ]]; then
     warn "Backend is crash-looping (restart #${RESTARTS}) — logs below"
     dump_backend_diagnostics
-    die "Backend keeps restarting. Typical causes: env validation (production needs smsir + zarinpal creds in backend/.env), wrong DATABASE_URL/MYSQL_PASSWORD, or a failed migration. Fix backend/.env and re-run this script."
+    die "Backend keeps restarting. Check production sms.ir settings and disabled or licensed payment driver, private database credentials, and migrations. Preserve this deployment before retrying."
   fi
   if [[ $i -eq 90 ]]; then
     dump_backend_diagnostics
@@ -317,8 +335,12 @@ for i in $(seq 1 90); do
 done
 
 # ---------- 8) seed ----------
-step "Seeding reference data + admin user (ADMIN_SEED_PHONE)"
-compose exec -T backend npm run prisma:seed || warn "Seed failed — run it later: docker compose -f backend/docker-compose.yml exec backend npm run prisma:seed"
+step "Checking reference-data initialization"
+if [[ "$NODE_ENV_VALUE" == "production" ]]; then
+  warn "Production demo seed skipped. Provision approved reference data and the first admin separately; existing data is preserved."
+else
+  compose exec -T backend npm run prisma:seed || warn "Local seed failed; inspect it before retrying."
+fi
 
 # ---------- 9) optional frontend builds ----------
 if [[ $WITH_FRONT -eq 1 ]]; then
@@ -326,9 +348,9 @@ if [[ $WITH_FRONT -eq 1 ]]; then
   if command -v npm >/dev/null; then
     export NODE_OPTIONS=--max-old-space-size=768
     info "Building frontend..."
-    (cd "$ROOT_DIR/frontend" && npm ci --no-audit --no-fund && npm run build)
+    (cd "$ROOT_DIR/frontend" && npm ci --no-audit --no-fund && VITE_API_BASE_URL=/api/v1 npm run build)
     info "Building admin panel..."
-    (cd "$ROOT_DIR/admin" && npm ci --no-audit --no-fund && npm run build)
+    (cd "$ROOT_DIR/admin" && npm ci --no-audit --no-fund && VITE_API_BASE_URL=/api/v1 npm run build)
     info "frontend/dist and admin/dist are ready"
   else
     warn "npm not found — build the frontends later (or in CI) and re-run scripts/ssl.sh"

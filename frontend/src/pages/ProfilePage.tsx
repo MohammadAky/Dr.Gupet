@@ -9,6 +9,7 @@ import { validateUploadFile } from '../lib/schemas';
 import { errorText } from '../lib/labels';
 import { API_BASE_URL } from '../lib/env';
 import { safeImageUrl } from '../lib/image-url';
+import { PasswordChange } from '../components/PasswordChange';
 
 /** Profile (F3): name + avatar editing; the phone number is read-only. */
 export function ProfilePage() {
@@ -73,8 +74,11 @@ export function ProfilePage() {
         <h1>سلام، {user.firstName || 'همراه گوپت'}</h1>
         <p>اطلاعات حساب و بخش‌های شخصی شما اینجاست.</p>
         <span dir="ltr" className="account-hero__phone">
-          {user.phone}
+          {user.phone ?? user.username ?? `#${user.id}`}
         </span>
+        <p>
+          نام کاربری: <bdi>{user.username ?? 'هنوز ثبت نشده'}</bdi>
+        </p>
       </div>
       <nav className="account-grid" aria-label="بخش‌های حساب">
         <Link to="/addresses">
@@ -150,6 +154,7 @@ export function ProfilePage() {
         {notice && <p role="status">{notice}</p>}
         {save.error && <ErrorState error={save.error} />}
       </div>
+      <PasswordChange />
     </section>
   );
 }

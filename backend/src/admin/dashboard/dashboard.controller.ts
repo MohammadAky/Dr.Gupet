@@ -5,6 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
+import { withUsername } from '../../modules/auth/auth-user';
 
 @ApiTags('Admin - Dashboard')
 @Controller('admin')
@@ -32,10 +33,11 @@ export class DashboardController {
         role: true,
         status: true,
         createdAt: true,
+        passwordCredential: { select: { username: true } },
       },
     });
     if (!user) throw new NotFoundException('کاربر یافت نشد');
-    return user;
+    return withUsername(user);
   }
 
   @Get('dashboard')

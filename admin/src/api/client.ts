@@ -114,6 +114,7 @@ export interface AdminIdentity {
   firstName: string | null;
   lastName: string | null;
   phone: string;
+  username: string | null;
   role: "ADMIN" | "USER";
   status: string;
 }
@@ -124,6 +125,8 @@ export interface TokenPair {
 }
 
 export const adminApi = {
+  loginPassword: (username: string, password: string) =>
+    apiRequest<TokenPair>("/auth/password/login", { method: "POST", body: { username, password } }),
   requestOtp: (phone: string) =>
     apiRequest<{ expiresIn: number; cooldownSeconds?: number }>("/auth/otp/request", {
       method: "POST",
