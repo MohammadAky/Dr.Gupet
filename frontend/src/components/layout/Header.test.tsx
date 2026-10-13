@@ -2,7 +2,7 @@
 import { act, useState, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
-import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { shopApi, type Page } from '../../api/endpoints-shop';
 import type { Medicine, Pharmacy, ProductCard } from '../../api/types';
@@ -18,22 +18,37 @@ function CurrentPath() {
   return <output data-testid="current-path">{location.pathname}</output>;
 }
 
+function HistoryBackButton() {
+  const navigate = useNavigate();
+  return (
+    <button id="history-back" type="button" onClick={() => navigate(-1)}>
+      بازگشت
+    </button>
+  );
+}
+
 function Harness({ onSubmit }: { onSubmit?: (event: FormEvent<HTMLFormElement>) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   return (
-    <><Header
-      status="guest"
-      userName={null}
-      cartCount={0}
-      search={search}
-      menuOpen={menuOpen}
-      onSearchChange={setSearch}
-      onSearchSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSubmit?.(event); }}
-      onMenuToggle={() => setMenuOpen((open) => !open)}
-      onMenuClose={() => setMenuOpen(false)}
-      onLogout={() => {}}
-    /><CurrentPath /></>
+    <>
+      <Header
+        status="guest"
+        userName={null}
+        cartCount={0}
+        search={search}
+        menuOpen={menuOpen}
+        onSearchChange={setSearch}
+        onSearchSubmit={(event: FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          onSubmit?.(event);
+        }}
+        onMenuToggle={() => setMenuOpen((open) => !open)}
+        onMenuClose={() => setMenuOpen(false)}
+        onLogout={() => {}}
+      />
+      <CurrentPath />
+    </>
   );
 }
 
@@ -43,18 +58,40 @@ const page = <T,>(data: T[], totalPages = 1): Page<T> => ({
 });
 
 const product = {
-  id: 1, name: 'غذای رویال کنین', slug: 'royal-canin', brand: { id: 1, name: 'رویال' },
-  image: null, minPrice: 100, inStock: true, lifeStage: 'ALL', sizeClass: 'ALL',
+  id: 1,
+  name: 'غذای رویال کنین',
+  slug: 'royal-canin',
+  brand: { id: 1, name: 'رویال' },
+  image: null,
+  minPrice: 100,
+  inStock: true,
+  lifeStage: 'ALL',
+  sizeClass: 'ALL',
 } satisfies ProductCard;
 
 const medicine = {
-  id: 2, name: 'داروی رویال', activeIngredient: null, type: null, brand: null, usage: null,
-  notes: null, requiresPrescription: false, image: null, isActive: true, petTypes: [],
+  id: 2,
+  name: 'داروی رویال',
+  activeIngredient: null,
+  type: null,
+  brand: null,
+  usage: null,
+  notes: null,
+  requiresPrescription: false,
+  image: null,
+  isActive: true,
+  petTypes: [],
 } satisfies Medicine;
 
 const pharmacy = {
-  id: 3, name: 'داروخانه رویال', city: 'تهران', province: 'تهران', address: 'تهران',
-  phone: null, is24h: false, isVerified: true,
+  id: 3,
+  name: 'داروخانه رویال',
+  city: 'تهران',
+  province: 'تهران',
+  address: 'تهران',
+  phone: null,
+  is24h: false,
+  isVerified: true,
 } satisfies Pharmacy;
 
 const clinic = { ...pharmacy, id: 4, name: 'کلینیک رویال' };
@@ -120,36 +157,54 @@ describe('mobile header controls', () => {
   });
 
   it('preserves page input on query changes and makes keyboard route changes immediate', async () => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    await act(async () => root.render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={['/products']}>
-          <Routes>
-            <Route element={<Shell />}>
-              <Route path="products" element={<>
-                <input aria-label="یادداشت آزمایشی" defaultValue="" />
-                <Link id="query-link" to="/products?q=غذا">جست‌وجو</Link>
-                <Link id="page-link" to="/clinics">کلینیک‌ها</Link>
-              </>} />
-              <Route path="clinics" element={<h1>فهرست کلینیک‌ها</h1>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    ));
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={['/products']}>
+            <Routes>
+              <Route element={<Shell />}>
+                <Route
+                  path="products"
+                  element={
+                    <>
+                      <input aria-label="یادداشت آزمایشی" defaultValue="" />
+                      <Link id="query-link" to="/products?q=غذا">
+                        جست‌وجو
+                      </Link>
+                      <Link id="page-link" to="/clinics">
+                        کلینیک‌ها
+                      </Link>
+                    </>
+                  }
+                />
+                <Route path="clinics" element={<h1>فهرست کلینیک‌ها</h1>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+    );
     const shell = container.querySelector<HTMLElement>('.app-shell')!;
     const main = container.querySelector('main')!;
     const input = main.querySelector('input')!;
     input.value = 'یادداشت حفظ شود';
+    const queryLink = container.querySelector<HTMLAnchorElement>('#query-link')!;
+    await act(async () => queryLink.focus());
     await act(async () => {
       shell.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-      container.querySelector('#query-link')!.dispatchEvent(
-        new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, button: 0 }),
-      );
+      container
+        .querySelector('#query-link')!
+        .dispatchEvent(
+          new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, button: 0 }),
+        );
     });
     expect(container.querySelector('main')).toBe(main);
     expect(main.querySelector('input')).toBe(input);
     expect(input.value).toBe('یادداشت حفظ شود');
+    expect(document.activeElement).toBe(queryLink);
+    expect(scroll).not.toHaveBeenCalled();
     expect(shell.dataset.routeMotion).toBe('enter');
 
     await act(async () => {
@@ -160,7 +215,61 @@ describe('mobile header controls', () => {
     expect(container.querySelector('main')).not.toBe(main);
     expect(shell.dataset.routeMotion).toBe('instant');
     expect(container.querySelector('main')?.textContent).toBe('فهرست کلینیک‌ها');
+    expect(document.activeElement).toBe(container.querySelector('main'));
+    expect(scroll).toHaveBeenCalledWith({ top: 0, behavior: 'instant' });
     expect(container.querySelector('.app-shell')).toBe(shell);
+    client.clear();
+  });
+
+  it('focuses the destination after pointer navigation and restores page scroll when going back', async () => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    vi.stubGlobal('scrollY', 684);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={['/products']}>
+            <Routes>
+              <Route element={<Shell />}>
+                <Route
+                  path="products"
+                  element={
+                    <Link id="pointer-page" to="/clinics">
+                      کلینیک‌ها
+                    </Link>
+                  }
+                />
+                <Route
+                  path="clinics"
+                  element={
+                    <>
+                      <h1>فهرست کلینیک‌ها</h1>
+                      <HistoryBackButton />
+                    </>
+                  }
+                />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+    );
+    const shell = container.querySelector<HTMLElement>('.app-shell')!;
+    const link = container.querySelector<HTMLAnchorElement>('#pointer-page')!;
+    await act(async () => {
+      link.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      link.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, button: 0 }),
+      );
+    });
+    expect(shell.dataset.routeMotion).toBe('enter');
+    expect(document.activeElement).toBe(container.querySelector('main'));
+    expect(scroll).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
+    vi.stubGlobal('scrollY', 203);
+    await act(async () => container.querySelector<HTMLButtonElement>('#history-back')?.click());
+    expect(scroll).toHaveBeenLastCalledWith({ top: 684, behavior: 'instant' });
+    expect(document.activeElement).toBe(container.querySelector('main'));
+    expect(container.querySelector('#pointer-page')).not.toBeNull();
     client.clear();
   });
 
@@ -170,7 +279,13 @@ describe('mobile header controls', () => {
     const medicines = vi.spyOn(shopApi, 'medicines').mockResolvedValue(page([medicine]));
     const pharmacies = vi.spyOn(shopApi, 'pharmacies').mockResolvedValue(page([pharmacy]));
     const clinics = vi.spyOn(shopApi, 'clinics').mockResolvedValue(page([clinic]));
-    await act(async () => root.render(<MemoryRouter><Harness /></MemoryRouter>));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <Harness />
+        </MemoryRouter>,
+      ),
+    );
     const input = container.querySelector<HTMLInputElement>('.header-search input')!;
 
     await changeInput(input, 'رو');
@@ -184,8 +299,11 @@ describe('mobile header controls', () => {
     expect(medicines).toHaveBeenCalledWith({ q: 'روی', limit: 5 });
     expect(pharmacies).toHaveBeenCalledWith({ page: 1, limit: 50 });
     expect(clinics).toHaveBeenCalledWith({ page: 1, limit: 50 });
-    expect(Array.from(container.querySelectorAll('.search-suggestions__heading')).map((node) => node.textContent))
-      .toEqual(['محصولات', 'داروها', 'داروخانه‌ها', 'کلینیک‌ها']);
+    expect(
+      Array.from(container.querySelectorAll('.search-suggestions__heading')).map(
+        (node) => node.textContent,
+      ),
+    ).toEqual(['محصولات', 'داروها', 'داروخانه‌ها', 'کلینیک‌ها']);
     expect(container.querySelectorAll('[role="option"]')).toHaveLength(4);
 
     const firstOption = container.querySelector<HTMLElement>('#desktop-search-option-0')!;
@@ -196,21 +314,40 @@ describe('mobile header controls', () => {
     expect(input.getAttribute('aria-activedescendant')).toBe('desktop-search-option-0');
     expect(firstOption.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
     await act(async () => {
-      input.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      input
+        .closest('form')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
-    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe('/products/royal-canin');
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe(
+      '/products/royal-canin',
+    );
   });
 
   it('reuses directory pages between keystrokes and ignores older query replies', async () => {
     vi.useFakeTimers();
     let resolveOlder!: (value: Page<ProductCard>) => void;
-    const older = new Promise<Page<ProductCard>>((resolve) => { resolveOlder = resolve; });
-    const products = vi.spyOn(shopApi, 'products').mockImplementation(({ q }) =>
-      q === 'روی' ? older : Promise.resolve(page([{ ...product, id: 5, name: 'غذای رویال دوم', slug: 'royal-two' }])));
+    const older = new Promise<Page<ProductCard>>((resolve) => {
+      resolveOlder = resolve;
+    });
+    const products = vi
+      .spyOn(shopApi, 'products')
+      .mockImplementation(({ q }) =>
+        q === 'روی'
+          ? older
+          : Promise.resolve(
+              page([{ ...product, id: 5, name: 'غذای رویال دوم', slug: 'royal-two' }]),
+            ),
+      );
     vi.spyOn(shopApi, 'medicines').mockResolvedValue(page([]));
     const pharmacies = vi.spyOn(shopApi, 'pharmacies').mockResolvedValue(page([pharmacy]));
     const clinics = vi.spyOn(shopApi, 'clinics').mockResolvedValue(page([clinic]));
-    await act(async () => root.render(<MemoryRouter><Harness /></MemoryRouter>));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <Harness />
+        </MemoryRouter>,
+      ),
+    );
     const input = container.querySelector<HTMLInputElement>('.header-search input')!;
 
     await changeInput(input, 'روی');
@@ -222,27 +359,42 @@ describe('mobile header controls', () => {
     expect(clinics).toHaveBeenCalledTimes(1);
     expect(container.querySelector('[role="option"]')?.textContent).toContain('غذای رویال دوم');
 
-    await act(async () => { resolveOlder(page([product])); await Promise.resolve(); });
+    await act(async () => {
+      resolveOlder(page([product]));
+      await Promise.resolve();
+    });
     expect(container.querySelector('[role="option"]')?.textContent).toContain('غذای رویال دوم');
-    expect(container.querySelector('[role="option"]')?.textContent).not.toContain('غذای رویال کنین');
+    expect(container.querySelector('[role="option"]')?.textContent).not.toContain(
+      'غذای رویال کنین',
+    );
   });
 
   it('indicates a truncated directory and lets users select a clinic by touch or click', async () => {
     vi.useFakeTimers();
     vi.spyOn(shopApi, 'products').mockResolvedValue(page([]));
     vi.spyOn(shopApi, 'medicines').mockResolvedValue(page([]));
-    const pharmacies = vi.spyOn(shopApi, 'pharmacies').mockImplementation(({ page: pageNumber }) =>
-      Promise.resolve(page(pageNumber === 1 ? [pharmacy] : [], 6)));
+    const pharmacies = vi
+      .spyOn(shopApi, 'pharmacies')
+      .mockImplementation(({ page: pageNumber }) =>
+        Promise.resolve(page(pageNumber === 1 ? [pharmacy] : [], 6)),
+      );
     vi.spyOn(shopApi, 'clinics').mockResolvedValue(page([clinic]));
-    await act(async () => root.render(<MemoryRouter><Harness /></MemoryRouter>));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <Harness />
+        </MemoryRouter>,
+      ),
+    );
     const input = container.querySelector<HTMLInputElement>('.header-search input')!;
     await changeInput(input, 'روی');
     await advanceSearch();
     expect(pharmacies.mock.calls.map(([filters]) => filters.page)).toEqual([1, 2, 3, 4, 5]);
     expect(container.textContent).toContain('پیشنهادهای مراکز به فهرست بارگذاری‌شده محدودند.');
     expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
-    const clinicOption = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="option"]'))
-      .find((node) => node.textContent?.includes('کلینیک رویال'))!;
+    const clinicOption = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ).find((node) => node.textContent?.includes('کلینیک رویال'))!;
     await act(async () => clinicOption.click());
     expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe('/clinics/4');
   });
@@ -253,16 +405,28 @@ describe('mobile header controls', () => {
     vi.spyOn(shopApi, 'medicines').mockResolvedValue(page([medicine]));
     vi.spyOn(shopApi, 'pharmacies').mockResolvedValue(page([]));
     vi.spyOn(shopApi, 'clinics').mockResolvedValue(page([]));
-    await act(async () => root.render(<MemoryRouter><Harness /></MemoryRouter>));
-    await act(async () => container.querySelector<HTMLButtonElement>('.mobile-search-trigger')?.click());
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <Harness />
+        </MemoryRouter>,
+      ),
+    );
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('.mobile-search-trigger')?.click(),
+    );
     const input = container.querySelector<HTMLInputElement>('.mobile-search input')!;
     expect(container.querySelector('.mobile-toggle')).not.toBeNull();
     await changeInput(input, 'روی');
     await advanceSearch();
     expect(input.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('#mobile-search-suggestions')).not.toBeNull();
-    await act(async () => container.querySelector<HTMLButtonElement>('#mobile-search-option-0')?.click());
-    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe('/medicines/2');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('#mobile-search-option-0')?.click(),
+    );
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe(
+      '/medicines/2',
+    );
     expect(container.querySelector('.mobile-search')?.hasAttribute('hidden')).toBe(true);
   });
 
@@ -273,13 +437,21 @@ describe('mobile header controls', () => {
     vi.spyOn(shopApi, 'medicines').mockRejectedValue(new Error('offline'));
     vi.spyOn(shopApi, 'pharmacies').mockRejectedValue(new Error('offline'));
     vi.spyOn(shopApi, 'clinics').mockRejectedValue(new Error('offline'));
-    await act(async () => root.render(<MemoryRouter><Harness onSubmit={onSubmit} /></MemoryRouter>));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <Harness onSubmit={onSubmit} />
+        </MemoryRouter>,
+      ),
+    );
     const input = container.querySelector<HTMLInputElement>('.header-search input')!;
     await changeInput(input, 'روی');
     await advanceSearch();
     expect(container.textContent).toContain('دریافت نتایج ممکن نشد؛ دوباره تلاش کنید.');
     await act(async () => {
-      input.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      input
+        .closest('form')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });

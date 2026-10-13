@@ -86,7 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await apiRequest<T>(path, { ...options, token: pair.accessToken });
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401) {
-        if (error instanceof ApiError && error.status === 403) clearSession();
+        if (error instanceof ApiError && error.status === 403 &&
+          version.current === startedAt) clearSession();
         throw error;
       }
       if (version.current !== startedAt)

@@ -5,6 +5,8 @@ import { formatToman } from '../lib/format';
 import { API_BASE_URL } from '../lib/env';
 import { safeImageUrl } from '../lib/image-url';
 import { LIFE_STAGE_FA, SIZE_CLASS_FA } from '../lib/labels';
+import { SafeImage } from './SafeImage';
+import { isSampleProduct } from '../lib/sample-records';
 
 /**
  * The single product card renderer used by home, catalog, favorites and
@@ -20,15 +22,17 @@ export function ProductCardView({
   actions?: ReactNode;
 }) {
   const imageUrl = safeImageUrl(card.image, window.location.origin, API_BASE_URL);
+  const sample = isSampleProduct(card);
   return (
     <article className="product-card" data-product-id={card.id}>
       <Link to={`/products/${card.slug}`} className="product-card__link">
         <div className="product-card__media">
-          {imageUrl ? (
-            <img src={imageUrl} alt={card.name} loading="lazy" referrerPolicy="no-referrer" />
-          ) : (
-            <span className="product-card__placeholder" aria-hidden="true" />
-          )}
+          <SafeImage
+            src={imageUrl ?? undefined}
+            alt={card.name}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <h3>{card.name}</h3>
         <p className="product-card__brand">{card.brand.name}</p>
@@ -41,8 +45,8 @@ export function ProductCardView({
             )}
             <p className="product-card__price">{formatToman(card.minPrice)}</p>
           </div>
-          <span className={`stock-pill${card.inStock ? '' : ' stock-pill--out'}`}>
-            {card.inStock ? 'موجود' : 'ناموجود'}
+          <span className={`stock-pill${card.inStock && !sample ? '' : ' stock-pill--out'}`}>
+            {sample ? 'نمونهٔ نمایشی؛ غیرقابل خرید' : card.inStock ? 'موجود' : 'ناموجود'}
           </span>
         </div>
         <p className="product-card__meta">

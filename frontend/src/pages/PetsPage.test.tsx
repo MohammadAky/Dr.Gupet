@@ -68,11 +68,13 @@ describe('pets list mutations', () => {
     await renderPage();
     const remove = container.querySelector<HTMLButtonElement>('li button')!;
     await act(async () => { remove.click(); remove.click(); });
-    expect(window.confirm).toHaveBeenCalledWith('«باران» حذف شود؟');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('باران');
+    expect(api.deletePet).not.toHaveBeenCalled();
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === 'حذف حیوان')!.click());
     expect(api.deletePet).toHaveBeenCalledTimes(1);
     expect(remove.disabled).toBe(true);
     await act(async () => pending.reject(new Error('حذف انجام نشد')));
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('حذف انجام نشد');
+    expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toBe('حذف انجام نشد');
     expect(window.alert).not.toHaveBeenCalled();
     expect(remove.disabled).toBe(false);
   });
@@ -82,6 +84,7 @@ describe('pets list mutations', () => {
     vi.mocked(api.deletePet).mockResolvedValue(undefined);
     await renderPage();
     await act(async () => container.querySelector<HTMLButtonElement>('li button')?.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === 'حذف حیوان')!.click());
     await vi.waitFor(() => expect(container.querySelector('[role="status"]')?.textContent).toBe('حیوان حذف شد.'));
     expect(api.listPets).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain('هنوز حیوان خانگی ثبت نکرده‌اید.');
@@ -92,6 +95,7 @@ describe('pets list mutations', () => {
     vi.mocked(api.deletePet).mockReturnValue(pending.promise);
     await renderPage();
     await act(async () => container.querySelector<HTMLButtonElement>('li button')?.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === 'حذف حیوان')!.click());
     const invalidate = vi.spyOn(client, 'invalidateQueries');
     authState.userId = 2;
     await renderPage();

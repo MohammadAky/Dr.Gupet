@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "./auth";
 import { PasswordInput } from "./PasswordInput";
-import { credentialError, normalizePhone, normalizeUsername, passwordHint, usernameHint } from "./password";
+import { credentialError, credentialFieldErrors, normalizePhone, normalizeUsername, passwordHint, usernameHint } from "./password";
 import {
+  confirmAction, markFormSaved, showFieldErrors,
   errorMessage,
   formatDate,
   formatMoney,
@@ -11,6 +12,7 @@ import {
   PageHeader,
   Paginator,
   QueryState,
+  useInlinePanelFocus,
   useDetail,
   usePaged,
 } from "./management";
@@ -70,16 +72,19 @@ function CredentialAssignment({ user, onSaved }: { user: UserRow; onSaved(): voi
   const pending = useRef(false);
   const mounted = useRef(true);
   useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (pending.current) return;
     const problem = credentialError(username, password, confirm);
+    showFieldErrors(form, credentialFieldErrors(username, password, confirm, "assign"));
     setError(problem); setNotice("");
     if (problem) return;
     pending.current = true; setBusy(true);
     try {
       await request(`/admin/users/${user.id}/password-account`, { method: "POST", body: { username: normalizeUsername(username), password } });
       if (!mounted.current) return;
+      markFormSaved(form);
       setPassword(""); setConfirm("");
       if (identity?.id === user.id) { logout(); return; }
       setNotice("اطلاعات ورود ذخیره شد؛ نشست‌های قبلی این کاربر پایان یافتند.");
@@ -91,13 +96,13 @@ function CredentialAssignment({ user, onSaved }: { user: UserRow; onSaved(): voi
   return <section className="credential-panel" aria-label="اطلاعات ورود کاربر">
     <h3>{user.username ? "بازنشانی اطلاعات ورود" : "فعال‌سازی ورود با رمز"}</h3>
     <p>برای همین کاربر با شمارهٔ <bdi>{user.phone}</bdi> ذخیره می‌شود. نشست‌های قبلی پایان می‌یابند.{identity?.id === user.id ? " پس از ذخیره باید دوباره وارد پنل شوید." : ""}</p>
-    <form className="manage-toolbar" onSubmit={(event) => void submit(event)} noValidate>
+    <form className="manage-form credential-form" onSubmit={(event) => void submit(event)} noValidate>
       <label>نام کاربری<input name="username" dir="ltr" autoComplete="off" autoCapitalize="none" spellCheck={false} value={username} disabled={busy} onChange={(event) => setUsername(event.target.value)} /></label>
       <p className="credential-hint">{usernameHint}</p>
       <div><label htmlFor="assign-password">رمز عبور جدید</label><PasswordInput id="assign-password" value={password} onChange={setPassword} disabled={busy} /></div>
       <div><label htmlFor="assign-confirm">تکرار رمز عبور جدید</label><PasswordInput id="assign-confirm" value={confirm} onChange={setConfirm} disabled={busy} /></div>
       <p className="credential-hint">{passwordHint}</p>
-      <button className="manage-primary" type="submit" disabled={busy}>{busy ? "در حال ذخیره…" : "ذخیرهٔ اطلاعات ورود"}</button>
+      <div className="manage-actions manage-full"><button className="manage-primary" type="submit" disabled={busy}>{busy ? "در حال ذخیره…" : "ذخیرهٔ اطلاعات ورود"}</button></div>
       <Notice message={error} /><Notice message={notice} kind="success" />
     </form>
   </section>;
@@ -105,6 +110,11 @@ function CredentialAssignment({ user, onSaved }: { user: UserRow; onSaved(): voi
 
 export function Users() {
   const { request, identity } = useAuth();
+  const mutationPending = useRef(false);
+  const mounted = useRef(true);
+  const selectionVersion = useRef(0);
+  const editFieldsRef = useRef<HTMLFieldSetElement | null>(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; selectionVersion.current += 1; }; }, []);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [applied, setApplied] = useState("");
@@ -117,6 +127,8 @@ export function Users() {
   const [editRole, setEditRole] = useState<"USER" | "ADMIN">("USER");
   const [editStatus, setEditStatus] = useState<"ACTIVE" | "BLOCKED">("ACTIVE");
   const [creating, setCreating] = useState(false);
+  const { panelRef: createPanelRef, reveal: revealCreate, restore: restoreCreate } = useInlinePanelFocus<HTMLFormElement>();
+  const { panelRef: detailPanelRef, reveal: revealDetail, restore: restoreDetail } = useInlinePanelFocus();
   const [newPhone, setNewPhone] = useState("");
   const [newFirstName, setNewFirstName] = useState("");
   const [newLastName, setNewLastName] = useState("");
@@ -143,7 +155,9 @@ export function Users() {
   );
   useEffect(() => {
     if (!detail.data) return;
+    let current = true;
     queueMicrotask(() => {
+      if (!current) return;
       setFirstName(detail.data?.firstName || "");
       setLastName(detail.data?.lastName || "");
       if (detail.data) {
@@ -151,6 +165,7 @@ export function Users() {
         setEditStatus(detail.data.status);
       }
     });
+    return () => { current = false; };
   }, [detail.data]);
 
   async function mutate(
@@ -160,24 +175,33 @@ export function Users() {
     success: string,
     confirmText?: string,
   ) {
-    if (confirmText && !window.confirm(confirmText)) return;
-    setBusy(true);
-    setError("");
-    setMessage("");
+    if (mutationPending.current || createPending.current) return;
+    mutationPending.current = true;
+    const version = selectionVersion.current;
+    const owner = editFieldsRef.current;
     try {
+      if (confirmText && !await confirmAction(confirmText, "تأیید تغییر حساب")) return;
+      if (!mounted.current || version !== selectionVersion.current) return;
+      setBusy(true); setError(""); setMessage("");
       await request(path, { method, ...(body === undefined ? {} : { body }) });
+      if (!mounted.current) return;
+      if (owner) markFormSaved(owner);
       setRevision((value) => value + 1);
-      setMessage(success);
+      if (version === selectionVersion.current) setMessage(success);
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current && version === selectionVersion.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      mutationPending.current = false; if (mounted.current) setBusy(false);
     }
   }
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || createPending.current) return;
-    if (!/^09\d{9}$/.test(normalizePhone(newPhone))) { setError("شمارهٔ موبایل معتبر وارد کنید."); return; }
+    const form = event.currentTarget;
+    if (busy || createPending.current || mutationPending.current) return;
+    const errors = accountKind === "password" ? credentialFieldErrors(newUsername, newPassword, newConfirm, "create") : {};
+    if (!/^09\d{9}$/.test(normalizePhone(newPhone))) errors.phone = "شمارهٔ موبایل معتبر وارد کنید.";
+    showFieldErrors(form, errors);
+    if (Object.keys(errors).length) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     if (accountKind === "password") {
       const problem = credentialError(newUsername, newPassword, newConfirm);
       if (problem) { setError(problem); return; }
@@ -198,6 +222,7 @@ export function Users() {
         },
       });
       setRevision((value) => value + 1);
+      markFormSaved(form);
       setNewPhone("");
       setNewUsername(""); setNewPassword(""); setNewConfirm("");
       setNewFirstName("");
@@ -225,19 +250,26 @@ export function Users() {
         title="کاربران"
         description="پروندهٔ کاربران، نقش و وضعیت دسترسی را همراه با تاریخچهٔ مرتبط بررسی کنید."
       />
-      <section className="manage-card" aria-label="افزودن کاربر">
-        <div className="manage-actions">
+      <section id="user-create-editor" data-draft-region className="manage-card" aria-label="افزودن کاربر">
+        <div className="manage-section-heading">
+          <div><h2>حساب تازه</h2><p>شمارهٔ یکتا، روش ورود و سطح دسترسی را مشخص کنید.</p></div>
+          <div className="manage-actions">
           <button
             type="button"
             className="manage-primary"
             disabled={busy}
-            onClick={() => { setCreating((value) => !value); setNewPassword(""); setNewConfirm(""); }}
+            onClick={(event) => {
+              if (creating) restoreCreate();
+              else revealCreate(event.currentTarget);
+              setCreating((value) => !value); setNewPassword(""); setNewConfirm("");
+            }}
           >
             {creating ? "بستن فرم" : "افزودن کاربر"}
           </button>
+          </div>
         </div>
         {creating && (
-          <form className="manage-toolbar" onSubmit={createUser} noValidate>
+          <form ref={createPanelRef} tabIndex={-1} aria-label="ساخت حساب کاربر" className="manage-form credential-form" onSubmit={createUser} noValidate>
             <label>روش ورود حساب
               <select value={accountKind} disabled={busy} onChange={(event) => { setAccountKind(event.target.value as "password" | "otp"); setNewPassword(""); setNewConfirm(""); setError(""); }}>
                 <option value="password">نام کاربری و رمز عبور</option><option value="otp">کد پیامکی</option>
@@ -255,6 +287,7 @@ export function Users() {
               <input
                 dir="ltr"
                 value={newPhone}
+                name="phone"
                 onChange={(event) => setNewPhone(event.target.value)}
                 placeholder="09xxxxxxxxx"
                 required
@@ -295,9 +328,9 @@ export function Users() {
                 <option value="ADMIN">مدیر</option>
               </select>
             </label>
-            <button type="submit" className="manage-primary" disabled={busy}>
+            <div className="manage-actions manage-full"><button type="submit" className="manage-primary" disabled={busy}>
               ثبت کاربر
-            </button>
+            </button></div>
             <Notice message={error} />
             <Notice message={message} kind="success" />
           </form>
@@ -354,7 +387,7 @@ export function Users() {
         {list.data && list.data.data.length > 0 && (
           <>
             <div className="manage-table-wrap">
-              <table className="manage-table">
+              <table className="manage-table manage-table--users">
                 <thead>
                   <tr>
                     <th>کاربر</th>
@@ -369,15 +402,17 @@ export function Users() {
                 <tbody>
                   {list.data.data.map((item) => (
                     <tr key={item.id}>
-                      <td>{fullName(item)}</td>
-                      <td dir="ltr">{item.phone ?? item.username ?? `#${item.id}`}</td>
-                      <td>{item.role === "ADMIN" ? "مدیر" : "کاربر"}</td>
+                      <td><strong>{fullName(item)}</strong><small>شناسهٔ {formatNumber(item.id)}</small></td>
+                      <td><bdi>{item.phone}</bdi><small><bdi>{item.username ?? "نام کاربری ثبت نشده"}</bdi></small></td>
+                      <td><span className={"manage-badge" + (item.role === "ADMIN" ? " manage-badge--admin" : "")}>{item.role === "ADMIN" ? "مدیر" : "کاربر"}</span></td>
                       <td>
+                        <span className={"manage-badge" + (item.deletedAt || item.status === "BLOCKED" ? " manage-badge--warning" : " manage-badge--active")}>
                         {item.deletedAt
                           ? "حذف موقت"
                           : item.status === "BLOCKED"
                             ? "مسدود"
                             : "فعال"}
+                        </span>
                       </td>
                       <td>
                         {formatNumber(item._count.orders)} /{" "}
@@ -387,9 +422,12 @@ export function Users() {
                       <td>
                         <button
                           className="manage-row-button"
+                          data-draft-target="user-detail-editor"
                           type="button"
-                          onClick={() => {
+                          onClick={(event) => {
+                            revealDetail(event.currentTarget);
                             setSelected(item.id);
+                            selectionVersion.current += 1; setError(""); setMessage("");
                             setError("");
                             setMessage("");
                           }}
@@ -407,9 +445,9 @@ export function Users() {
         )}
       </section>
       {selected && (
-        <section className="manage-card" aria-label="پروندهٔ کاربر">
+        <section id="user-detail-editor" data-draft-region ref={detailPanelRef} tabIndex={-1} className="manage-card" aria-label="پروندهٔ کاربر">
           <div className="manage-actions">
-            <button type="button" onClick={() => setSelected(null)}>
+            <button type="button" onClick={() => { selectionVersion.current += 1; setSelected(null); restoreDetail(); }}>
               بستن پرونده
             </button>
           </div>
@@ -485,7 +523,7 @@ export function Users() {
               {!user.deletedAt && (
                 <div className="manage-card">
                   <h2>ویرایش دسترسی و نام</h2>
-                  <div className="manage-form">
+                  <fieldset ref={editFieldsRef} className="manage-form manage-fieldset" disabled={busy}>
                     <label>
                       نام
                       <input
@@ -528,7 +566,7 @@ export function Users() {
                         <option value="BLOCKED">مسدود</option>
                       </select>
                     </label>
-                  </div>
+                  </fieldset>
                   <div className="manage-actions">
                     <button
                       type="button"

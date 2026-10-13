@@ -1,33 +1,50 @@
+import { SafeImage } from './SafeImage';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
-import { clinicArtwork } from '../lib/image-url';
+import { clinicArtwork, safeImageUrl } from '../lib/image-url';
+import { API_BASE_URL } from '../lib/env';
 import { citySuggestions, provinces } from '../lib/locations';
 import { Pagination } from './Pagination';
 import { SearchableFilter } from './SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from './states';
+import { isSampleReference } from '../lib/sample-records';
 
 export function DirectoryPage({ kind }: { kind: 'pharmacies' | 'clinics' }) {
-  const [params] = useSearchParams();
-  return <DirectoryContent key={`${kind}:${params.toString()}`} kind={kind} />;
+  return <DirectoryContent key={kind} kind={kind} />;
 }
 
 function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
   const [params, setParams] = useSearchParams();
-  const [city, setCity] = useState(params.get('city') ?? '');
-  const [province, setProvince] = useState(params.get('province') ?? '');
-  const [is24h, setIs24h] = useState(params.get('is24h') === '1');
   const dutyParam = params.get('onDuty');
-  const [onDuty, setOnDuty] = useState(
-    dutyParam === 'true' || dutyParam === 'false' ? dutyParam : 'all',
-  );
+  const urlDraft = {
+    source: params.toString(),
+    city: params.get('city') ?? '',
+    province: params.get('province') ?? '',
+    is24h: params.get('is24h') === '1',
+    onDuty: dutyParam === 'true' || dutyParam === 'false' ? dutyParam : 'all',
+  };
+  const [draft, setDraft] = useState(urlDraft);
+  const current = draft.source === urlDraft.source ? draft : urlDraft;
+  const { city, province, is24h, onDuty } = current;
+  const setCity = (city: string) =>
+    setDraft((old) => ({ ...(old.source === urlDraft.source ? old : urlDraft), city }));
+  const setProvince = (province: string) =>
+    setDraft((old) => ({ ...(old.source === urlDraft.source ? old : urlDraft), province }));
+  const setIs24h = (is24h: boolean) =>
+    setDraft((old) => ({ ...(old.source === urlDraft.source ? old : urlDraft), is24h }));
+  const setOnDuty = (onDuty: string) =>
+    setDraft((old) => ({ ...(old.source === urlDraft.source ? old : urlDraft), onDuty }));
   const filters = {
     city: params.get('city') || undefined,
     province: params.get('province') || undefined,
     is24h: params.get('is24h') === '1' ? true : undefined,
-    page: Number(params.get('page') ?? '1') || 1,
+    page:
+      Number.isSafeInteger(Number(params.get('page'))) && Number(params.get('page')) > 0
+        ? Number(params.get('page'))
+        : 1,
   };
   const pharmacyFilters = {
     ...filters,
@@ -126,6 +143,12 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
           </button>
         </div>
       </form>
+      {data?.meta && (
+        <p className="directory-results" role="status">
+          {data.meta.total.toLocaleString('fa-IR')} {clinics ? 'کلینیک' : 'داروخانه'} پیدا شد
+          {directory.isFetching ? ' · در حال به‌روزرسانی…' : ''}
+        </p>
+      )}
 
       {directory.isLoading && <LoadingState />}
       {directory.error && (
@@ -137,11 +160,20 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
           <div className="directory-grid">
             {data.data.map((place) => (
               <article className={`directory-card${clinics ? ' clinic-card' : ''}`} key={place.id}>
-                {clinics && (
+                {(clinics || place.image) && (
                   <figure className="clinic-card__image">
-                    <img
-                      src={`${clinicArtwork(place.id)}-480.webp`}
-                      srcSet={`${clinicArtwork(place.id)}-480.webp 480w, ${clinicArtwork(place.id)}-960.webp 960w`}
+                    <SafeImage
+                      src={
+                        clinics
+                          ? `${clinicArtwork(place.id)}-480.webp`
+                          : (safeImageUrl(place.image, window.location.origin, API_BASE_URL) ??
+                            undefined)
+                      }
+                      srcSet={
+                        clinics
+                          ? `${clinicArtwork(place.id)}-480.webp 480w, ${clinicArtwork(place.id)}-960.webp 960w`
+                          : undefined
+                      }
                       sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 360px"
                       width="960"
                       height="720"
@@ -149,11 +181,14 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
                       decoding="async"
                       alt=""
                     />
-                    <figcaption>تصویر نمادین</figcaption>
+                    <figcaption>
+                      {isSampleReference(place) ? 'تصویر نمونهٔ نمایشی' : 'تصویر نمادین'}
+                    </figcaption>
                   </figure>
                 )}
                 <div className={clinics ? 'clinic-card__body' : undefined}>
                   <div className="directory-card__meta">
+                    {isSampleReference(place) && <span>نمونهٔ نمایشی؛ مرکز واقعی نیست</span>}
                     {place.isVerified && <span>تأییدشده</span>}
                     {place.is24h && <span>۲۴ ساعته</span>}
                     {!clinics && place.onDuty && <span>کشیک</span>}

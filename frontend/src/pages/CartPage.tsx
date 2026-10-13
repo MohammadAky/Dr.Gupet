@@ -1,15 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import type { UserProfile } from '../api/types';
 import { useAuth } from '../auth/auth-provider';
-import { EmptyState, ErrorState, LoadingState } from '../components/states';
-import { cartFingerprint, shippingEstimate as getShippingEstimate } from '../features/cart/cart-state';
+import { ErrorState, LoadingState } from '../components/states';
+import {
+  cartFingerprint,
+  shippingEstimate as getShippingEstimate,
+} from '../features/cart/cart-state';
 import { MAX_CART_ITEM_QTY } from '../lib/constants';
 import { formatToman, formatWeight } from '../lib/format';
 import { errorText } from '../lib/labels';
+import { safeImageUrl } from '../lib/image-url';
+import { API_BASE_URL } from '../lib/env';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { SafeImage } from '../components/SafeImage';
+import { readCheckoutIntent, writeCheckoutIntent } from '../features/checkout/intent';
+import { toEnDigits } from '../lib/format';
 
 /**
  * Cart (F8): the server view is always authoritative; totals are never
@@ -22,8 +31,23 @@ export function CartPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const [couponCode, setCouponCode] = useState('');
+  const [couponCode, setCouponCode] = useState(() =>
+    identity ? readCheckoutIntent(identity.id).couponCode : '',
+  );
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeKind, setNoticeKind] = useState<'error' | 'success'>('error');
+  const [clearOpen, setClearOpen] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [dirtyQuantities, setDirtyQuantities] = useState<Set<number>>(() => new Set());
+  const markQuantityDirty = useCallback((id: number, dirty: boolean) => {
+    setDirtyQuantities((current) => {
+      if (current.has(id) === dirty) return current;
+      const next = new Set(current);
+      if (dirty) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
   const [couponPreview, setCouponPreview] = useState<{
     requestedCode: string;
     code: string;
@@ -59,7 +83,10 @@ export function CartPage() {
 
   useLayoutEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; couponRequestRef.current += 1; };
+    return () => {
+      mountedRef.current = false;
+      couponRequestRef.current += 1;
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -72,6 +99,9 @@ export function CartPage() {
     setCouponPending(false);
     setCartWritePending(false);
     setNotice(null);
+    setClearOpen(false);
+    setDirtyQuantities(new Set());
+    setCouponCode(identity ? readCheckoutIntent(identity.id).couponCode : '');
   }, [identity]);
 
   useLayoutEffect(() => {
@@ -109,25 +139,61 @@ export function CartPage() {
     mutationFn: (code: string) => shopApi.validateCoupon(code),
   });
 
-  function runCartWrite(operation: () => Promise<unknown>) {
-    if (cartWriteRef.current || !identityRef.current) return;
+  async function runCartWrite(
+    operation: () => Promise<unknown>,
+    completion?: string,
+    removedId?: number,
+    failureInDialog = false,
+  ) {
+    if (cartWriteRef.current || !identityRef.current || queryClient.isFetching({ queryKey: queryKeys.cart }) > 0) {
+      if (failureInDialog) throw new Error('سبد در حال به‌روزرسانی است. پس از پایان دوباره تلاش کنید.');
+      return;
+    }
     const requestIdentity = identityRef.current;
     const generation = ++cartWriteGenerationRef.current;
     cartWriteRef.current = true;
     setCartWritePending(true);
     invalidateCoupon();
     setNotice(null);
-    void operation()
+    setNoticeKind('error');
+    return operation()
       .then(async () => {
-        if (mountedRef.current && identityRef.current === requestIdentity &&
-          cartWriteGenerationRef.current === generation) await invalidate();
+        if (
+          mountedRef.current &&
+          identityRef.current === requestIdentity &&
+          cartWriteGenerationRef.current === generation
+        ) {
+          await invalidate();
+          if (
+            mountedRef.current &&
+            identityRef.current === requestIdentity &&
+            cartWriteGenerationRef.current === generation &&
+            completion
+          ) {
+            setNoticeKind('success');
+            setNotice(completion);
+            if (removedId !== undefined) markQuantityDirty(removedId, false);
+            else setDirtyQuantities(new Set());
+            headingRef.current?.focus();
+          }
+        }
       })
       .catch((error: unknown) => {
-        if (mountedRef.current && identityRef.current === requestIdentity &&
-          cartWriteGenerationRef.current === generation) setNotice(errorText(error));
+        if (
+          mountedRef.current &&
+          identityRef.current === requestIdentity &&
+          cartWriteGenerationRef.current === generation
+        ) {
+          if (!failureInDialog) setNotice(errorText(error));
+          else throw error;
+        }
       })
       .finally(() => {
-        if (identityRef.current !== requestIdentity || cartWriteGenerationRef.current !== generation) return;
+        if (
+          identityRef.current !== requestIdentity ||
+          cartWriteGenerationRef.current !== generation
+        )
+          return;
         cartWriteRef.current = false;
         if (mountedRef.current) setCartWritePending(false);
       });
@@ -135,8 +201,15 @@ export function CartPage() {
 
   if (!isAuthenticated) {
     return (
-      <section>
-        <h1>سبد خرید</h1>
+      <section className="account-page account-commerce-page">
+        <header className="account-heading">
+          <div>
+            <h1 ref={headingRef} tabIndex={-1}>
+              سبد خرید
+            </h1>
+            <p>انتخاب‌های شما برای همراه کوچکتان.</p>
+          </div>
+        </header>
         <p>
           برای مشاهدهٔ سبد خرید <Link to="/login?next=/cart">ورود کنید</Link>.
         </p>
@@ -144,8 +217,20 @@ export function CartPage() {
     );
   }
 
-  if (cart.isLoading) return <LoadingState />;
-  if (cart.error) return <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />;
+  if (cart.isLoading || cart.error)
+    return (
+      <section className="account-page account-commerce-page">
+        <header className="account-heading">
+          <h1>سبد خرید</h1>
+          <Link to="/products">ادامه خرید</Link>
+        </header>
+        {cart.isLoading ? (
+          <LoadingState />
+        ) : (
+          <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />
+        )}
+      </section>
+    );
 
   const hasProblem = view?.items.some((item) => !item.available) ?? false;
   const shipping = getShippingEstimate(view);
@@ -168,126 +253,370 @@ export function CartPage() {
     const request = ++couponRequestRef.current;
     const cartAtRequest = fingerprint;
     const requestIdentity = identity;
-    void validateCoupon.mutateAsync(code)
+    void validateCoupon
+      .mutateAsync(code)
       .then((preview) => {
-        if (!mountedRef.current || request !== couponRequestRef.current ||
-          cartAtRequest !== fingerprintRef.current || couponCodeRef.current.trim() !== code ||
-          identityRef.current !== requestIdentity || cartWriteRef.current) return;
-        setCouponPreview({ requestedCode: code, code: preview.code, discountAmount: preview.discountAmount,
-          cartFingerprint: cartAtRequest, identity: requestIdentity });
+        if (
+          !mountedRef.current ||
+          request !== couponRequestRef.current ||
+          cartAtRequest !== fingerprintRef.current ||
+          couponCodeRef.current.trim() !== code ||
+          identityRef.current !== requestIdentity ||
+          cartWriteRef.current
+        )
+          return;
+        setCouponPreview({
+          requestedCode: code,
+          code: preview.code,
+          discountAmount: preview.discountAmount,
+          cartFingerprint: cartAtRequest,
+          identity: requestIdentity,
+        });
         setCouponPending(false);
       })
       .catch((error: unknown) => {
-        if (!mountedRef.current || request !== couponRequestRef.current ||
-          cartAtRequest !== fingerprintRef.current || couponCodeRef.current.trim() !== code ||
-          identityRef.current !== requestIdentity || cartWriteRef.current) return;
+        if (
+          !mountedRef.current ||
+          request !== couponRequestRef.current ||
+          cartAtRequest !== fingerprintRef.current ||
+          couponCodeRef.current.trim() !== code ||
+          identityRef.current !== requestIdentity ||
+          cartWriteRef.current
+        )
+          return;
         setNotice(errorText(error));
         setCouponPending(false);
       });
   }
 
   return (
-    <section>
-      <h1>سبد خرید</h1>
+    <section className="account-page account-commerce-page">
+      <header className="account-heading">
+        <div>
+          <h1 ref={headingRef} tabIndex={-1}>
+            سبد خرید
+          </h1>
+          <p>انتخاب‌ها و تعدادشان را بررسی کنید، سپس به مرحلهٔ تحویل بروید.</p>
+        </div>
+        <Link className="account-secondary-link" to="/products">
+          ادامه خرید
+        </Link>
+      </header>
+      <ol className="account-purchase-steps" aria-label="مراحل خرید">
+        <li aria-current="step">سبد خرید</li>
+        <li>تحویل</li>
+        <li>پرداخت</li>
+      </ol>
 
       {view && view.items.length === 0 && (
-        <EmptyState
-          text="سبد خرید شما خالی است."
-          action={<Link to="/products">مشاهدهٔ محصولات</Link>}
-        />
+        <div className="account-empty-cart">
+          <div className="account-empty-cart__copy">
+            <span className="account-empty-cart__label">سبد خرید شما خالی است.</span>
+            <h2>
+              یک انتخاب خوب،
+              <br />
+              برای یک همراه خوب.
+            </h2>
+            <p>محصولات را ببینید و آنچه برای همراه کوچکتان مناسب است، به سبد اضافه کنید.</p>
+            <div className="account-actions">
+              <Link className="account-primary-link" to="/products">
+                مشاهدهٔ محصولات <span aria-hidden="true">←</span>
+              </Link>
+              <Link className="account-secondary-link" to="/favorites">
+                علاقه‌مندی‌های من
+              </Link>
+            </div>
+          </div>
+          <SafeImage
+            src="/brand/companion-dog-960.webp"
+            width={960}
+            height={720}
+            alt=""
+            decoding="async"
+          />
+        </div>
       )}
 
       {view && view.items.length > 0 && (
-        <>
-          <ul>
-            {view.items.map((item) => (
-              <li key={item.id} data-available={String(item.available)}>
-                <p>
-                  {item.productName} — {formatWeight(item.weightGram)}
-                </p>
-                <p dir="ltr">{formatToman(item.unitPrice)}</p>
-                <label>
-                  تعداد
-                  <input
-                    type="number"
-                    min={1}
-                    max={MAX_CART_ITEM_QTY}
-                    step={1}
-                    dir="ltr"
-                    value={item.quantity}
-                    disabled={cartWritePending || cart.isFetching}
-                    onChange={(event) => {
-                      const next = Number(event.target.value);
-                      if (!Number.isSafeInteger(next) || next < 1 || next > MAX_CART_ITEM_QTY) return;
-                      runCartWrite(() => updateQuantity.mutateAsync({ itemId: item.id, quantity: next }));
-                    }}
+        <div className="account-shopping-layout">
+          <ul className="account-cart-items">
+            {view.items.map((item) => {
+              const image = safeImageUrl(item.productImage, window.location.origin, API_BASE_URL);
+              return (
+                <li key={item.id} data-available={String(item.available)}>
+                  <div className="account-cart-product">
+                    <SafeImage
+                      src={image ?? undefined}
+                      alt={item.productName}
+                      width={88}
+                      height={88}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div>
+                      <Link to={`/products/${item.productSlug}`}>{item.productName}</Link>
+                      <p className="account-subtle">{formatWeight(item.weightGram)}</p>
+                      <p className="account-subtle">
+                        قیمت واحد: <bdi>{formatToman(item.unitPrice)}</bdi>
+                      </p>
+                    </div>
+                  </div>
+                  <CartQuantity
+                    id={item.id}
+                    name={item.productName}
+                    quantity={item.quantity}
+                    locked={cartWritePending || cart.isFetching}
+                    onDirty={markQuantityDirty}
+                    onCommit={(quantity) =>
+                      runCartWrite(() => updateQuantity.mutateAsync({ itemId: item.id, quantity }))
+                    }
                   />
-                </label>
-                <p dir="ltr">{formatToman(item.total)}</p>
-                {item.stockProblem && (
-                  <p role="alert">
-                    {item.stockProblem === 'OUT_OF_STOCK'
-                      ? 'این کالا ناموجود است.'
-                      : 'موجودی کافی نیست؛ تعداد را کم کنید.'}
-                  </p>
-                )}
-                {!item.available && !item.stockProblem && (
-                  <p role="alert">این کالا در حال حاضر قابل خرید نیست.</p>
-                )}
-                <button type="button" disabled={cartWritePending || cart.isFetching}
-                  onClick={() => runCartWrite(() => removeItem.mutateAsync(item.id))}>
-                  حذف
-                </button>
-              </li>
-            ))}
+                  <p className="account-cart-total">{formatToman(item.total)}</p>
+                  {item.stockProblem && (
+                    <p role="alert">
+                      {item.stockProblem === 'OUT_OF_STOCK'
+                        ? 'این کالا ناموجود است.'
+                        : 'موجودی کافی نیست؛ تعداد را کم کنید.'}
+                    </p>
+                  )}
+                  {!item.available && !item.stockProblem && (
+                    <p role="alert">این کالا در حال حاضر قابل خرید نیست.</p>
+                  )}
+                  <button
+                    className="account-danger"
+                    type="button"
+                    disabled={cartWritePending || cart.isFetching}
+                    onClick={() =>
+                      runCartWrite(
+                        () => removeItem.mutateAsync(item.id),
+                        `«${item.productName}» از سبد حذف شد.`,
+                        item.id,
+                      )
+                    }
+                  >
+                    حذف
+                  </button>
+                </li>
+              );
+            })}
           </ul>
 
-          <form onSubmit={submitCoupon}>
-            <label htmlFor="coupon">کد تخفیف</label>
-            <input
-              id="coupon"
-              dir="ltr"
-              value={couponCode}
-              onChange={(event) => { invalidateCoupon(); setNotice(null); setCouponCode(event.target.value); }}
-            />
-            <button type="submit" disabled={!couponCode.trim() || couponPending || cartWritePending || cart.isFetching}>
-              اعمال کد
-            </button>
-          </form>
-          {shownCoupon && (
-            <p>
-              تخفیف {shownCoupon.code}: {formatToman(shownCoupon.discountAmount)} (بدون هزینهٔ
-              ارسال)
+          <aside className="account-shopping-summary" aria-label="خلاصه سبد خرید">
+            <h2>خلاصه سبد خرید</h2>
+            <form className="account-coupon-form" onSubmit={submitCoupon}>
+              <label htmlFor="coupon">کد تخفیف</label>
+              <input
+                id="coupon"
+                dir="ltr"
+                value={couponCode}
+                onChange={(event) => {
+                  invalidateCoupon();
+                  setNotice(null);
+                  setCouponCode(event.target.value);
+                  if (identity)
+                    writeCheckoutIntent(identity.id, { couponCode: event.target.value });
+                }}
+              />
+              <button
+                type="submit"
+                disabled={
+                  !couponCode.trim() || couponPending || cartWritePending || cart.isFetching
+                }
+              >
+                {couponPending ? 'در حال بررسی…' : 'بررسی کد'}
+              </button>
+            </form>
+            {shownCoupon && (
+              <p>
+                تخفیف {shownCoupon.code}: {formatToman(shownCoupon.discountAmount)} (بدون هزینهٔ
+                ارسال)
+              </p>
+            )}
+
+            <dl className="account-totals">
+              <dt>جمع کالاها</dt>
+              <dd dir="ltr">{formatToman(view.itemsTotal)}</dd>
+              <dt>
+                هزینهٔ ارسال ({shipping.source === 'server' ? 'برآورد سامانه' : 'برآورد اولیه'})
+              </dt>
+              <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
+            </dl>
+            <p className="account-subtle">
+              {shipping.source === 'server'
+                ? view.estimate?.note
+                : 'هزینهٔ ارسال برآوردی است و هنگام ثبت سفارش نهایی می‌شود.'}{' '}
+              مبلغ قطعی پس از اعمال کد تخفیف در مرحلهٔ سفارش محاسبه می‌شود.
             </p>
-          )}
 
-          <dl>
-            <dt>جمع کالاها</dt>
-            <dd dir="ltr">{formatToman(view.itemsTotal)}</dd>
-            <dt>
-              هزینهٔ ارسال ({shipping.source === 'server' ? 'تخمین سرور' : 'تخمین محلیِ جایگزین'})
-            </dt>
-            <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
-          </dl>
-          <p>
-            {shipping.source === 'server'
-              ? view.estimate?.note
-              : 'این عدد تنها تخمین محلی است؛ نسخهٔ فعلی پاسخ سبد خرید، تخمین سرور را ارائه نکرد.'}{' '}
-            مبلغ قطعی پس از اعمال کد تخفیف در مرحلهٔ سفارش محاسبه می‌شود.
-          </p>
+            {notice && <p role={noticeKind === 'error' ? 'alert' : 'status'}>{notice}</p>}
+            {dirtyQuantities.size > 0 && (
+              <p role="status">تعداد ویرایش‌شده را به‌روزرسانی کنید یا به مقدار قبلی برگردانید.</p>
+            )}
 
-          {notice && <p role="alert">{notice}</p>}
-
-          <button type="button" disabled={hasProblem || cartWritePending || cart.isFetching}
-            onClick={() => navigate('/checkout')}>
-            تکمیل خرید
-          </button>
-          <button type="button" disabled={cartWritePending || cart.isFetching}
-            onClick={() => runCartWrite(() => clearCart.mutateAsync())}>
-            خالی‌کردن سبد
-          </button>
-        </>
+            <button
+              className="account-submit"
+              type="button"
+              disabled={
+                hasProblem || dirtyQuantities.size > 0 || cartWritePending || cart.isFetching
+              }
+              onClick={() => {
+                if (
+                  cartWriteRef.current ||
+                  dirtyQuantities.size > 0 ||
+                  hasProblem ||
+                  queryClient.isFetching({ queryKey: queryKeys.cart }) > 0
+                )
+                  return;
+                if (identity) writeCheckoutIntent(identity.id, { couponCode: couponCode.trim() });
+                navigate('/checkout');
+              }}
+            >
+              تکمیل خرید
+            </button>
+            <button
+              className="account-danger"
+              type="button"
+              disabled={cartWritePending || cart.isFetching}
+              onClick={() => setClearOpen(true)}
+            >
+              خالی‌کردن سبد
+            </button>
+          </aside>
+        </div>
       )}
+      <ConfirmDialog
+        open={clearOpen}
+        title="خالی‌کردن سبد خرید"
+        description={`همهٔ ${view?.items.length.toLocaleString('fa-IR') ?? '۰'} قلم از سبد شما حذف می‌شوند.`}
+        confirmLabel="حذف همهٔ اقلام"
+        pending={cartWritePending}
+        onClose={() => setClearOpen(false)}
+        onConfirm={() => runCartWrite(() => clearCart.mutateAsync(), 'سبد خرید خالی شد.', undefined, true)}
+      />
     </section>
+  );
+}
+
+function CartQuantity({
+  id,
+  name,
+  quantity,
+  locked,
+  onCommit,
+  onDirty,
+}: {
+  id: number;
+  name: string;
+  quantity: number;
+  locked: boolean;
+  onCommit: (quantity: number) => void;
+  onDirty: (id: number, dirty: boolean) => void;
+}) {
+  const [localDraft, setLocalDraft] = useState({ quantity, value: String(quantity) });
+  const [localError, setLocalError] = useState({ quantity, value: '' });
+  if (localDraft.quantity !== quantity) {
+    setLocalDraft({ quantity, value: String(quantity) });
+    setLocalError({ quantity, value: '' });
+  }
+  const draft = localDraft.quantity === quantity ? localDraft.value : String(quantity);
+  const error = localError.quantity === quantity ? localError.value : '';
+  const setDraft = (value: string) => setLocalDraft({ quantity, value });
+  const setError = (value: string) => setLocalError({ quantity, value });
+  useEffect(() => {
+    onDirty(id, false);
+    return () => onDirty(id, false);
+  }, [id, quantity, onDirty]);
+  const parsed = Number(toEnDigits(draft));
+  const valid =
+    draft.trim() !== '' &&
+    Number.isSafeInteger(parsed) &&
+    parsed >= 1 &&
+    parsed <= MAX_CART_ITEM_QTY;
+  function commit(value = parsed) {
+    if (locked) return;
+    if (!valid || !Number.isSafeInteger(value) || value < 1 || value > MAX_CART_ITEM_QTY) {
+      setError(`تعداد باید عدد صحیح بین ۱ تا ${MAX_CART_ITEM_QTY.toLocaleString('fa-IR')} باشد.`);
+      return;
+    }
+    setError('');
+    setDraft(String(value));
+    onDirty(id, value !== quantity);
+    if (value !== quantity) onCommit(value);
+    else onDirty(id, false);
+  }
+  return (
+    <div className="commerce-quantity">
+      <label htmlFor={`quantity-${id}`}>تعداد</label>
+      <div className="commerce-quantity__controls">
+        <button
+          type="button"
+          aria-label={`کاهش تعداد ${name}`}
+          disabled={locked || !valid || parsed <= 1}
+          onClick={() => commit(parsed - 1)}
+        >
+          −
+        </button>
+        <input
+          id={`quantity-${id}`}
+          type="number"
+          inputMode="numeric"
+          dir="ltr"
+          min={1}
+          max={MAX_CART_ITEM_QTY}
+          step={1}
+          aria-label={`تعداد ${name}`}
+          value={draft}
+          disabled={locked}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `quantity-error-${id}` : undefined}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setError('');
+            onDirty(id, event.target.value !== String(quantity));
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.closest('.commerce-quantity')?.contains(event.relatedTarget))
+              commit();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commit();
+            }
+          }}
+        />
+        <button
+          type="button"
+          aria-label={`افزایش تعداد ${name}`}
+          disabled={locked || !valid || parsed >= MAX_CART_ITEM_QTY}
+          onClick={() => commit(parsed + 1)}
+        >
+          +
+        </button>
+      </div>
+      {draft !== String(quantity) && (
+        <div className="commerce-quantity__actions">
+          <button type="button" disabled={locked} onClick={() => commit()}>
+            به‌روزرسانی تعداد
+          </button>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => {
+              setDraft(String(quantity));
+              setError('');
+              onDirty(id, false);
+            }}
+          >
+            بازگرداندن تعداد
+          </button>
+        </div>
+      )}
+      {error && (
+        <p id={`quantity-error-${id}`} role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

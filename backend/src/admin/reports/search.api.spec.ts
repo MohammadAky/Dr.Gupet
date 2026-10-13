@@ -75,7 +75,18 @@ describe('reference entity admin search (search + isActive)', () => {
 
 describe('public q search for clinics and pharmacies (part c)', () => {
   function locationPrisma(model: string) {
-    const findMany = findManySpy([{}]);
+    const findMany = findManySpy([
+      {
+        id: 1,
+        name: 'مرکز آزمایشی',
+        city: 'تهران',
+        province: 'تهران',
+        address: 'نشانی آزمایشی',
+        phone: null,
+        is24h: false,
+        isVerified: false,
+      },
+    ]);
     const prisma = prismaWith(model, findMany);
     return { prisma, findMany };
   }

@@ -1,9 +1,9 @@
-import type { CreatePetInput, SetPetTagsInput } from '../../api/endpoints';
+import type { CreatePetInput, SetPetTagsInput, UpdatePetInput } from '../../api/endpoints';
 import type { Pet } from '../../api/types';
 
 interface PetSaveApi {
   createPet: (input: CreatePetInput) => Promise<Pet>;
-  updatePet: (id: number, input: CreatePetInput) => Promise<Pet>;
+  updatePet: (id: number, input: UpdatePetInput) => Promise<Pet>;
   setPetTags: (id: number, tags: SetPetTagsInput) => Promise<Pet>;
 }
 
@@ -17,8 +17,15 @@ export async function savePetWithTags(
   input: CreatePetInput,
   tags: SetPetTagsInput,
   rememberCreatedId: (id: number) => void,
+  updateInput?: UpdatePetInput,
+  isActive: () => boolean = () => true,
 ): Promise<PetSaveResult> {
-  const pet = petId === null ? await petApi.createPet(input) : await petApi.updatePet(petId, input);
+  if (!isActive()) throw new Error('نشست کاربری تغییر کرده است.');
+  const pet =
+    petId === null
+      ? await petApi.createPet(input)
+      : await petApi.updatePet(petId, updateInput ?? input);
+  if (!isActive()) throw new Error('نشست کاربری تغییر کرده است.');
   if (petId === null) rememberCreatedId(pet.id);
 
   try {

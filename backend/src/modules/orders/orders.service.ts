@@ -8,6 +8,7 @@ import { generateOrderNumber } from '../../common/utils/order-number.util';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { SettingsService } from '../../admin/settings/settings.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { parseAddressSnapshot } from './address-snapshot';
 
 @Injectable()
 export class OrdersService {
@@ -107,7 +108,7 @@ export class OrdersService {
     const finalAmount = Math.max(0, itemsTotal - discountAmount + shippingCost);
 
     // 8. Reserve stock and create order in transaction
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // Reserve stock
       await this.orderStockService.reserve(
         tx,
@@ -122,7 +123,7 @@ export class OrdersService {
         data: {
           orderNumber: generateOrderNumber(),
           userId,
-          addressSnapshot: addressSnapshot as any,
+          addressSnapshot: JSON.stringify(addressSnapshot),
           itemsTotal,
           discountAmount,
           shippingCost,
@@ -165,6 +166,7 @@ export class OrdersService {
 
       return order;
     });
+    return this.presentOrder(created);
   }
 
   /**
@@ -206,7 +208,7 @@ export class OrdersService {
     ]);
 
     return {
-      data: orders,
+      data: await Promise.all(orders.map((order) => this.presentOrder(order))),
       meta: {
         page,
         limit,
@@ -235,7 +237,7 @@ export class OrdersService {
       throw new NotFoundException('سفارش یافت نشد');
     }
 
-    return order;
+    return this.presentOrder(order);
   }
 
   /**
@@ -262,7 +264,7 @@ export class OrdersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const canceled = await this.prisma.$transaction(async (tx) => {
       // Atomic claim: only one caller can move the order out of PENDING_PAYMENT.
       const claimed = await tx.order.updateMany({
         where: { id: orderId, userId, status: 'PENDING_PAYMENT' },
@@ -295,6 +297,26 @@ export class OrdersService {
 
       return tx.order.findUnique({ where: { id: orderId } });
     });
+    return canceled ? this.presentOrder(canceled) : null;
+  }
+
+  private getExpireMinutes() {
+    return this.settingsService.getNumber(
+      'ORDER_EXPIRE_MINUTES',
+      this.configService.get<number>('app.orderExpireMinutes') || 30,
+    );
+  }
+
+  private async presentOrder<
+    T extends { addressSnapshot: string; status: string; createdAt: Date },
+  >(order: T) {
+    let expiresAt: string | null = null;
+    if (order.status === 'PENDING_PAYMENT') {
+      const expireMinutes = await this.getExpireMinutes();
+      const eligibility = new Date(new Date(order.createdAt).getTime() + expireMinutes * 60 * 1000);
+      if (Number.isFinite(eligibility.getTime())) expiresAt = eligibility.toISOString();
+    }
+    return { ...order, addressSnapshot: parseAddressSnapshot(order.addressSnapshot), expiresAt };
   }
 
   /**
@@ -302,10 +324,7 @@ export class OrdersService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async expirePendingOrders() {
-    const expireMinutes = await this.settingsService.getNumber(
-      'ORDER_EXPIRE_MINUTES',
-      this.configService.get<number>('app.orderExpireMinutes') || 30,
-    );
+    const expireMinutes = await this.getExpireMinutes();
     const cutoff = new Date(Date.now() - expireMinutes * 60 * 1000);
 
     const expiredOrders = await this.prisma.order.findMany({

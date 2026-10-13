@@ -1,8 +1,10 @@
+import { SafeImage } from '../SafeImage';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { shopApi, type Page } from '../../api/endpoints-shop';
 import type { Clinic, Medicine, Pharmacy, ProductCard } from '../../api/types';
 import type { AuthStatus } from '../../auth/auth-provider';
+import { formatAmount } from '../../lib/format';
 
 type SearchSource = 'desktop' | 'mobile';
 type SuggestionGroup = 'products' | 'medicines' | 'pharmacies' | 'clinics';
@@ -405,7 +407,7 @@ export function Header({
             <Icon name="menu" />
           </button>
           <Link to="/" className="app-logo" aria-label="دکتر گوپت، صفحهٔ اصلی" onClick={() => { closeSuggestions(); onMenuClose(); }}>
-            <img src="/brand/logo.jpg" alt="" width="55" height="55" />
+            <SafeImage src="/brand/logo.jpg" alt="" width="55" height="55" />
             <span>
               دکتر گوپت<small>DR. GUPET</small>
             </span>
@@ -466,10 +468,10 @@ export function Header({
               <span className="header-label">ورود</span>
             </Link>
           )}
-          <Link to="/cart" className="cart-link" aria-label={`سبد خرید، ${cartCount} کالا`}>
+          <Link to="/cart" className="cart-link" aria-label={`سبد خرید، ${formatAmount(cartCount)} کالا`}>
             <Icon name="cart" />
             <span className="header-label">سبد خرید</span>
-            {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
+            {cartCount > 0 && <span className="cart-count">{formatAmount(cartCount)}</span>}
           </Link>
         </div>
       </div>
@@ -511,9 +513,6 @@ export function Header({
           <NavLink to="/medicines">اطلاعات داروها</NavLink>
           <NavLink to="/pharmacies">داروخانه‌ها</NavLink>
           <NavLink to="/clinics">کلینیک‌ها</NavLink>
-          {status === 'authed' && <NavLink to="/recommendations">پیشنهادهای من</NavLink>}
-          {status === 'authed' && <NavLink to="/favorites">علاقه‌مندی‌ها</NavLink>}
-          {status === 'authed' && <NavLink to="/orders">سفارش‌ها</NavLink>}
           {status === 'authed' && (
             <button className="mobile-logout" type="button" onClick={onLogout}>
               خروج از حساب

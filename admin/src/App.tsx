@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { AuthProvider, useAuth } from "./auth";
 import { ApiError } from "./api/client";
 import { Catalog } from "./Catalog";
@@ -8,10 +8,13 @@ import { Users } from "./Users";
 import { Promotions } from "./Promotions";
 import { Operations } from "./Operations";
 import { Reports } from "./Reports";
+import { LandingContent } from "./LandingContent";
 import { type DashboardData } from "./dashboard-data";
 import { ThemeToggle } from "./ThemeToggle";
 import { PasswordInput } from "./PasswordInput";
 import { normalizeUsername } from "./password";
+import { confirmAction, hasUnsavedDrafts, useDraftProtection } from "./management";
+import { parseAdminLocation, type AdminSection } from "./navigation";
 import {
   periodLabels,
   periodQuery,
@@ -23,6 +26,15 @@ import {
 
 const number = new Intl.NumberFormat("fa-IR");
 const money = (value: number) => `${number.format(value)} تومان`;
+type GrowthReport = { totals: { users: number; admins: number; customers: number } };
+
+function ActionRow({ href, label, count, note }: { href: string; label: string; count: number; note?: string }) {
+  return <a className="dashboard-action" href={href}>
+    <span>{label}{note && <small>{note}</small>}</span>
+    <strong>{number.format(count)}</strong>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
+  </a>;
+}
 const dateFormat = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
   month: "short",
   day: "numeric",
@@ -39,7 +51,7 @@ const orderStatus: Record<string, string> = {
 function humanError(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError)
-    return "ارتباط با بک‌اند برقرار نشد. اجرای API را بررسی کنید.";
+    return "اتصال برقرار نشد. ارتباط اینترنت را بررسی کنید و دوباره تلاش کنید.";
   return "درخواست انجام نشد. دوباره تلاش کنید.";
 }
 
@@ -177,12 +189,11 @@ function Login() {
       <div className="login-intro">
         <Brand />
         <span className="eyebrow">سامانهٔ مدیریت</span>
-        <h1>همه‌چیز زیر نگاه شما.</h1>
+        <h1>یک نگاه روشن.<br />مدیریت دقیق‌تر.</h1>
         <p>سفارش‌ها، فروش و وضعیت فروشگاه را در یک نمای روشن دنبال کنید.</p>
         <div className="login-accent" aria-hidden="true">
-          <span>۰۱</span>
-          <span>نمای کلی فروش</span>
-          <span>←</span>
+          <span>دکتر گوپت</span>
+          <span>همراه مراقبت بهتر</span>
         </div>
       </div>
       <section className="login-card" aria-labelledby="login-title">
@@ -288,9 +299,6 @@ function Login() {
   );
 }
 
-type AdminSection = "overview" | "products" | "orders" | "people" | "promotions" |
-  "care" | "payments" | "reports" | "audit" | "settings";
-
 const navigation: Array<{
   title: string;
   items: Array<{ id: AdminSection; label: string; index: string }>;
@@ -310,6 +318,7 @@ const navigation: Array<{
     { id: "reports", label: "گزارش‌ها", index: "۰۸" },
     { id: "audit", label: "لاگ تغییرات", index: "۰۹" },
     { id: "settings", label: "تنظیمات", index: "۱۰" },
+    { id: "landing", label: "محتوای صفحهٔ اصلی", index: "۱۱" },
   ] },
 ];
 
@@ -346,7 +355,7 @@ function Sidebar({ active, onSelect, open, onClose, mobile, sidebarRef, closeRef
           </button>)}
         </div>)}
       </nav>
-      <p className="sidebar-note">عملیات این پنل به داده و مجوز واقعی API نیاز دارد.</p>
+      <p className="sidebar-note">دکتر گوپت<br /><span>فضای کار مدیریت فروشگاه</span></p>
     </aside>
   );
 }
@@ -395,14 +404,14 @@ function SalesChart({
           <div className="chart-bar-track">
             <div
               className="chart-bar"
-              style={{ height: `${Math.max(4, (point.revenue / max) * 100)}%` }}
+              style={{ height: `${(point.revenue / max) * 100}%` }}
             />
           </div>
           <span>{dateFormat.format(new Date(`${point.date}T12:00:00Z`))}</span>
         </div>
       ))}
     </div>
-    <table className="chart-data-table">
+    <div className="chart-data-table"><table>
       <caption>فروش روزانه {label}</caption>
       <thead><tr><th scope="col">تاریخ</th><th scope="col">مبلغ فروش</th><th scope="col">تعداد سفارش</th></tr></thead>
       <tbody>{points.map((point) => (
@@ -412,7 +421,7 @@ function SalesChart({
           <td>{number.format(point.orders)}</td>
         </tr>
       ))}</tbody>
-    </table>
+    </table></div>
     </>
   );
 }
@@ -425,6 +434,9 @@ function DashboardContent({
   reportLoading,
   reportError,
   onReportRetry,
+  growth,
+  growthError,
+  onRefresh,
 }: {
   data: DashboardData;
   report: SalesReport | null;
@@ -433,6 +445,9 @@ function DashboardContent({
   reportLoading: boolean;
   reportError: string;
   onReportRetry: () => void;
+  growth: GrowthReport | null;
+  growthError: string;
+  onRefresh: () => void;
 }) {
   const { totals, recentOrders, topProducts } = data;
   const now = new Date();
@@ -448,7 +463,7 @@ function DashboardContent({
         <div>
           <span className="eyebrow">نبض فروشگاه</span>
           <h1>نمای کلی</h1>
-          <p>تصویری سریع از فروش، سفارش‌ها و موارد نیازمند توجه.</p>
+          <p>سفارش‌های قابل پیگیری، وضعیت موجودی و گزارش فعالیت ثبت‌شده.</p>
         </div>
         <div className="period-selector" role="group" aria-label="بازهٔ گزارش فروش">
           {(Object.keys(periodLabels) as SalesPeriod[]).map((choice) => (
@@ -462,29 +477,39 @@ function DashboardContent({
             </button>
           ))}
         </div>
+        <button type="button" className="button" onClick={onRefresh}>به‌روزرسانی نمای کلی</button>
       </div>
       <section className="metrics" aria-label="شاخص‌های فروشگاه">
         <Metric
           label={`فروش ${periodLabels[period]}`}
           value={report ? money(report.totals.revenue) : "—"}
-          note={report ? `${number.format(report.totals.paidOrders)} سفارش پرداخت‌شده` : "در حال دریافت گزارش"}
+          note={report ? `${number.format(report.totals.paidOrders)} سفارش پرداخت‌شده` : reportError ? "گزارش دریافت نشد" : "در حال دریافت گزارش"}
           tone="gold"
         />
         <Metric
-          label="فروش امروز"
-          value={money(totals.revenueToday)}
-          note="براساس سفارش‌های پرداخت‌شده"
+          label={`سفارش‌های ${periodLabels[period]}`}
+          value={report ? number.format(report.totals.orders) : "—"}
+          note="همهٔ وضعیت‌ها؛ براساس زمان ثبت سفارش"
         />
         <Metric
-          label="کاربران"
-          value={number.format(totals.users)}
-          note={`${number.format(totals.newUsers30d)} نفر جدید در ۳۰ روز`}
+          label={`مشتریان جدید ${periodLabels[period]}`}
+          value={growth ? number.format(growth.totals.customers) : "—"}
+          note={growthError ? "گزارش ثبت‌نام دریافت نشد" : growth ? "حساب‌های مشتری؛ بدون مدیران" : "در حال دریافت گزارش ثبت‌نام"}
         />
         <Metric
           label="در انتظار پرداخت"
           value={number.format(totals.pendingPaymentOrders)}
-          note="نیازمند پیگیری"
+          note="وضعیت فعلی؛ مستقل از بازهٔ گزارش"
         />
+      </section>
+      {growthError && <div className="report-error" role="alert"><p>{growthError}</p><button type="button" onClick={onReportRetry}>تلاش دوباره برای گزارش ثبت‌نام</button></div>}
+      <section className="panel work-queue" aria-labelledby="queue-title">
+        <div className="panel-head"><div><span className="eyebrow">کارهای روزانه</span><h2 id="queue-title">پیگیری سفارش‌ها</h2><p className="dashboard-scope">وضعیت فعلی همهٔ سفارش‌ها؛ پس از دریافت داده از سرور.</p></div><a className="button" href="#orders">همهٔ سفارش‌ها</a></div>
+        <div className="work-queue-actions">
+          <ActionRow href="#orders?status=PAID" label="آماده‌سازی سفارش" count={totals.orders.PAID || 0} note="پرداخت‌شده" />
+          <ActionRow href="#orders?status=PROCESSING" label="ثبت رهگیری و ارسال" count={totals.orders.PROCESSING || 0} note="در حال پردازش" />
+          <ActionRow href="#orders?status=SHIPPED" label="پیگیری تحویل" count={totals.orders.SHIPPED || 0} note="ارسال‌شده" />
+        </div>
       </section>
       <div className="dashboard-columns">
         <section className="panel sales-panel" aria-labelledby="sales-title">
@@ -522,24 +547,11 @@ function DashboardContent({
               <h2 id="attention-title">نیازمند توجه</h2>
             </div>
           </div>
-          <dl>
-            <div>
-              <dt>موجودی کم</dt>
-              <dd>{number.format(totals.lowStockVariants)}</dd>
-            </div>
-            <div>
-              <dt>ناموجود</dt>
-              <dd>{number.format(totals.outOfStockVariants)}</dd>
-            </div>
-            <div>
-              <dt>محصول غیرفعال</dt>
-              <dd>{number.format(totals.inactiveProducts)}</dd>
-            </div>
-            <div>
-              <dt>پرداخت ناموفق ۲۴ ساعت</dt>
-              <dd>{number.format(totals.failedPayments24h)}</dd>
-            </div>
-          </dl>
+          <p className="dashboard-scope">موجودی فعلی و پرداخت‌های ناموفق ۲۴ ساعت گذشته.</p>
+          <ActionRow href="#reports?focus=low" label="بررسی موجودی کم" count={totals.lowStockVariants} note="تعداد تنوع‌های محصول" />
+          <ActionRow href="#reports?focus=low" label="بررسی کالاهای ناموجود" count={totals.outOfStockVariants} note="در گزارش موجودی" />
+          <ActionRow href="#products?active=false" label="بررسی محصولات غیرفعال" count={totals.inactiveProducts} />
+          <ActionRow href="#payments?status=FAILED" label="بررسی پرداخت‌های ناموفق" count={totals.failedPayments24h} note="تعداد ۲۴ ساعت گذشته؛ فهرست همهٔ ناموفق‌ها" />
         </section>
       </div>
       <div className="dashboard-columns dashboard-columns--bottom">
@@ -564,7 +576,7 @@ function DashboardContent({
                 <tbody>
                   {recentOrders.map((order) => (
                     <tr key={order.id}>
-                      <td dir="ltr">{order.orderNumber}</td>
+                      <td dir="ltr"><a href={`#orders?order=${order.id}`} aria-label={`جزئیات سفارش ${order.orderNumber}`}>{order.orderNumber}</a></td>
                       <td>
                         {[order.user.firstName, order.user.lastName]
                           .filter(Boolean)
@@ -590,8 +602,9 @@ function DashboardContent({
         <section className="panel products-panel" aria-labelledby="top-title">
           <div className="panel-head">
             <div>
-              <span className="eyebrow">محبوب مشتری‌ها</span>
-              <h2 id="top-title">پرفروش‌ترین‌ها</h2>
+              <span className="eyebrow">اقلام سفارش‌ها</span>
+              <h2 id="top-title">بیشترین مبلغ ثبت‌شده</h2>
+              <p className="dashboard-scope">همهٔ زمان‌ها و وضعیت‌ها؛ شامل سفارش‌های پرداخت‌نشده و لغوشده.</p>
             </div>
           </div>
           {topProducts.length ? (
@@ -626,11 +639,15 @@ function Dashboard() {
     key: string;
     data: SalesReport | null;
     error: string;
-  }>({ key: "", data: null, error: "" });
+    growth: GrowthReport | null;
+    growthError: string;
+  }>({ key: "", data: null, error: "", growth: null, growthError: "" });
   const reportKey = `${period}:${reportRevision}`;
   const report = reportState.key === reportKey ? reportState.data : null;
   const reportError = reportState.key === reportKey ? reportState.error : "";
   const reportLoading = reportState.key !== reportKey;
+  const growth = reportState.key === reportKey ? reportState.growth : null;
+  const growthError = reportState.key === reportKey ? reportState.growthError : "";
 
   useEffect(() => {
     let active = true;
@@ -648,12 +665,16 @@ function Dashboard() {
 
   useEffect(() => {
     let active = true;
-    void read<SalesReport>(periodQuery(period))
-      .then((result) => {
-        if (active) setReportState({ key: reportKey, data: result, error: "" });
-      })
-      .catch((problem) => {
-        if (active) setReportState({ key: reportKey, data: null, error: humanError(problem) });
+    const salesPath = periodQuery(period);
+    const range = salesPath.split("?")[1];
+    void Promise.allSettled([read<SalesReport>(salesPath), read<GrowthReport>(`/admin/reports/users?${range}`)])
+      .then(([sales, users]) => {
+        if (active) setReportState({ key: reportKey,
+          data: sales.status === "fulfilled" ? sales.value : null,
+          error: sales.status === "rejected" ? humanError(sales.reason) : "",
+          growth: users.status === "fulfilled" ? users.value : null,
+          growthError: users.status === "rejected" ? humanError(users.reason) : "",
+        });
       });
     return () => {
       active = false;
@@ -686,6 +707,9 @@ function Dashboard() {
               reportLoading={reportLoading}
               reportError={reportError}
               onReportRetry={() => setReportRevision((n) => n + 1)}
+              growth={growth}
+              growthError={growthError}
+              onRefresh={() => { setData(null); setError(""); setRevision((n) => n + 1); setReportRevision((n) => n + 1); }}
             />
           ) : (
             <p className="loading" role="status">
@@ -706,13 +730,83 @@ function mobileNavigationViewport(): boolean {
 
 function Workspace() {
   const { identity, logout } = useAuth();
-  const [section, setSection] = useState<AdminSection>("overview");
+  const [location, setLocation] = useState(() => parseAdminLocation(window.location.hash));
+  const section = location.section;
+  const currentLocation = useRef(location.canonical);
+  const historyIndex = useRef(0);
+  const restoringHistory = useRef(false);
+  const navigationPending = useRef(false);
+  const pendingTraversal = useRef<{ hash: string; index?: number } | null>(null);
+  const navigationGeneration = useRef(0);
+  const focusLocation = useRef(location.canonical);
   const [navOpen, setNavOpen] = useState(false);
+  useDraftProtection();
+  const navigate = useCallback(async (hash: string, push: boolean, targetIndex?: number) => {
+    if (!push) pendingTraversal.current = { hash, index: targetIndex };
+    if (navigationPending.current || document.querySelector(".admin-confirm")) return;
+    let next = parseAdminLocation(hash);
+    if (next.canonical === currentLocation.current) return;
+    if (push) pendingTraversal.current = null;
+    const generation = ++navigationGeneration.current;
+    navigationPending.current = true;
+    if (hasUnsavedDrafts() && !await confirmAction("تغییرهای ذخیره‌نشده با رفتن به بخش دیگر کنار گذاشته می‌شوند.", "کنار گذاشتن تغییرها")) {
+      if (generation === navigationGeneration.current && !push) {
+        const index = pendingTraversal.current?.index ?? targetIndex;
+        if (index !== undefined && index !== historyIndex.current) {
+          restoringHistory.current = true;
+          history.go(historyIndex.current - index);
+        } else history.replaceState({ adminIndex: historyIndex.current }, "", currentLocation.current);
+      }
+      navigationPending.current = false;
+      pendingTraversal.current = null;
+      return;
+    }
+    navigationPending.current = false;
+    if (generation !== navigationGeneration.current) return;
+    if (pendingTraversal.current) {
+      next = parseAdminLocation(pendingTraversal.current.hash);
+      targetIndex = pendingTraversal.current.index;
+    }
+    pendingTraversal.current = null;
+    historyIndex.current = push ? historyIndex.current + 1 : targetIndex ?? historyIndex.current;
+    if (push) history.pushState({ adminIndex: historyIndex.current }, "", next.canonical);
+    else history.replaceState({ adminIndex: historyIndex.current }, "", next.canonical);
+    currentLocation.current = next.canonical;
+    setLocation(next); setNavOpen(false); window.scrollTo(0, 0);
+  }, []);
+  useLayoutEffect(() => {
+    if (focusLocation.current !== location.canonical) document.getElementById("admin-content")?.focus({ preventScroll: true });
+    focusLocation.current = location.canonical;
+  }, [location.canonical]);
+  useEffect(() => {
+    history.replaceState({ adminIndex: historyIndex.current }, "", currentLocation.current);
+    const update = () => {
+      if (restoringHistory.current) {
+        if (window.location.hash === currentLocation.current) restoringHistory.current = false;
+        return;
+      }
+      const index = history.state?.adminIndex;
+      void navigate(window.location.hash, false, Number.isSafeInteger(index) ? index : undefined);
+    };
+    const followLink = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !(event.target instanceof Element)) return;
+      const link = event.target.closest<HTMLAnchorElement>("a[href^='#']");
+      const hash = link?.getAttribute("href");
+      if (!hash || hash === "#admin-content") return;
+      event.preventDefault(); void navigate(hash, true);
+    };
+    const afterConfirmation = () => { queueMicrotask(update); };
+    window.addEventListener("admin:confirmationclosed", afterConfirmation);
+    document.addEventListener("click", followLink);
+    window.addEventListener("popstate", update); window.addEventListener("hashchange", update);
+    return () => { window.removeEventListener("admin:confirmationclosed", afterConfirmation); document.removeEventListener("click", followLink); window.removeEventListener("popstate", update); window.removeEventListener("hashchange", update); };
+  }, [navigate]);
   const [mobile, setMobile] = useState(mobileNavigationViewport);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const openRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<"mobile" | "desktop" | null>(null);
+  const drawerLocation = useRef(location.canonical);
   const drawerOpen = mobile && navOpen;
 
   useEffect(() => {
@@ -732,7 +826,9 @@ function Workspace() {
 
   useLayoutEffect(() => {
     if (!drawerOpen) {
-      if (restoreFocusRef.current === "mobile") openRef.current?.focus();
+      if (restoreFocusRef.current && drawerLocation.current !== currentLocation.current)
+        document.getElementById("admin-content")?.focus({ preventScroll: true });
+      else if (restoreFocusRef.current === "mobile") openRef.current?.focus();
       else if (restoreFocusRef.current === "desktop")
         sidebarRef.current?.querySelector<HTMLButtonElement>(".sidebar-link--active")?.focus();
       restoreFocusRef.current = null;
@@ -741,11 +837,13 @@ function Workspace() {
     }
     const sidebar = sidebarRef.current;
     if (!sidebar) return;
+    drawerLocation.current = currentLocation.current;
     if (closeRef.current) closeRef.current.focus();
     else sidebar.focus();
     const priorOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (document.querySelector(".admin-confirm")) return;
       if (event.key === "Escape") {
         event.preventDefault();
         setNavOpen(false);
@@ -775,18 +873,22 @@ function Workspace() {
   }, [drawerOpen, mobile]);
   const label = navigation.flatMap((group) => group.items).find((item) => item.id === section)?.label || "نمای کلی";
   return <div className="admin-shell">
+    <a className="skip-link" href="#admin-content" onClick={(event) => {
+      event.preventDefault();
+      document.getElementById("admin-content")?.focus({ preventScroll: true });
+    }}>رفتن به محتوای اصلی</a>
     {drawerOpen && <button type="button" className="sidebar-scrim" aria-hidden="true" tabIndex={-1}
       onClick={() => setNavOpen(false)} />}
-    <Sidebar active={section} open={drawerOpen} mobile={mobile} sidebarRef={sidebarRef} closeRef={closeRef}
+    <div className="sidebar-viewport"><Sidebar active={section} open={drawerOpen} mobile={mobile} sidebarRef={sidebarRef} closeRef={closeRef}
       onClose={() => setNavOpen(false)}
-      onSelect={(value) => { setSection(value); setNavOpen(false); window.scrollTo(0, 0); }} />
+      onSelect={(value) => { if (value === section) setNavOpen(false); else void navigate(`#${value}`, true); }} /></div>
     <div className="main-shell" inert={drawerOpen}>
       <header className="topbar">
         <div className="topbar-context">
           <button ref={openRef} type="button" className="nav-open" aria-label="باز کردن فهرست"
             aria-controls="admin-navigation" aria-expanded={drawerOpen}
             onClick={() => setNavOpen(true)}>☰</button>
-          <span className="topbar-dot" /> پنل مدیریت <span>/</span> {label}
+          <span className="topbar-workspace">پنل مدیریت</span><span className="topbar-divider" aria-hidden="true">/</span><strong>{label}</strong>
         </div>
         <div className="topbar-user">
           <ThemeToggle />
@@ -795,7 +897,7 @@ function Workspace() {
           <button type="button" onClick={logout}>خروج</button>
         </div>
       </header>
-      <main className="dashboard-main">
+      <main key={location.canonical} id="admin-content" className="dashboard-main" tabIndex={-1}>
         {section === "overview" ? <Dashboard />
           : section === "products" ? <Catalog />
           : section === "orders" ? <Orders />
@@ -803,6 +905,7 @@ function Workspace() {
           : section === "promotions" ? <Promotions />
           : section === "care" ? <Care />
           : section === "reports" ? <Reports />
+          : section === "landing" ? <LandingContent />
           : <Operations key={section} initialTab={section === "audit" ? "audit" : section === "settings" ? "settings" : "payments"} />}
       </main>
     </div>

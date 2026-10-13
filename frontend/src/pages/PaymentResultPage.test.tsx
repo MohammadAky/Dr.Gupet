@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { defaultScheduler, notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  defaultScheduler,
+  notifyManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,29 +12,65 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import type { OrderDetail, OrderStatus, OrderSummary } from '../api/types';
-import { clearPendingOrder, readPendingOrder, writePendingOrder } from '../features/checkout/pending-order';
+import {
+  clearPendingOrder,
+  readPendingOrder,
+  writePendingOrder,
+} from '../features/checkout/pending-order';
 import { PaymentResultPage } from './PaymentResultPage';
 
 const auth = vi.hoisted(() => ({ userId: 1 as number | null }));
-vi.mock('../auth/auth-provider', () => ({ useAuth: () => ({
-  status: auth.userId === null ? 'guest' : 'authed', user: auth.userId === null ? null : { id: auth.userId },
-}) }));
-vi.mock('../api/endpoints-shop', () => ({ shopApi: {
-  order: vi.fn(), orders: vi.fn(), startPayment: vi.fn(), cancelOrder: vi.fn(),
-} }));
+vi.mock('../auth/auth-provider', () => ({
+  useAuth: () => ({
+    status: auth.userId === null ? 'guest' : 'authed',
+    user: auth.userId === null ? null : { id: auth.userId },
+  }),
+}));
+vi.mock('../api/endpoints-shop', () => ({
+  shopApi: {
+    order: vi.fn(),
+    orders: vi.fn(),
+    startPayment: vi.fn(),
+    cancelOrder: vi.fn(),
+  },
+}));
 
 const fixture: OrderDetail = {
-  id: 8, orderNumber: 'O-8', userId: 1, status: 'PENDING_PAYMENT',
-  addressSnapshot: { title: 'خانه', receiverName: 'کاربر', receiverPhone: '09120000000',
-    province: 'تهران', city: 'تهران', fullAddress: 'نشانی', postalCode: null },
-  itemsTotal: 100_000, discountAmount: 0, shippingCost: 50_000, finalAmount: 150_000,
-  shippingMethod: null, trackingCode: null, shippedAt: null, deliveredAt: null, note: null,
-  couponId: null, createdAt: '', updatedAt: '', items: [], payments: [],
+  id: 8,
+  orderNumber: 'O-8',
+  userId: 1,
+  status: 'PENDING_PAYMENT',
+  addressSnapshot: {
+    title: 'خانه',
+    receiverName: 'کاربر',
+    receiverPhone: '09120000000',
+    province: 'تهران',
+    city: 'تهران',
+    fullAddress: 'نشانی',
+    postalCode: null,
+  },
+  itemsTotal: 100_000,
+  discountAmount: 0,
+  shippingCost: 50_000,
+  finalAmount: 150_000,
+  shippingMethod: null,
+  trackingCode: null,
+  shippedAt: null,
+  deliveredAt: null,
+  note: null,
+  couponId: null,
+  createdAt: '',
+  updatedAt: '',
+  items: [],
+  payments: [],
 };
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
   return { promise, resolve, reject };
 }
 
@@ -46,41 +87,73 @@ describe('payment result server truth and session boundaries', () => {
     auth.userId = 1;
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const browserWindow = window;
-    vi.stubGlobal('window', new Proxy(browserWindow, {
-      get(target, key) { return key === 'location' ? { assign } : Reflect.get(target, key, target); },
-    }));
+    vi.stubGlobal(
+      'window',
+      new Proxy(browserWindow, {
+        get(target, key) {
+          return key === 'location' ? { assign } : Reflect.get(target, key, target);
+        },
+      }),
+    );
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
     mounted = true;
-    client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } });
+    client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    });
     vi.mocked(shopApi.order).mockResolvedValue(fixture);
     vi.mocked(shopApi.orders).mockResolvedValue({ data: [] });
-    vi.mocked(shopApi.startPayment).mockResolvedValue({ paymentUrl: 'https://www.zarinpal.com/pg/StartPay/A' });
+    vi.mocked(shopApi.startPayment).mockResolvedValue({
+      paymentUrl: 'https://www.zarinpal.com/pg/StartPay/A',
+    });
     vi.mocked(shopApi.cancelOrder).mockResolvedValue({ ...fixture, status: 'CANCELED' });
     writePendingOrder({ orderId: 8, orderNumber: 'O-8' });
   });
 
   afterEach(async () => {
     if (mounted) await act(async () => root.unmount());
-    client.clear(); clearPendingOrder(); container.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks();
+    client.clear();
+    clearPendingOrder();
+    container.remove();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     notifyManager.setScheduler(defaultScheduler);
   });
 
   async function renderPage(url = '/payment/result?orderNumber=O-8&status=success') {
     await act(async () => {
-      root.render(<QueryClientProvider client={client}><MemoryRouter key={url} initialEntries={[url]}>
-        <PaymentResultPage />
-      </MemoryRouter></QueryClientProvider>);
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter key={url} initialEntries={[url]}>
+            <PaymentResultPage />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
     });
   }
   async function settle(operation: () => void) {
-    await act(async () => { operation(); });
+    await act(async () => {
+      operation();
+    });
   }
   function button(label: string) {
-    const found = [...container.querySelectorAll('button')].find((item) => item.textContent === label);
+    const found = [...container.querySelectorAll('button')].find(
+      (item) => item.textContent === label,
+    );
     if (!found) throw new Error(`Missing button: ${label}`);
     return found;
+  }
+  function confirmCancellation() {
+    const confirm = [...document.querySelectorAll('[role="dialog"] button')].find(
+      (item) => item.textContent === 'لغو این سفارش',
+    );
+    if (!(confirm instanceof HTMLButtonElement))
+      throw new Error('Missing cancellation confirmation');
+    confirm.click();
   }
 
   it('does not accept a success URL as proof, and confirms paid server states even for a failed URL', async () => {
@@ -110,7 +183,10 @@ describe('payment result server truth and session boundaries', () => {
   });
 
   it('rejects malformed stored IDs and resolves an owned order through the list', async () => {
-    window.sessionStorage.setItem('drgupet.pendingOrder', JSON.stringify({ orderId: 1.5, orderNumber: 'O-8' }));
+    window.sessionStorage.setItem(
+      'drgupet.pendingOrder',
+      JSON.stringify({ orderId: 1.5, orderNumber: 'O-8' }),
+    );
     vi.mocked(shopApi.orders).mockResolvedValue({ data: [fixture as unknown as OrderSummary] });
     await renderPage();
     await vi.waitFor(() => expect(shopApi.order).toHaveBeenCalledWith(8));
@@ -124,7 +200,9 @@ describe('payment result server truth and session boundaries', () => {
     vi.mocked(shopApi.orders).mockResolvedValue({ data: [fixture as unknown as OrderSummary] });
     vi.mocked(shopApi.order).mockResolvedValue({ ...fixture, userId: 2, status: 'PAID' });
     await renderPage();
-    await vi.waitFor(() => expect(container.textContent).toContain('اطلاعات این سفارش برای حساب فعلی معتبر نیست.'));
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain('اطلاعات این سفارش برای حساب فعلی معتبر نیست.'),
+    );
     expect(container.textContent).not.toContain('پرداخت این سفارش در سامانه تأیید شده است.');
     expect(readPendingOrder()).toBeNull();
     expect(client.getQueryData(queryKeys.order(8))).toBeUndefined();
@@ -136,10 +214,15 @@ describe('payment result server truth and session boundaries', () => {
     await renderPage();
     const pay = button('پرداخت مجدد');
     const cancel = button('انصراف از سفارش');
-    await settle(() => { pay.click(); cancel.click(); pay.click(); });
+    await settle(() => {
+      pay.click();
+      cancel.click();
+      pay.click();
+    });
     expect(shopApi.startPayment).toHaveBeenCalledTimes(1);
     expect(shopApi.cancelOrder).not.toHaveBeenCalled();
-    expect(pay.disabled).toBe(true); expect(cancel.disabled).toBe(true);
+    expect(pay.disabled).toBe(true);
+    expect(cancel.disabled).toBe(true);
     await settle(() => payment.resolve({ paymentUrl: 'https://www.zarinpal.com/pg/StartPay/A' }));
     expect(assign).toHaveBeenCalledTimes(1);
     expect(readPendingOrder()).toEqual({ orderId: 8, orderNumber: 'O-8' });
@@ -160,9 +243,18 @@ describe('payment result server truth and session boundaries', () => {
   it('refreshes canceled order/list/cart and clears only its matching pending marker', async () => {
     client.setQueryData(queryKeys.cart, { items: [], itemsTotal: 0 });
     client.setQueryData(queryKeys.orders(2), { data: [] });
-    vi.mocked(shopApi.order).mockResolvedValueOnce(fixture).mockResolvedValue({ ...fixture, status: 'CANCELED' });
+    vi.mocked(shopApi.order)
+      .mockResolvedValueOnce(fixture)
+      .mockResolvedValue({ ...fixture, status: 'CANCELED' });
     await renderPage();
-    await settle(() => { button('انصراف از سفارش').click(); button('پرداخت مجدد').click(); });
+    await settle(() => button('انصراف از سفارش').click());
+    expect(shopApi.cancelOrder).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('O-8');
+    const pay = button('پرداخت مجدد');
+    await settle(() => {
+      confirmCancellation();
+      pay.click();
+    });
     expect(shopApi.cancelOrder).toHaveBeenCalledTimes(1);
     expect(shopApi.startPayment).not.toHaveBeenCalled();
     expect(container.textContent).toContain('سفارش لغو شد.');
@@ -171,6 +263,30 @@ describe('payment result server truth and session boundaries', () => {
     expect(client.getQueryState(queryKeys.cart)?.isInvalidated).toBe(true);
     expect(client.getQueryState(queryKeys.orders(2))?.isInvalidated).toBe(true);
     expect(client.getQueryData<OrderDetail>(queryKeys.order(8))?.status).toBe('CANCELED');
+  });
+
+  it('retains payment-result cancellation context on deferred failure and closes after retry succeeds', async () => {
+    const first = deferred<OrderDetail>();
+    const retry = deferred<OrderDetail>();
+    vi.mocked(shopApi.cancelOrder).mockReturnValueOnce(first.promise).mockReturnValueOnce(retry.promise);
+    await renderPage();
+    await settle(() => button('انصراف از سفارش').click());
+    await settle(() => { confirmCancellation(); confirmCancellation(); });
+    expect(shopApi.cancelOrder).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('O-8');
+    await settle(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await settle(() => first.reject(new Error('لغو موقتاً ممکن نیست')));
+    expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toBe('لغو موقتاً ممکن نیست');
+    expect(readPendingOrder()).toEqual({ orderId: 8, orderNumber: 'O-8' });
+    await settle(confirmCancellation);
+    const canceled = { ...fixture, status: 'CANCELED' as const };
+    vi.mocked(shopApi.order).mockResolvedValue(canceled);
+    await settle(() => retry.resolve(canceled));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain('سفارش لغو شد.');
+    expect(readPendingOrder()).toBeNull();
+    expect(shopApi.cancelOrder).toHaveBeenCalledTimes(2);
   });
 
   it('discards a payment response after account switch without navigation or marker writes', async () => {
@@ -192,7 +308,9 @@ describe('payment result server truth and session boundaries', () => {
     vi.mocked(shopApi.cancelOrder).mockReturnValue(cancellation.promise);
     await renderPage();
     await settle(() => button('انصراف از سفارش').click());
-    await act(async () => root.unmount()); mounted = false;
+    await settle(confirmCancellation);
+    await act(async () => root.unmount());
+    mounted = false;
     const nextOrder = { ...fixture, userId: 2, status: 'PAID' as const };
     client.setQueryData(queryKeys.order(8), nextOrder);
     writePendingOrder({ orderId: 9, orderNumber: 'O-9' });
@@ -207,7 +325,8 @@ describe('payment result server truth and session boundaries', () => {
     const result = deferred<OrderDetail>();
     vi.mocked(shopApi.order).mockReturnValue(result.promise);
     await renderPage();
-    await act(async () => root.unmount()); mounted = false;
+    await act(async () => root.unmount());
+    mounted = false;
     clearPendingOrder();
     await settle(() => result.resolve(fixture));
     expect(client.getQueryData(queryKeys.order(8))).toBeUndefined();

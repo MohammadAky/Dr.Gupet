@@ -108,6 +108,18 @@ describe('customer initial OTP request safeguards', () => {
     expect(container.querySelector('h2')!.textContent).toContain('?next=%2Fprofile');
   });
 
+  it('focuses an invalid phone and clears its inline error as the number is corrected', async () => {
+    await renderPage();
+    await enterPhone('123');
+    await act(async () => submit());
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe('phone'));
+    expect(container.querySelector('#phone')?.getAttribute('aria-invalid')).toBe('true');
+    expect(api.requestOtp).not.toHaveBeenCalled();
+    await enterPhone();
+    expect(container.querySelector('#phone')?.getAttribute('aria-invalid')).not.toBe('true');
+    expect(container.querySelector('.field__error')).toBeNull();
+  });
+
   it('does not overwrite a newer phone flow or navigate after leaving during delivery', async () => {
     const send = deferred<{ expiresIn: number; cooldownSeconds: number }>();
     vi.mocked(api.requestOtp).mockReturnValue(send.promise);
@@ -146,6 +158,7 @@ describe('customer initial OTP request safeguards', () => {
     expect(container.querySelector('button')!.disabled).toBe(false);
     expect(readOtpPhone()).toBeNull();
     await enterPhone('09121111111');
+    expect(container.textContent).not.toContain('ارسال انجام نشد');
     await act(async () => {
       submit();
       await flush();

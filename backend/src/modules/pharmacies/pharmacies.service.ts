@@ -1,3 +1,8 @@
+import {
+  isPresentationName,
+  PRESENTATION_LABEL,
+} from '../../common/utils/presentation-sample.util';
+import { nearbyDirectory, NearbyQuery } from '../../common/utils/nearby.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
@@ -7,11 +12,16 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 export class PharmaciesService {
   constructor(private prisma: PrismaService) {}
 
+  async nearby(query: NearbyQuery) {
+    return nearbyDirectory(this.prisma, 'Pharmacy', query);
+  }
+
   /**
    * List pharmacies with filtering
    */
   async findAll(
     query: PaginationQueryDto & {
+      sampleOnly?: boolean;
       q?: string;
       city?: string;
       province?: string;
@@ -23,6 +33,8 @@ export class PharmaciesService {
     const skip = (page - 1) * limit;
 
     const where: any = { isActive: true };
+
+    if (query.sampleOnly) where.AND = [{ name: { endsWith: `— ${PRESENTATION_LABEL}` } }];
 
     if (q) {
       where.name = { contains: normalizeFa(q) };
@@ -53,6 +65,8 @@ export class PharmaciesService {
           city: true,
           province: true,
           address: true,
+          lat: true,
+          lng: true,
           phone: true,
           is24h: true,
           onDuty: true,
@@ -66,7 +80,11 @@ export class PharmaciesService {
     ]);
 
     return {
-      data: pharmacies,
+      data: pharmacies.map((row) => ({
+        ...row,
+        isSample: isPresentationName(row.name),
+        image: isPresentationName(row.name) ? '/brand/discovery-pharmacy-480.webp' : null,
+      })),
       meta: {
         page,
         limit,
@@ -101,7 +119,11 @@ export class PharmaciesService {
       throw new NotFoundException('داروخانه یافت نشد');
     }
 
-    return pharmacy;
+    return {
+      ...pharmacy,
+      isSample: isPresentationName(pharmacy.name),
+      image: isPresentationName(pharmacy.name) ? '/brand/discovery-pharmacy-480.webp' : null,
+    };
   }
 
   // -------------------------------------------------------------------

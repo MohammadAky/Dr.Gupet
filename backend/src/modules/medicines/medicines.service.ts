@@ -1,3 +1,7 @@
+import {
+  isPresentationName,
+  PRESENTATION_LABEL,
+} from '../../common/utils/presentation-sample.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
@@ -13,6 +17,7 @@ export class MedicinesService {
    */
   async findAll(
     query: PaginationQueryDto & {
+      sampleOnly?: boolean;
       q?: string;
       petTypeId?: number;
       requiresPrescription?: boolean;
@@ -22,6 +27,8 @@ export class MedicinesService {
     const skip = (page - 1) * limit;
 
     const where: any = { isActive: true };
+
+    if (query.sampleOnly) where.AND = [{ name: { endsWith: `— ${PRESENTATION_LABEL}` } }];
 
     if (q) {
       where.OR = [
@@ -52,7 +59,7 @@ export class MedicinesService {
     ]);
 
     return {
-      data: medicines,
+      data: medicines.map((row) => ({ ...row, isSample: isPresentationName(row.name) })),
       meta: {
         page,
         limit,
@@ -100,6 +107,7 @@ export class MedicinesService {
 
     return {
       ...medicine,
+      isSample: isPresentationName(medicine.name),
       disclaimer: MEDICINE_DISCLAIMER,
       pharmacies: medicine.pharmacies.map((pm) => ({
         ...pm.pharmacy,

@@ -1,3 +1,4 @@
+import { PRESENTATION_PREFIX } from '../../common/utils/presentation-sample.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
@@ -12,6 +13,7 @@ export class ProductsService {
    */
   async findAll(
     query: PaginationQueryDto & {
+      sampleOnly?: boolean;
       q?: string;
       petTypeId?: number;
       categorySlug?: string;
@@ -48,6 +50,8 @@ export class ProductsService {
     };
 
     // Search by name (normalized Persian)
+    if (query.sampleOnly) where.slug = { startsWith: PRESENTATION_PREFIX };
+
     if (q) {
       where.name = { contains: normalizeFa(q) };
     }
@@ -164,9 +168,11 @@ export class ProductsService {
         cheapest && cheapest.compareAtPrice && cheapest.compareAtPrice > cheapest.price
           ? cheapest.compareAtPrice
           : null;
-      const inStock = activeVariants.some((v) => v.stock > 0);
+      const inStock =
+        !product.slug.startsWith(PRESENTATION_PREFIX) && activeVariants.some((v) => v.stock > 0);
 
       return {
+        isSample: product.slug.startsWith(PRESENTATION_PREFIX),
         id: product.id,
         name: product.name,
         slug: product.slug,
@@ -233,12 +239,13 @@ export class ProductsService {
       weightGram: v.weightGram,
       price: v.price,
       compareAtPrice: v.compareAtPrice,
-      inStock: v.stock > 0,
-      lowStock: v.stock > 0 && v.stock <= 5,
+      inStock: !product.slug.startsWith(PRESENTATION_PREFIX) && v.stock > 0,
+      lowStock: !product.slug.startsWith(PRESENTATION_PREFIX) && v.stock > 0 && v.stock <= 5,
     }));
 
     return {
       ...product,
+      isSample: product.slug.startsWith(PRESENTATION_PREFIX),
       variants,
       tags: product.tags.map((pt) => pt.tag),
     };

@@ -11,7 +11,7 @@ import { FavoritesPage } from './FavoritesPage';
 
 const authState = vi.hoisted(() => ({ userId: 1, status: 'authed' }));
 vi.mock('../auth/auth-provider', () => ({ useAuth: () => ({ status: authState.status, user: { id: authState.userId } }) }));
-vi.mock('../api/endpoints-shop', () => ({ shopApi: { favorites: vi.fn(), removeFavorite: vi.fn() } }));
+vi.mock('../api/endpoints-shop', () => ({ shopApi: { favorites: vi.fn(), removeFavorite: vi.fn(), addFavorite: vi.fn() } }));
 
 const card: ProductCard = {
   id: 7, name: 'غذای محبوب', slug: 'favorite-food', brand: { id: 2, name: 'برند' },
@@ -92,6 +92,21 @@ describe('favorites removal', () => {
     expect(container.textContent).toContain('بازگشت به صفحهٔ اول');
   });
 
+  it('restores a removed favorite through the server and waits before clearing Undo', async () => {
+    vi.mocked(shopApi.favorites).mockResolvedValueOnce(page([card])).mockResolvedValueOnce(page([])).mockResolvedValueOnce(page([card]));
+    vi.mocked(shopApi.removeFavorite).mockResolvedValue(undefined);
+    const restore = deferred<void>(); vi.mocked(shopApi.addFavorite).mockReturnValue(restore.promise);
+    await renderPage();
+    await act(async () => container.querySelector<HTMLButtonElement>('.product-card button')!.click());
+    await vi.waitFor(() => expect(container.textContent).toContain('بازگردانی'));
+    const undo = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'بازگردانی')!;
+    await act(async () => { undo.click(); undo.click(); });
+    expect(shopApi.addFavorite).toHaveBeenCalledExactlyOnceWith(7); expect(undo.disabled).toBe(true);
+    await act(async () => restore.resolve(undefined));
+    await vi.waitFor(() => expect(container.querySelector('.product-card')).not.toBeNull());
+    expect(container.textContent).not.toContain('بازگردانی');
+  });
+
   it('does not show stale feedback or invalidate a cache after unmount', async () => {
     const pending = deferred<void>();
     vi.mocked(shopApi.removeFavorite).mockReturnValue(pending.promise);
@@ -103,6 +118,22 @@ describe('favorites removal', () => {
     await act(async () => pending.resolve(undefined));
     expect(invalidate).not.toHaveBeenCalled();
     expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('blocks removal from previous-page placeholders until the requested page is ready', async () => {
+    const next = deferred<ReturnType<typeof page>>();
+    vi.mocked(shopApi.favorites).mockResolvedValueOnce(page([card])).mockReturnValueOnce(next.promise);
+    await renderPage();
+    const previous = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'قبلی')!;
+    await act(async () => previous.click());
+    const staleRemove = container.querySelector<HTMLButtonElement>('.product-card button')!;
+    expect(staleRemove.disabled).toBe(true);
+    await act(async () => staleRemove.click());
+    expect(shopApi.removeFavorite).not.toHaveBeenCalled();
+    const nextCard = { ...card, id: 8, name: 'انتخاب تازه' };
+    await act(async () => next.resolve({ data: [nextCard], meta: { page: 1, limit: 20, total: 2, totalPages: 2 } }));
+    await vi.waitFor(() => expect(container.querySelector<HTMLButtonElement>('.product-card button')?.disabled).toBe(false));
+    expect(container.querySelector('.product-card button')?.getAttribute('aria-label')).toContain('انتخاب تازه');
   });
 
   it('does not fetch or remove private favorites for a guest', async () => {

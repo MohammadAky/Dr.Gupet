@@ -1,3 +1,4 @@
+import { PRESENTATION_PREFIX } from '../../common/utils/presentation-sample.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -72,7 +73,11 @@ export class CartService {
       const product = variant.product;
       const unitPrice = variant.price;
       const total = unitPrice * item.quantity;
-      const available = variant.isActive && product.isActive && variant.stock >= item.quantity;
+      const available =
+        !product.slug.startsWith(PRESENTATION_PREFIX) &&
+        variant.isActive &&
+        product.isActive &&
+        variant.stock >= item.quantity;
 
       let stockProblem: 'OUT_OF_STOCK' | 'INSUFFICIENT' | undefined;
       if (variant.stock <= 0) {
@@ -128,11 +133,19 @@ export class CartService {
     // Validate variant exists and is active
     const variant = await this.prisma.productVariant.findUnique({
       where: { id: variantId },
-      include: { product: { select: { isActive: true } } },
+      include: { product: { select: { isActive: true, slug: true } } },
     });
 
     if (!variant || !variant.isActive || !variant.product.isActive) {
       throw new AppException('VARIANT_UNAVAILABLE', 'این واریانت موجود نیست', 400);
+    }
+
+    if (variant.product.slug?.startsWith(PRESENTATION_PREFIX)) {
+      throw new AppException(
+        'PRESENTATION_ONLY',
+        'این محصول نمونه نمایشی است و قابل خرید نیست',
+        400,
+      );
     }
 
     // Check stock
@@ -198,11 +211,19 @@ export class CartService {
     // Get item and verify ownership
     const item = await this.prisma.cartItem.findUnique({
       where: { id: itemId },
-      include: { variant: true },
+      include: { variant: { include: { product: { select: { slug: true } } } } },
     });
 
     if (!item || item.cartId !== cart.id) {
       throw new NotFoundException('آیتم یافت نشد');
+    }
+
+    if (item.variant.product.slug?.startsWith(PRESENTATION_PREFIX)) {
+      throw new AppException(
+        'PRESENTATION_ONLY',
+        'این محصول نمونه نمایشی است و قابل خرید نیست',
+        400,
+      );
     }
 
     // Validate quantity

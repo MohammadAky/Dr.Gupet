@@ -32,7 +32,9 @@ export class PaymentsService {
     // everywhere, and the mock driver is refused in production.
     const driver = this.configService.get<string>('payment.driver') || 'mock';
     if (driver !== 'mock' && driver !== 'zarinpal' && driver !== 'disabled') {
-      throw new Error(`Unknown PAYMENT_DRIVER "${driver}" — expected "mock", "zarinpal" or "disabled"`);
+      throw new Error(
+        `Unknown PAYMENT_DRIVER "${driver}" — expected "mock", "zarinpal" or "disabled"`,
+      );
     }
     const nodeEnv = this.configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
     if (driver === 'mock' && nodeEnv === 'production') {
@@ -211,7 +213,7 @@ export class PaymentsService {
     }
 
     // Server-to-server verification with the gateway.
-    let verified = false;
+    let verified: boolean;
     try {
       const verifyResult = await gateway.verify(payment.gatewayRef || '', payment.amount);
       verified = verifyResult.success;

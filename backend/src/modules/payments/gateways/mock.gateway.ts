@@ -15,7 +15,9 @@ import {
  * - The service layer refuses to even construct this gateway in production.
  */
 export class MockPaymentGateway implements PaymentGateway {
-  constructor(private readonly mockPayUrl: string = 'http://localhost:3000/api/v1/payments/mock-pay') {}
+  constructor(
+    private readonly mockPayUrl: string = 'http://localhost:3000/api/v1/payments/mock-pay',
+  ) {}
 
   async request(data: PaymentRequest): Promise<PaymentResponse> {
     const gatewayRef = `mock-${Date.now()}-${data.paymentId}`;

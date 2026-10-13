@@ -12,11 +12,22 @@
   --muted: #596859;
   --line: #e5e8de;
   --danger: #a62424;
+  --danger-surface: #fff5f3;
   --focus: #315237;
   --radius-sm: 12px;
   --radius-md: 20px;
   --radius-lg: 32px;
   --shadow-card: 0 14px 36px rgb(18 47 18 / 8%);
+  --success: #216341;
+  --success-surface: #edf6ef;
+  --hero-surface: #102914;
+  --hero-ink: #f8f6ee;
+  --hero-muted: #d9e3d5;
+  --hero-accent: #e4c67f;
+  --motion-press: 120ms;
+  --motion-state: 180ms;
+  --motion-overlay: 220ms;
+  --motion-intro: 360ms;
 }
 
 :root {
@@ -36,5 +47,9 @@
   --forest-soft: #bfd6b8;
   --gold-soft: #3c341e;
   --focus: #d49f28;
+  --danger: #ffb4a9;
+  --danger-surface: #362321;
+  --success: #b4e5c9;
+  --success-surface: #193a29;
   --shadow-card: 0 14px 36px rgb(0 0 0 / 24%);
 }

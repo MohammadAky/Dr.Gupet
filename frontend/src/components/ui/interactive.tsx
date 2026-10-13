@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -9,10 +9,20 @@ export interface DialogProps {
   onClose: () => void;
   children: ReactNode;
   variant?: 'modal' | 'drawer';
+  dismissible?: boolean;
 }
 
 const focusable =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button, input, select, textarea, [contenteditable="true"], [tabindex]';
+
+function isTabStop(node: HTMLElement) {
+  if (node.tabIndex < 0 || node.matches(':disabled, input[type="hidden"]') || node.closest('[hidden], [inert]')) return false;
+  for (let ancestor: HTMLElement | null = node; ancestor; ancestor = ancestor.parentElement) {
+    const style = getComputedStyle(ancestor);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+  }
+  return true;
+}
 
 export function Dialog({
   open,
@@ -21,30 +31,39 @@ export function Dialog({
   onClose,
   children,
   variant = 'modal',
+  dismissible = true,
 }: DialogProps) {
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const closeCallback = useRef(onClose);
-  useEffect(() => {
+  const canDismiss = useRef(dismissible);
+  useLayoutEffect(() => {
     closeCallback.current = onClose;
-  }, [onClose]);
+    canDismiss.current = dismissible;
+  }, [onClose, dismissible]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
+    const appRoot = document.getElementById('root');
+    const previousInert = appRoot?.inert ?? false;
+    if (appRoot) appRoot.inert = true;
     document.body.style.overflow = 'hidden';
-    closeRef.current?.focus();
+    if (panelRef.current) panelRef.current.dataset.motion = previous?.matches(':focus-visible') ? 'instant' : 'enter';
+    if (canDismiss.current) closeRef.current?.focus();
+    else panelRef.current?.focus();
     function keydown(event: globalThis.KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        closeCallback.current();
+        if (canDismiss.current) closeCallback.current();
         return;
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
-      const nodes = Array.from(panelRef.current.querySelectorAll<HTMLElement>(focusable));
+      const nodes = Array.from(panelRef.current.querySelectorAll<HTMLElement>(focusable))
+        .filter(isTabStop);
       if (!nodes.length) {
         event.preventDefault();
         panelRef.current.focus();
@@ -52,7 +71,10 @@ export function Dialog({
       }
       const first = nodes[0];
       const last = nodes[nodes.length - 1];
-      if (event.shiftKey && document.activeElement === first && last) {
+      if (!panelRef.current.contains(document.activeElement) || document.activeElement === panelRef.current) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      } else if (event.shiftKey && document.activeElement === first && last) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last && first) {
@@ -64,14 +86,19 @@ export function Dialog({
     return () => {
       document.removeEventListener('keydown', keydown);
       document.body.style.overflow = previousOverflow;
-      previous?.focus();
+      if (appRoot) appRoot.inert = previousInert;
+      if (previous?.isConnected) previous.focus();
+      else {
+        const heading = document.querySelector<HTMLElement>('main h1');
+        if (heading) { heading.tabIndex = -1; heading.focus(); }
+      }
     };
   }, [open]);
 
   if (!open) return null;
   return createPortal(
     <div className={`ui-dialog ui-dialog--${variant}`}>
-      <div className="ui-dialog__backdrop" aria-hidden="true" onClick={onClose} />
+      <div className="ui-dialog__backdrop" aria-hidden="true" onClick={() => { if (dismissible) onClose(); }} />
       <div
         ref={panelRef}
         className="ui-dialog__panel"
@@ -91,6 +118,7 @@ export function Dialog({
             type="button"
             className="ui-dialog__close"
             aria-label="بستن پنجره"
+            disabled={!dismissible}
             onClick={onClose}
           >
             ×

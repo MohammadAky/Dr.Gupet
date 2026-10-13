@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError, type PageResult } from "./api/client";
 import { useAuth } from "./auth";
+import { parseAdminLocation } from "./navigation";
+import { validateRequiredFields } from "./management";
 import {
   CatalogReferencesManager,
   type CatalogReferences,
@@ -26,6 +28,15 @@ import {
 const count = new Intl.NumberFormat("fa-IR");
 const toman = (value: number | null) =>
   value == null ? "بدون قیمت" : count.format(value) + " تومان";
+const lifeStageLabels: Record<string, string> = {
+  ALL: "همه", PUPPY_KITTEN: "توله / بچه‌گربه", ADULT: "بالغ", SENIOR: "مسن",
+};
+const sizeClassLabels: Record<string, string> = {
+  ALL: "همه", SMALL: "کوچک", MEDIUM: "متوسط", LARGE: "بزرگ",
+};
+const neuterSuitabilityLabels: Record<string, string> = {
+  ANY: "بدون محدودیت", NEUTERED_ONLY: "مخصوص عقیم‌شده",
+};
 
 type Section = "list" | "create" | "detail" | "references";
 type RefKind = "brand" | "category" | "petType";
@@ -34,7 +45,7 @@ type References = CatalogReferences;
 function errorText(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError)
-    return "ارتباط با API برقرار نشد. بک‌اند را بررسی کنید.";
+    return "اتصال برقرار نشد. ارتباط اینترنت را بررسی کنید و دوباره تلاش کنید.";
   if (error instanceof Error) return error.message;
   return "درخواست انجام نشد. دوباره تلاش کنید.";
 }
@@ -86,6 +97,7 @@ function QuickReference({
   onCreated: (kind: RefKind, value: NamedRef) => void;
 }) {
   const { request } = useAuth();
+  const pending = useRef(false);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -102,11 +114,12 @@ function QuickReference({
   };
 
   async function submit() {
+    if (pending.current) return;
     if (name.trim().length < 2) {
       setError("نام باید دست‌کم دو نویسه باشد.");
       return;
     }
-    setBusy(true);
+    pending.current = true; setBusy(true);
     setError("");
     try {
       const body =
@@ -123,7 +136,7 @@ function QuickReference({
     } catch (problem) {
       setError(errorText(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   }
 
@@ -185,6 +198,9 @@ function CreateProduct({
   onRefCreated: (kind: RefKind, value: NamedRef) => void;
 }) {
   const { request } = useAuth();
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [draft, setDraft] = useState<ProductDraft>(emptyProductDraft);
   const [variant, setVariant] = useState<VariantDraft>(emptyVariantDraft);
   const [image, setImage] = useState<File | null>(null);
@@ -217,28 +233,30 @@ function CreateProduct({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || partialId !== null) return;
+    if (pending.current || partialId !== null) return;
+    if (!validateRequiredFields(event.currentTarget)) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     const problem =
       validateProductDraft(draft, variant) || validateImage(image);
     if (problem) {
       setError(problem);
       return;
     }
-    setBusy(true);
+    pending.current = true; setBusy(true);
     setError("");
     try {
       const id = await createProductWorkflow(request, draft, variant, image, {
         contains,
         suitableFor,
       });
-      onCreated(id);
+      if (mounted.current) onCreated(id);
     } catch (problem) {
+      if (!mounted.current) return;
       if (problem instanceof PartialProductError) {
         setPartialId(problem.productId);
         setError(
           problem.message +
             " مرحله: " +
-            problem.stage +
+            ({ variant: "ثبت گزینهٔ محصول", upload: "بارگذاری تصویر", image: "ثبت تصویر", tags: "ثبت برچسب‌ها", activate: "فعال‌سازی محصول" }[problem.stage]) +
             "؛ دلیل: " +
             errorText(problem.cause),
         );
@@ -246,7 +264,7 @@ function CreateProduct({
         setError(errorText(problem));
       }
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
 
@@ -283,7 +301,7 @@ function CreateProduct({
           </button>
         </div>
       )}
-      <form className="catalog-form" onSubmit={(event) => void submit(event)}>
+      <form className="catalog-form" data-draft-region noValidate onSubmit={(event) => void submit(event)}>
         <div className="catalog-form__main">
           <section
             className="catalog-panel"
@@ -718,11 +736,17 @@ function Detail({
   onUpdated: () => void;
 }) {
   const { request } = useAuth();
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [working, setBusy] = useState(false);
+  const [refreshNeeded, setRefreshNeeded] = useState(false);
+  const busy = working || refreshNeeded;
+  const imageInput = useRef<HTMLInputElement | null>(null);
   const [variant, setVariant] = useState<VariantDraft>(emptyVariantDraft);
   const [image, setImage] = useState<File | null>(null);
   const [editDraft, setEditDraft] = useState<ProductDraft | null>(null);
@@ -758,21 +782,42 @@ function Detail({
     success: string,
     after?: () => void,
   ) {
-    if (busy) return;
-    setBusy(true);
+    if (pending.current || refreshNeeded) return;
+    pending.current = true; setBusy(true);
     setError("");
     setNotice("");
     try {
       await action();
-      const fresh = await request<ProductDetail>("/admin/products/" + id);
-      setProduct(fresh);
+      if (!mounted.current) return;
       setNotice(success);
       after?.();
       onUpdated();
+      setRefreshNeeded(true);
+      const fresh = await request<ProductDetail>("/admin/products/" + id);
+      if (!mounted.current) return;
+      setProduct(fresh);
+      setRefreshNeeded(false);
     } catch (problem) {
-      setError(errorText(problem));
+      if (mounted.current) setError(errorText(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
+    }
+  }
+
+  async function refreshDetail() {
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
+    if (!product) setLoading(true);
+    setError("");
+    try {
+      const fresh = await request<ProductDetail>("/admin/products/" + id);
+      if (!mounted.current) return;
+      setProduct(fresh);
+      setRefreshNeeded(false);
+    } catch (problem) {
+      if (mounted.current) setError(errorText(problem));
+    } finally {
+      pending.current = false; if (mounted.current) { setBusy(false); setLoading(false); }
     }
   }
 
@@ -808,6 +853,7 @@ function Detail({
 
   function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!validateRequiredFields(event.currentTarget)) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     if (!editDraft) return;
     if (
       editDraft.name.trim().length < 2 ||
@@ -839,6 +885,7 @@ function Detail({
 
   function saveVariant(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!validateRequiredFields(event.currentTarget)) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     if (editingVariantId === null || !variantEdit.sku.trim()) {
       setError("شناسهٔ کالا (SKU) الزامی است.");
       return;
@@ -880,26 +927,28 @@ function Detail({
   }
 
   async function removeProduct() {
-    if (busy) return;
-    setBusy(true);
+    if (pending.current || refreshNeeded) return;
+    pending.current = true; setBusy(true);
     setError("");
     try {
       const result = await request<{ deleted: boolean }>(
         "/admin/products/" + id,
         { method: "DELETE" },
       );
+      if (!mounted.current) return;
       onUpdated();
       if (result.deleted) onBack();
       else {
         const fresh = await request<ProductDetail>("/admin/products/" + id);
+        if (!mounted.current) return;
         setProduct(fresh);
         setNotice("محصول به‌دلیل وابستگی به سفارش، غیرفعال شد.");
         setConfirmProduct(false);
       }
     } catch (problem) {
-      setError(errorText(problem));
+      if (mounted.current) setError(errorText(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
 
@@ -913,6 +962,9 @@ function Detail({
     return (
       <div className="catalog-notice catalog-notice--warning" role="alert">
         {error}
+        <button type="button" disabled={working} onClick={() => void refreshDetail()}>
+          تلاش دوباره
+        </button>
         <button type="button" onClick={onBack}>
           بازگشت
         </button>
@@ -946,6 +998,14 @@ function Detail({
       {error && (
         <div className="catalog-notice catalog-notice--warning" role="alert">
           {error}
+          {refreshNeeded && (
+            <>
+              <p>تغییر ذخیره شده است؛ برای ادامه، اطلاعات تازهٔ محصول را دریافت کنید.</p>
+              <button type="button" disabled={working} onClick={() => void refreshDetail()}>
+                دریافت دوبارهٔ جزئیات
+              </button>
+            </>
+          )}
         </div>
       )}
       <div className="catalog-detail-grid">
@@ -954,7 +1014,7 @@ function Detail({
             <span>۰۱</span>
             <div>
               <h2>شناسنامه و انتشار</h2>
-              <p>جزئیات ثبت‌شده در API</p>
+              <p>اطلاعات محصول</p>
             </div>
           </div>
           <dl className="catalog-facts">
@@ -972,15 +1032,15 @@ function Detail({
             </div>
             <div>
               <dt>مرحلهٔ زندگی</dt>
-              <dd>{product.lifeStage}</dd>
+              <dd>{lifeStageLabels[product.lifeStage] ?? product.lifeStage}</dd>
             </div>
             <div>
               <dt>اندازه</dt>
-              <dd>{product.sizeClass}</dd>
+              <dd>{sizeClassLabels[product.sizeClass] ?? product.sizeClass}</dd>
             </div>
             <div>
               <dt>وضعیت عقیم‌سازی</dt>
-              <dd>{product.neuterSuitability}</dd>
+              <dd>{neuterSuitabilityLabels[product.neuterSuitability] ?? product.neuterSuitability}</dd>
             </div>
           </dl>
           {product.ingredientsText && (
@@ -1002,7 +1062,7 @@ function Detail({
               ویرایش اطلاعات محصول
             </button>
           ) : (
-            <form className="catalog-inline-form" onSubmit={saveProduct}>
+            <form className="catalog-inline-form" data-draft-region noValidate onSubmit={saveProduct}>
               <h3>ویرایش شناسنامه</h3>
               <label>
                 نام
@@ -1238,7 +1298,7 @@ function Detail({
             ) : (
               <>
                 <p>
-                  اگر محصول در سفارش استفاده شده باشد، API آن را غیرفعال می‌کند.
+                  اگر محصول در سفارش استفاده شده باشد، فقط غیرفعال می‌شود.
                 </p>
                 <button
                   type="button"
@@ -1328,10 +1388,10 @@ function Detail({
             )}
           </div>
           {editingVariantId !== null && (
-            <form className="catalog-inline-form" onSubmit={saveVariant}>
+            <form className="catalog-inline-form" data-draft-region noValidate onSubmit={saveVariant}>
               <h3>ویرایش واریانت</h3>
               <label>
-                SKU
+                شناسهٔ کالا (SKU)
                 <input
                   dir="ltr"
                   required
@@ -1439,8 +1499,11 @@ function Detail({
           )}
           <form
             className="catalog-inline-form"
+            data-draft-region
+            noValidate
             onSubmit={(event) => {
               event.preventDefault();
+              if (!validateRequiredFields(event.currentTarget)) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
               const problem = validateProductDraft(
                 {
                   ...emptyProductDraft,
@@ -1462,12 +1525,13 @@ function Detail({
                     body: variantPayload(variant),
                   }),
                 "واریانت افزوده شد.",
+                () => setVariant(emptyVariantDraft),
               );
             }}
           >
             <h3>افزودن واریانت</h3>
             <label>
-              SKU
+              شناسهٔ کالا (SKU)
               <input
                 dir="ltr"
                 required
@@ -1622,13 +1686,17 @@ function Detail({
                   method: "POST",
                   body: { url: uploaded.url, sortOrder: product.images.length },
                 });
-              }, "تصویر افزوده شد.");
+              }, "تصویر افزوده شد.", () => {
+                setImage(null);
+                if (imageInput.current) imageInput.current.value = "";
+              });
             }}
           >
             <label>
               افزودن تصویر
               <input
                 type="file"
+                ref={imageInput}
                 accept="image/jpeg,image/png,image/webp"
                 disabled={busy}
                 onChange={(event) => setImage(event.target.files?.[0] ?? null)}
@@ -1759,32 +1827,38 @@ export function Catalog() {
   const [page, setPage] = useState(1);
   const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState(() => parseAdminLocation(window.location.hash).params.get("active") ?? "all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refsError, setRefsError] = useState("");
+  const [refsLoading, setRefsLoading] = useState(true);
   const [refsRevision, setRefsRevision] = useState(0);
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      request<NamedRef[]>("/admin/brands"),
-      request<NamedRef[]>("/admin/categories"),
-      request<NamedRef[]>("/admin/pet-types"),
-      request<NamedRef[]>("/admin/breeds"),
-      request<CatalogTag[]>("/admin/tags"),
-    ])
-      .then(([brands, categories, petTypes, breeds, tags]) => {
-        if (active) {
-          setRefs({ brands, categories, petTypes, breeds, tags });
-          setRefsError("");
-        }
-      })
-      .catch((problem) => {
-        if (active) setRefsError(errorText(problem));
-      });
+    queueMicrotask(() => {
+      if (!active) return;
+      setRefsLoading(true);
+      setRefsError("");
+      void Promise.all([
+        request<NamedRef[]>("/admin/brands"),
+        request<NamedRef[]>("/admin/categories"),
+        request<NamedRef[]>("/admin/pet-types"),
+        request<NamedRef[]>("/admin/breeds"),
+        request<CatalogTag[]>("/admin/tags"),
+      ])
+        .then(([brands, categories, petTypes, breeds, tags]) => {
+          if (active) setRefs({ brands, categories, petTypes, breeds, tags });
+        })
+        .catch((problem) => {
+          if (active) setRefsError(errorText(problem));
+        })
+        .finally(() => {
+          if (active) setRefsLoading(false);
+        });
+    });
     return () => {
       active = false;
     };
@@ -1795,23 +1869,27 @@ export function Catalog() {
     const query = new URLSearchParams({ page: String(page), limit: "12" });
     if (search) query.set("search", search);
     if (activeFilter !== "all") query.set("isActive", activeFilter);
-    void request<PageResult<ProductRow>>(
-      "/admin/products?" + query.toString(),
-      { withMeta: true },
-    )
-      .then((result) => {
-        if (active) {
-          setRows(result.data);
-          setMeta(result.meta);
-          setError("");
-        }
-      })
-      .catch((problem) => {
-        if (active) setError(errorText(problem));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    queueMicrotask(() => {
+      if (!active) return;
+      setLoading(true);
+      setError("");
+      void request<PageResult<ProductRow>>(
+        "/admin/products?" + query.toString(),
+        { withMeta: true },
+      )
+        .then((result) => {
+          if (active) {
+            setRows(result.data);
+            setMeta(result.meta);
+          }
+        })
+        .catch((problem) => {
+          if (active) setError(errorText(problem));
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    });
     return () => {
       active = false;
     };
@@ -1830,6 +1908,47 @@ export function Catalog() {
           : "petTypes";
     setRefs((current) => ({ ...current, [key]: [...current[key], value] }));
   }
+
+  const referenceState = (
+    <>
+      {refsLoading && (
+        <p className="loading" role="status">
+          در حال دریافت داده‌های مرجع…
+        </p>
+      )}
+      {refsError && (
+        <div className="catalog-notice catalog-notice--warning" role="alert">
+          دریافت داده‌های مرجع انجام نشد: {refsError}
+          <button
+            type="button"
+            onClick={() => {
+              setRefsLoading(true);
+              setRefsRevision((value) => value + 1);
+            }}
+          >
+            تلاش دوباره
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  if (section !== "list" && (refsLoading || refsError))
+    return (
+      <>
+        <Intro
+          eyebrow="کاتالوگ / مدیریت"
+          title="داده‌های مرجع"
+          text="برای ویرایش محصول، ابتدا دسته‌بندی‌ها و سایر داده‌های مرجع باید دریافت شوند."
+          actions={
+            <button type="button" className="button button--ghost" onClick={() => setSection("list")}>
+              بازگشت به محصولات
+            </button>
+          }
+        />
+        {referenceState}
+      </>
+    );
 
   if (section === "create")
     return (
@@ -1873,6 +1992,7 @@ export function Catalog() {
               type="button"
               className="button button--ghost"
               onClick={() => setSection("references")}
+              disabled={refsLoading || !!refsError}
             >
               داده‌های مرجع
             </button>
@@ -1880,23 +2000,14 @@ export function Catalog() {
               type="button"
               className="button button--primary"
               onClick={() => setSection("create")}
+              disabled={refsLoading || !!refsError}
             >
               + ثبت محصول
             </button>
           </>
         }
       />
-      {refsError && (
-        <div className="catalog-notice catalog-notice--warning" role="alert">
-          دریافت داده‌های مرجع انجام نشد: {refsError}
-          <button
-            type="button"
-            onClick={() => setRefsRevision((value) => value + 1)}
-          >
-            تلاش دوباره
-          </button>
-        </div>
-      )}
+      {referenceState}
       <section
         className="catalog-panel catalog-list"
         aria-label="فهرست محصولات"
@@ -2014,7 +2125,7 @@ export function Catalog() {
             )}
           </div>
         )}
-        {meta.totalPages > 1 && (
+        {!error && meta.totalPages > 1 && (
           <div className="catalog-pagination">
             <span>
               {count.format(meta.total)} محصول / صفحهٔ {count.format(meta.page)}{" "}
@@ -2022,14 +2133,14 @@ export function Catalog() {
             </span>
             <button
               type="button"
-              disabled={page <= 1}
+              disabled={loading || page <= 1}
               onClick={() => setPage(page - 1)}
             >
               قبلی
             </button>
             <button
               type="button"
-              disabled={page >= meta.totalPages}
+              disabled={loading || page >= meta.totalPages}
               onClick={() => setPage(page + 1)}
             >
               بعدی

@@ -1,0 +1,204 @@
+.commerce-quantity {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.commerce-quantity > label {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.commerce-quantity__controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.content-page .commerce-quantity__controls button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 1.15rem;
+}
+.account-cart-items .commerce-quantity input[type='number'] {
+  width: 64px;
+  min-height: 44px;
+  text-align: center;
+  margin: 0;
+}
+.commerce-quantity__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.content-page .commerce-quantity__actions button {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+}
+.commerce-quantity [role='alert'] {
+  max-width: 220px;
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+.commerce-disclosure {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  padding: 0 18px;
+}
+.commerce-disclosure > summary {
+  min-height: 54px;
+  cursor: pointer;
+  padding-block: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.commerce-disclosure > fieldset {
+  margin: 0 0 16px;
+}
+.account-checkout-form .commerce-disclosure fieldset {
+  border: 0;
+  padding: 4px 0 0;
+  background: transparent;
+}
+.commerce-disclosure > label {
+  display: block;
+  padding-block: 4px 8px;
+}
+.commerce-disclosure > textarea {
+  margin-block-end: 18px;
+  width: 100%;
+}
+.commerce-add-address {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: 8px;
+  color: var(--forest-soft);
+  text-underline-offset: 4px;
+}
+.commerce-product-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  padding-block: 2px 12px;
+}
+.commerce-product-price strong {
+  color: var(--ink);
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+  font-weight: 700;
+}
+.commerce-product-price del {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.content-page .commerce-variants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.content-page .commerce-variants legend {
+  margin-block-end: 12px;
+}
+.content-page .commerce-variants label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 12px;
+  min-height: 80px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.commerce-variants label > span:not(.commerce-variant-stock) {
+  display: grid;
+  gap: 4px;
+}
+.commerce-variants label strong {
+  font-weight: 600;
+}
+.commerce-variants label > span > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.commerce-variant-stock {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding-inline-start: 25px;
+}
+.product-detail__media .commerce-gallery-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: zoom-in;
+}
+.commerce-gallery-open > span {
+  position: absolute;
+  inset-inline-end: 18px;
+  bottom: 18px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.75rem;
+  padding: 7px 12px;
+  border-radius: 999px;
+}
+.commerce-gallery-open > .safe-image-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.commerce-gallery-viewer {
+  display: grid;
+  gap: 18px;
+}
+.commerce-gallery-viewer > img,
+.commerce-gallery-viewer > .safe-image-fallback {
+  display: block;
+  width: 100%;
+  height: min(58vh, 540px);
+  object-fit: contain;
+  background: var(--sand);
+  border-radius: 14px;
+}
+.commerce-gallery-viewer > nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+.commerce-gallery-viewer button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+@media (max-width: 600px) {
+  .content-page .commerce-variants {
+    grid-template-columns: 1fr;
+  }
+  .commerce-gallery-viewer > nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

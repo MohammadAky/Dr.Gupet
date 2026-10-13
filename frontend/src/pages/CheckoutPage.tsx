@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { shopApi, type CreateOrderInput } from '../api/endpoints-shop';
@@ -11,6 +11,11 @@ import { cartFingerprint, shippingEstimate } from '../features/cart/cart-state';
 import { writePendingOrder } from '../features/checkout/pending-order';
 import { formatToman } from '../lib/format';
 import { errorText } from '../lib/labels';
+import {
+  clearCheckoutIntent,
+  readCheckoutIntent,
+  writeCheckoutIntent,
+} from '../features/checkout/intent';
 
 /**
  * Checkout (F9): the server computes every amount — this page only collects
@@ -18,7 +23,7 @@ import { errorText } from '../lib/labels';
  */
 export function CheckoutPage() {
   const { status, user } = useAuth();
-  const userId = status === 'authed' ? user?.id ?? null : null;
+  const userId = status === 'authed' ? (user?.id ?? null) : null;
   // A new account gets a fresh checkout draft and new async request guards.
   return <CheckoutSession key={userId ?? 'guest'} userId={userId} />;
 }
@@ -26,7 +31,11 @@ export function CheckoutPage() {
 function CheckoutSession({ userId }: { userId: number | null }) {
   const queryClient = useQueryClient();
   const activeUserId = useRef<number | null>(null);
-  const couponCodeRef = useRef('');
+  const [initialIntent] = useState(() =>
+    userId === null ? { couponCode: '', note: '', addressId: null } : readCheckoutIntent(userId),
+  );
+  const couponCodeRef = useRef(initialIntent.couponCode);
+  const transferredCode = useRef(initialIntent.couponCode);
   const validationSequence = useRef(0);
   const previousCartKey = useRef<string | null>(null);
   const submitLocked = useRef(false);
@@ -42,19 +51,31 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     };
   }, [userId]);
 
-  const addresses = useQuery({ queryKey: queryKeys.addresses, queryFn: () => api.listAddresses(), enabled: userId !== null });
-  const cart = useQuery({ queryKey: queryKeys.cart, queryFn: () => shopApi.cart(), enabled: userId !== null });
+  const addresses = useQuery({
+    queryKey: queryKeys.addresses,
+    queryFn: () => api.listAddresses(),
+    enabled: userId !== null,
+  });
+  const cart = useQuery({
+    queryKey: queryKeys.cart,
+    queryFn: () => shopApi.cart(),
+    enabled: userId !== null,
+  });
 
-  const [addressId, setAddressId] = useState<number | null>(null);
-  const [couponCode, setCouponCode] = useState('');
-  const [note, setNote] = useState('');
+  const [addressId, setAddressId] = useState<number | null>(initialIntent.addressId);
+  const [couponCode, setCouponCode] = useState(initialIntent.couponCode);
+  const [note, setNote] = useState(initialIntent.note);
   const [preview, setPreview] = useState<{
     code: string;
     cartKey: string;
     userId: number;
     result: CouponPreview;
   } | null>(null);
-  const [validationRequest, setValidationRequest] = useState<{ code: string; cartKey: string; userId: number } | null>(null);
+  const [validationRequest, setValidationRequest] = useState<{
+    code: string;
+    cartKey: string;
+    userId: number;
+  } | null>(null);
   const [submittingForUser, setSubmittingForUser] = useState<number | null>(null);
   const [createdOrder, setCreatedOrder] = useState<{ id: number; userId: number } | null>(null);
   const [failure, setFailure] = useState<{ message: string; userId: number } | null>(null);
@@ -68,6 +89,10 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     addressList.find((address) => address.isDefault)?.id ??
     addressList[0]?.id ??
     null;
+  useEffect(() => {
+    if (userId !== null && activeUserId.current === userId && createdOrderId === null)
+      writeCheckoutIntent(userId, { couponCode, note, addressId: selectedAddress });
+  }, [userId, couponCode, note, selectedAddress, createdOrderId]);
   const cartKey = cartFingerprint(cart.data);
   useLayoutEffect(() => {
     if (previousCartKey.current !== null && previousCartKey.current !== cartKey) {
@@ -77,10 +102,14 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     }
     previousCartKey.current = cartKey;
   }, [cartKey]);
-  const validPreview = preview?.code === couponCode.trim() && preview.cartKey === cartKey && preview.userId === userId
-    ? preview.result
-    : null;
-  const validating = validationRequest?.code === couponCode.trim() && validationRequest.cartKey === cartKey && validationRequest.userId === userId;
+  const validPreview =
+    preview?.code === couponCode.trim() && preview.cartKey === cartKey && preview.userId === userId
+      ? preview.result
+      : null;
+  const validating =
+    validationRequest?.code === couponCode.trim() &&
+    validationRequest.cartKey === cartKey &&
+    validationRequest.userId === userId;
   const itemsTotal = cart.data?.itemsTotal ?? 0;
   const discount = validPreview?.discountAmount ?? 0;
   const shipping = shippingEstimate(cart.data);
@@ -96,7 +125,7 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     }
   }
 
-  async function validateCoupon() {
+  const validateCoupon = useCallback(async () => {
     const code = couponCode.trim();
     if (!code || validating || !cart.data || cart.isFetching || userId === null) return;
     const snapshot = cartFingerprint(cart.data);
@@ -107,22 +136,54 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     setValidationRequest({ code, cartKey: snapshot, userId });
     try {
       const result = await shopApi.validateCoupon(code);
-      if (sequence === validationSequence.current && activeUserId.current === userId && sessionEpoch.current === epoch && couponCodeRef.current.trim() === code &&
-          cartFingerprint(queryClient.getQueryData<CartView>(queryKeys.cart)) === snapshot) {
+      if (
+        sequence === validationSequence.current &&
+        activeUserId.current === userId &&
+        sessionEpoch.current === epoch &&
+        couponCodeRef.current.trim() === code &&
+        cartFingerprint(queryClient.getQueryData<CartView>(queryKeys.cart)) === snapshot
+      ) {
         setPreview({ code, cartKey: snapshot, userId, result });
       }
     } catch (error) {
-      if (sequence === validationSequence.current && activeUserId.current === userId && sessionEpoch.current === epoch && couponCodeRef.current.trim() === code &&
-          cartFingerprint(queryClient.getQueryData<CartView>(queryKeys.cart)) === snapshot) {
+      if (
+        sequence === validationSequence.current &&
+        activeUserId.current === userId &&
+        sessionEpoch.current === epoch &&
+        couponCodeRef.current.trim() === code &&
+        cartFingerprint(queryClient.getQueryData<CartView>(queryKeys.cart)) === snapshot
+      ) {
         setFailure({ message: errorText(error), userId });
       }
     } finally {
-      if (sequence === validationSequence.current && activeUserId.current === userId && sessionEpoch.current === epoch) setValidationRequest(null);
+      if (
+        sequence === validationSequence.current &&
+        activeUserId.current === userId &&
+        sessionEpoch.current === epoch
+      )
+        setValidationRequest(null);
     }
-  }
+  }, [couponCode, validating, cart.data, cart.isFetching, userId, queryClient]);
+
+  useEffect(() => {
+    if (
+      !transferredCode.current ||
+      couponCode !== transferredCode.current ||
+      !cart.data ||
+      cart.isFetching ||
+      userId === null
+    )
+      return;
+    transferredCode.current = '';
+    void validateCoupon();
+  }, [couponCode, cart.data, cart.isFetching, userId, validateCoupon]);
 
   const submitOrder = useMutation({
-    mutationFn: async (action: { kind: 'create'; payload: CreateOrderInput; userId: number; epoch: number } | { kind: 'retry'; orderId: number; userId: number; epoch: number }) => {
+    mutationFn: async (
+      action:
+        | { kind: 'create'; payload: CreateOrderInput; userId: number; epoch: number }
+        | { kind: 'retry'; orderId: number; userId: number; epoch: number },
+    ) => {
       requireSameUser(action.userId, action.epoch);
       let orderId: number;
       if (action.kind === 'create') {
@@ -130,6 +191,7 @@ function CheckoutSession({ userId }: { userId: number | null }) {
         requireSameUser(action.userId, action.epoch);
         orderId = order.id;
         setCreatedOrder({ id: order.id, userId: action.userId });
+        clearCheckoutIntent();
         writePendingOrder({ orderId: order.id, orderNumber: order.orderNumber });
         void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
         void queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -141,7 +203,8 @@ function CheckoutSession({ userId }: { userId: number | null }) {
       return { paymentUrl, userId: action.userId, epoch: action.epoch };
     },
     onSuccess: ({ paymentUrl, userId: submittedUserId, epoch }) => {
-      if (activeUserId.current === submittedUserId && sessionEpoch.current === epoch) window.location.assign(paymentUrl);
+      if (activeUserId.current === submittedUserId && sessionEpoch.current === epoch)
+        window.location.assign(paymentUrl);
     },
     onError: (error, action) => {
       if (activeUserId.current !== action.userId || sessionEpoch.current !== action.epoch) return;
@@ -151,24 +214,63 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     },
   });
   const mutationPending = submitOrder.isPending && submitOrder.variables?.userId === userId;
-  const cannotSubmit = userId === null || createdOrderId !== null || selectedAddress === null || blocked || couponNeedsValidation ||
-    validating || cart.isFetching || addresses.isFetching || submitting || mutationPending;
+  const cannotSubmit =
+    userId === null ||
+    createdOrderId !== null ||
+    selectedAddress === null ||
+    blocked ||
+    couponNeedsValidation ||
+    validating ||
+    cart.isFetching ||
+    addresses.isFetching ||
+    submitting ||
+    mutationPending;
 
-  if (userId === null) return <section><h1>تکمیل خرید</h1><p>
-    برای ثبت سفارش <Link to="/login?next=/checkout">ورود کنید</Link>.
-  </p></section>;
-  if (addresses.isLoading || cart.isLoading) return <LoadingState />;
-  if (addresses.error)
-    return <ErrorState error={addresses.error} onRetry={() => void addresses.refetch()} />;
-  if (cart.error) return <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />;
+  if (userId === null)
+    return (
+      <section className="account-page account-commerce-page">
+        <h1>تکمیل خرید</h1>
+        <p>
+          برای ثبت سفارش <Link to="/login?next=/checkout">ورود کنید</Link>.
+        </p>
+      </section>
+    );
+  if (addresses.isLoading || cart.isLoading || addresses.error || cart.error)
+    return (
+      <section className="account-page account-commerce-page">
+        <header className="account-heading">
+          <h1>تکمیل خرید</h1>
+          <Link to="/cart">بازگشت به سبد خرید</Link>
+        </header>
+        {addresses.isLoading || cart.isLoading ? (
+          <LoadingState />
+        ) : (
+          <ErrorState
+            error={addresses.error ?? cart.error}
+            onRetry={() => {
+              if (addresses.error) void addresses.refetch();
+              if (cart.error) void cart.refetch();
+            }}
+          />
+        )}
+      </section>
+    );
 
   function submit(event: FormEvent) {
     event.preventDefault();
     // The ref closes the gap before React has rendered the pending mutation state.
-    if (userId === null || selectedAddress === null || submitLocked.current || cannotSubmit ||
-        queryClient.isFetching({ queryKey: queryKeys.cart }) > 0 ||
-        cartFingerprint(queryClient.getQueryData<CartView>(queryKeys.cart)) !== cartKey ||
-        !addresses.data?.some((address) => address.id === selectedAddress && address.userId === userId)) return;
+    if (
+      userId === null ||
+      selectedAddress === null ||
+      submitLocked.current ||
+      cannotSubmit ||
+      queryClient.isFetching({ queryKey: queryKeys.cart }) > 0 ||
+      cartFingerprint(queryClient.getQueryData<CartView>(queryKeys.cart)) !== cartKey ||
+      !addresses.data?.some(
+        (address) => address.id === selectedAddress && address.userId === userId,
+      )
+    )
+      return;
     const trimmedNote = note.trim();
     if (trimmedNote.length > 500) return;
     const payload: CreateOrderInput = {
@@ -188,30 +290,51 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     submitLocked.current = true;
     setSubmittingForUser(userId);
     setFailure(null);
-    submitOrder.mutate({ kind: 'retry', orderId: createdOrderId, userId, epoch: sessionEpoch.current });
+    submitOrder.mutate({
+      kind: 'retry',
+      orderId: createdOrderId,
+      userId,
+      epoch: sessionEpoch.current,
+    });
   }
 
   return (
-    <section>
-      <h1>تکمیل خرید</h1>
+    <section className="account-page account-commerce-page">
+      <header className="account-heading">
+        <div>
+          <h1>تکمیل خرید</h1>
+          <p>نشانی تحویل را انتخاب کنید و پیش از پرداخت، جزئیات را مرور کنید.</p>
+        </div>
+        <Link className="account-secondary-link" to="/cart">
+          بازگشت به سبد خرید
+        </Link>
+      </header>
+      <ol className="account-purchase-steps" aria-label="مراحل خرید">
+        <li>سبد خرید</li>
+        <li aria-current="step">تحویل</li>
+        <li>پرداخت</li>
+      </ol>
 
       {shownFailure && (
         <p role="alert">
-          {shownFailure} {shownFailure.includes('خالی') && <Link to="/cart">بازگشت به سبد خرید</Link>}
-          {createdOrderId !== null && <Link to={`/orders/${createdOrderId}`}>مشاهدهٔ سفارش ثبت‌شده</Link>}
+          {shownFailure}{' '}
+          {shownFailure.includes('خالی') && <Link to="/cart">بازگشت به سبد خرید</Link>}
+          {createdOrderId !== null && (
+            <Link to={`/orders/${createdOrderId}`}>مشاهدهٔ سفارش ثبت‌شده</Link>
+          )}
         </p>
       )}
 
-      <form onSubmit={submit}>
-        <fieldset>
+      <form className="account-checkout-form" onSubmit={submit}>
+        <fieldset className="account-checkout-addresses">
           <legend>آدرس تحویل</legend>
-          {addressList.length === 0 && (
-            <p>
-              آدرسی ثبت نکرده‌اید — <Link to="/addresses/new">افزودن آدرس</Link>
-            </p>
-          )}
+          {addressList.length === 0 && <p>آدرسی ثبت نکرده‌اید.</p>}
           {addressList.map((address) => (
-            <label key={address.id}>
+            <label
+              key={address.id}
+              className="account-address-option"
+              data-selected={selectedAddress === address.id}
+            >
               <input
                 type="radio"
                 name="address"
@@ -219,65 +342,103 @@ function CheckoutSession({ userId }: { userId: number | null }) {
                 checked={selectedAddress === address.id}
                 onChange={() => setAddressId(address.id)}
               />
-              {address.title} — {address.receiverName}، {address.city}{' '}
-              {address.isDefault ? '(پیش‌فرض)' : ''}
+              <span>
+                <strong>
+                  {address.title}
+                  {address.isDefault ? ' (پیش‌فرض)' : ''}
+                </strong>
+                <span>
+                  {address.receiverName}، {address.city}
+                </span>
+                <span className="account-subtle">{address.fullAddress}</span>
+              </span>
             </label>
           ))}
+          <Link className="commerce-add-address" to="/addresses/new?next=%2Fcheckout">
+            افزودن آدرس جدید
+          </Link>
         </fieldset>
 
-        <fieldset>
-          <legend>کد تخفیف</legend>
-          <input
-            dir="ltr"
-            value={couponCode}
-            onChange={(event) => {
-              couponCodeRef.current = event.target.value;
-              validationSequence.current += 1;
-              setCouponCode(event.target.value);
-              setPreview(null);
-              setValidationRequest(null);
-              setFailure(null);
-            }}
-            placeholder="SUMMER20"
-          />
-          <button
-            type="button"
-            disabled={!couponCode.trim() || validating || cart.isFetching}
-            onClick={() => void validateCoupon()}
-          >
-            بررسی کد
-          </button>
-          {validPreview && <p>تخفیف {formatToman(validPreview.discountAmount)} اعمال شد.</p>}
-          {couponNeedsValidation && !validating && <p>برای استفاده از کد، ابتدا آن را بررسی کنید.</p>}
-        </fieldset>
+        <details
+          className="account-checkout-coupon commerce-disclosure"
+          open={initialIntent.couponCode !== '' || undefined}
+        >
+          <summary>کد تخفیف (اختیاری)</summary>
+          <fieldset>
+            <legend>کد تخفیف</legend>
+            <input
+              id="checkout-coupon"
+              aria-label="کد تخفیف"
+              dir="ltr"
+              value={couponCode}
+              onChange={(event) => {
+                couponCodeRef.current = event.target.value;
+                validationSequence.current += 1;
+                setCouponCode(event.target.value);
+                setPreview(null);
+                setValidationRequest(null);
+                setFailure(null);
+              }}
+              placeholder="کد تخفیف را وارد کنید"
+            />
+            <button
+              type="button"
+              disabled={!couponCode.trim() || validating || cart.isFetching}
+              onClick={() => void validateCoupon()}
+            >
+              {validating ? 'در حال بررسی…' : 'بررسی کد'}
+            </button>
+            {validPreview && (
+              <p role="status">تخفیف {formatToman(validPreview.discountAmount)} اعمال شد.</p>
+            )}
+            {couponNeedsValidation && !validating && (
+              <p>برای استفاده از کد، ابتدا آن را بررسی کنید.</p>
+            )}
+          </fieldset>
+        </details>
 
-        <fieldset>
+        <fieldset className="account-checkout-summary">
           <legend>خلاصه سفارش</legend>
-          <dl>
+          <dl className="account-totals">
             <dt>جمع کالاها</dt>
             <dd dir="ltr">{formatToman(itemsTotal)}</dd>
             <dt>تخفیف</dt>
             <dd dir="ltr">{formatToman(discount)}</dd>
-            <dt>{shipping.source === 'server' ? 'ارسال (برآورد سرور)' : 'ارسال (برآورد محلی؛ نرخ سرور نامعتبر یا ناموجود)'}</dt>
+            <dt>
+              {shipping.source === 'server' ? 'ارسال (برآورد سامانه)' : 'ارسال (برآورد اولیه)'}
+            </dt>
             <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
             <dt>قابل پرداخت (تخمینی)</dt>
             <dd dir="ltr">{formatToman(payableEstimate)}</dd>
           </dl>
-          <p>مبلغ نهایی فقط سمت سرور محاسبه و در رسید سفارش ثبت می‌شود.</p>
+          <p>مبلغ قطعی هنگام ثبت سفارش محاسبه و در رسید ثبت می‌شود.</p>
         </fieldset>
 
-        <label htmlFor="note">یادداشت سفارش (اختیاری)</label>
-        <textarea id="note" maxLength={500} value={note} onChange={(event) => setNote(event.target.value.slice(0, 500))} />
-
-        <button
-          type="submit"
-          disabled={cannotSubmit}
+        <details
+          className="account-checkout-note commerce-disclosure"
+          open={initialIntent.note !== '' || undefined}
         >
+          <summary>یادداشت سفارش (اختیاری)</summary>
+          <label htmlFor="note">یادداشت سفارش (اختیاری)</label>
+          <textarea
+            id="note"
+            rows={3}
+            maxLength={500}
+            value={note}
+            onChange={(event) => setNote(event.target.value.slice(0, 500))}
+          />
+        </details>
+
+        <button className="account-submit" type="submit" disabled={cannotSubmit}>
           {submitOrder.isPending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و پرداخت'}
         </button>
       </form>
       {createdOrderId !== null && (
-        <button type="button" disabled={userId === null || submitting || mutationPending} onClick={retryPayment}>
+        <button
+          type="button"
+          disabled={userId === null || submitting || mutationPending}
+          onClick={retryPayment}
+        >
           تلاش دوباره برای پرداخت همین سفارش
         </button>
       )}

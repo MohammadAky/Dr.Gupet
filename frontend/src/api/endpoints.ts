@@ -44,7 +44,9 @@ export interface CreateAddressInput {
   lng?: number;
 }
 
-export type UpdateAddressInput = Partial<CreateAddressInput>;
+export type UpdateAddressInput = Omit<Partial<CreateAddressInput>, 'postalCode'> & {
+  postalCode?: string | null;
+};
 
 export interface CreatePetInput {
   name: string;
@@ -57,7 +59,17 @@ export interface CreatePetInput {
   photo?: string;
 }
 
-export type UpdatePetInput = Partial<CreatePetInput>;
+/** Nullable update fields mirror IsOptional DTOs and Prisma's nullable columns. */
+export type UpdatePetInput = Omit<
+  Partial<CreatePetInput>,
+  'breedId' | 'birthDate' | 'gender' | 'weightKg' | 'photo'
+> & {
+  breedId?: number | null;
+  birthDate?: string | null;
+  gender?: 'MALE' | 'FEMALE' | null;
+  weightKg?: number | null;
+  photo?: string | null;
+};
 
 export interface SetPetTagsInput {
   allergenTagIds: number[];

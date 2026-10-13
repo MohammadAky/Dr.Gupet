@@ -4,6 +4,7 @@ import { useAuth } from '../auth/auth-provider';
 import { passwordError, passwordHint } from '../lib/password';
 import { Field } from './Field';
 import { PasswordInput } from './PasswordInput';
+import { focusFirstInvalid } from '../lib/form-validation';
 
 export function PasswordChange() {
   const { user, changePassword, logout } = useAuth();
@@ -11,6 +12,8 @@ export function PasswordChange() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const submitted = useRef(false);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -24,13 +27,12 @@ export function PasswordChange() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (pending.current) return;
-    const problem = !current
-      ? 'رمز عبور فعلی را وارد کنید.'
-      : (passwordError(password) ??
-        (password !== confirm ? 'تکرار رمز عبور یکسان نیست.' : undefined));
-    setError(problem ?? '');
+    submitted.current = true;
+    const next = validate(current, password, confirm);
+    setErrors(next);
+    setError('');
     setNotice('');
-    if (problem) return;
+    if (Object.keys(next).length) { focusFirstInvalid(event.currentTarget as HTMLFormElement); return; }
     pending.current = true;
     setBusy(true);
     try {
@@ -39,6 +41,8 @@ export function PasswordChange() {
         setCurrent('');
         setPassword('');
         setConfirm('');
+        submitted.current = false;
+        setErrors({});
         setNotice('رمز عبور تغییر کرد. نشست‌های قبلی پایان یافتند.');
       }
     } catch {
@@ -49,11 +53,28 @@ export function PasswordChange() {
       if (mounted.current) setBusy(false);
     }
   }
+  function validate(currentValue: string, nextValue: string, confirmation: string) {
+    const next: Record<string, string> = {};
+    if (!currentValue) next.current = 'رمز عبور فعلی را وارد کنید.';
+    const problem = passwordError(nextValue);
+    if (problem) next.password = problem;
+    if (nextValue !== confirmation || !confirmation) next.confirm = 'تکرار رمز عبور یکسان نیست.';
+    return next;
+  }
+  function change(field: 'current' | 'password' | 'confirm', value: string) {
+    if (field === 'current') setCurrent(value);
+    if (field === 'password') setPassword(value);
+    if (field === 'confirm') setConfirm(value);
+    setError('');
+    setNotice('');
+    if (submitted.current) setErrors(validate(field === 'current' ? value : current,
+      field === 'password' ? value : password, field === 'confirm' ? value : confirm));
+  }
   return (
     <div className="account-profile">
       <h2>رمز عبور</h2>
       {user?.username ? (
-        <form onSubmit={(event) => void submit(event)} noValidate>
+        <form onSubmit={(event) => void submit(event)} noValidate aria-busy={busy}>
           <input
             type="text"
             name="username"
@@ -62,28 +83,31 @@ export function PasswordChange() {
             readOnly
             hidden
           />
-          <Field label="رمز عبور فعلی" htmlFor="current-password">
+          <Field label="رمز عبور فعلی" htmlFor="current-password" error={errors.current}>
             <PasswordInput
               id="current-password"
+              required
               value={current}
-              onChange={setCurrent}
+              onChange={(value) => change('current', value)}
               disabled={busy}
             />
           </Field>
-          <Field label="رمز عبور جدید" htmlFor="new-password" hint={passwordHint}>
+          <Field label="رمز عبور جدید" htmlFor="new-password" hint={passwordHint} error={errors.password}>
             <PasswordInput
               id="new-password"
+              required
               value={password}
-              onChange={setPassword}
+              onChange={(value) => change('password', value)}
               disabled={busy}
               autoComplete="new-password"
             />
           </Field>
-          <Field label="تکرار رمز عبور جدید" htmlFor="confirm-new-password">
+          <Field label="تکرار رمز عبور جدید" htmlFor="confirm-new-password" error={errors.confirm}>
             <PasswordInput
               id="confirm-new-password"
+              required
               value={confirm}
-              onChange={setConfirm}
+              onChange={(value) => change('confirm', value)}
               disabled={busy}
               autoComplete="new-password"
             />

@@ -52,6 +52,9 @@ it('requires the current password and matching confirmation, sends once, and cle
     }),
   );
   await mount();
+  for (const id of ['current-password', 'new-password', 'confirm-new-password']) {
+    expect(container.querySelector<HTMLInputElement>(`#${id}`)?.required).toBe(true);
+  }
   await fill('current-password', ' current password ');
   await fill('new-password', ' new password ');
   await fill('confirm-new-password', 'mismatch');
@@ -79,4 +82,14 @@ it('offers the same-phone registration flow to an OTP-only account and explicitl
   expect(container.textContent).toContain('همین شمارهٔ موبایل');
   await act(async () => link.click());
   expect(auth.logout).toHaveBeenCalledOnce();
+});
+it('focuses the first invalid field and clears corrected field errors before resubmission', async () => {
+  await mount(); await act(async () => submit());
+  await vi.waitFor(() => expect(document.activeElement?.id).toBe('current-password'));
+  expect(container.querySelector('#current-password')?.getAttribute('aria-invalid')).toBe('true');
+  await fill('current-password', 'present password');
+  expect(container.querySelector('#current-password')?.getAttribute('aria-invalid')).not.toBe('true');
+  await fill('new-password', 'new long password'); await fill('confirm-new-password', 'new long password');
+  expect(container.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
+  expect(auth.changePassword).not.toHaveBeenCalled();
 });

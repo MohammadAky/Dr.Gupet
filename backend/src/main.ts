@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as helmet from 'helmet';
 import { AppModule } from './app.module';
+import { uploadStaticHeaders } from './upload/upload-static-headers';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -42,7 +43,7 @@ async function bootstrap() {
 
   // Static file serving for uploads
   const uploadDir = configService.get<string>('app.uploadDir') ?? './uploads';
-  app.useStaticAssets(uploadDir, { prefix: '/uploads' });
+  app.useStaticAssets(uploadDir, { prefix: '/uploads', setHeaders: uploadStaticHeaders });
 
   // Swagger documentation (disabled in production)
   const nodeEnv = configService.get<string>('app.nodeEnv');

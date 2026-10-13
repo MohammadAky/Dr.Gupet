@@ -41,7 +41,7 @@ export function ThemeToggle() {
           <circle cx="12" cy="12" r="4" />
           <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4" />
         </g>
-        <path className="theme-moon" d="M20.3 15.8A8.5 8.5 0 0 1 8.2 3.7a8.5 8.5 0 1 0 12.1 12.1Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path className="theme-moon" d="M21 12.5A9 9 0 1 1 11.5 3a7 7 0 0 0 9.5 9.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
       </svg>
     </button>
   );

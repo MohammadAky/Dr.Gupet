@@ -3,7 +3,15 @@ import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
+import { strictBoolean } from '../../clinics/dto/clinic-query.dto';
+
 export class ProductQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ description: 'Presentation records only', enum: ['true', 'false'] })
+  @IsOptional()
+  @Transform(strictBoolean)
+  @IsBoolean()
+  sampleOnly?: boolean;
+
   @ApiPropertyOptional({ description: 'Search by name', maxLength: 100 })
   @IsOptional()
   @IsString()

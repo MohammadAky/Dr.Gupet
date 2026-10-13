@@ -43,6 +43,11 @@ type Coupons = {
   }[];
 };
 type Loaded<T> = { data: T | null; error: string };
+const reportDate = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { dateStyle: "medium", timeZone: "Asia/Tehran" });
+const reportDay = (value: string) => {
+  const instant = new Date(`${value}T12:00:00Z`);
+  return Number.isNaN(instant.getTime()) ? value : reportDate.format(instant);
+};
 type Bundle = {
   key: string;
   sales: Loaded<Sales>;
@@ -104,6 +109,9 @@ export function Reports() {
     };
   }, [read, range, key]);
   const loading = bundle.key !== key;
+  useEffect(() => {
+    if (!loading && window.location.hash === "#reports?focus=low") document.getElementById("low-stock-report")?.scrollIntoView?.({ block: "start" });
+  }, [loading]);
 
   async function exportCsv(
     kind: "sales" | "top-products" | "users" | "coupons",
@@ -138,7 +146,7 @@ export function Reports() {
       <PageHeader
         eyebrow="داده‌های فروشگاه"
         title="گزارش‌ها"
-        description="روند فروش، رشد کاربران، کالاهای پرفروش، موجودی و عملکرد کدهای تخفیف را از API زنده بررسی کنید."
+        description="روند فروش، ثبت‌نام کاربران، اقلام سفارش‌ها، موجودی و عملکرد کدهای تخفیف را بررسی کنید."
         action={
           <button
             type="button"
@@ -208,7 +216,7 @@ export function Reports() {
                     <tbody>
                       {bundle.sales.data.byDay.map((day) => (
                         <tr key={day.date}>
-                          <td dir="ltr">{day.date}</td>
+                          <td><time dateTime={day.date}>{reportDay(day.date)}</time></td>
                           <td>{formatNumber(day.orders)}</td>
                           <td>{formatMoney(day.revenue)}</td>
                         </tr>
@@ -227,7 +235,7 @@ export function Reports() {
           <div className="manage-columns">
             <section className="manage-card">
               <div className="manage-report-head">
-                <h2>محصولات پرفروش</h2>
+                <h2>اقلام سفارش‌ها</h2>
                 <button
                   type="button"
                   disabled={!!exportBusy}
@@ -236,6 +244,7 @@ export function Reports() {
                   دریافت CSV
                 </button>
               </div>
+              <p className="dashboard-scope">براساس مبلغ اقلام سفارش‌های ثبت‌شده در بازهٔ انتخابی؛ همهٔ وضعیت‌ها، شامل لغوشده و پرداخت‌نشده.</p>
               <Notice message={bundle.top.error} />
               {bundle.top.data && (
                 <>
@@ -266,7 +275,7 @@ export function Reports() {
               )}
             </section>
             <section className="manage-card">
-              <h2>موجودی کم</h2>
+              <h2 id="low-stock-report">موجودی کم</h2>
               <Notice message={bundle.low.error} />
               {bundle.low.data && (
                 <>
@@ -340,7 +349,7 @@ export function Reports() {
                       <tbody>
                         {bundle.growth.data.byDay.map((day) => (
                           <tr key={day.date}>
-                            <td dir="ltr">{day.date}</td>
+                            <td><time dateTime={day.date}>{reportDay(day.date)}</time></td>
                             <td>{formatNumber(day.count)}</td>
                           </tr>
                         ))}

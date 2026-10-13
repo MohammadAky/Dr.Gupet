@@ -11,3 +11,10 @@ export function credentialError(username: string, password: string, confirm?: st
   if (confirm !== undefined && password !== confirm) return "تکرار رمز عبور یکسان نیست.";
   return "";
 }
+export function credentialFieldErrors(username: string, password: string, confirm: string, prefix: "assign" | "create") {
+  const errors: Record<string, string> = {};
+  if (!/^[a-z0-9_.]{3,32}$/.test(normalizeUsername(username))) errors.username = usernameHint;
+  if (Array.from(password).length < 12 || new TextEncoder().encode(password).length > 72) errors[`${prefix}-password`] = passwordHint;
+  if (password !== confirm) errors[`${prefix}-confirm`] = "تکرار رمز عبور یکسان نیست.";
+  return errors;
+}

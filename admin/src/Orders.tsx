@@ -1,17 +1,22 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "./auth";
 import {
+  confirmAction, discardDrafts, markFormSaved,
   errorMessage,
   formatDate,
   formatMoney,
   formatNumber,
+  gatewayLabel,
+  paymentStatusLabel,
   Notice,
   PageHeader,
   Paginator,
   QueryState,
+  useInlinePanelFocus,
   useDetail,
   usePaged,
 } from "./management";
+import { parseAdminLocation } from "./navigation";
 import "./management.css";
 
 type OrderStatus =
@@ -80,11 +85,16 @@ const name = (person: Person) =>
 
 export function Orders() {
   const { request } = useAuth();
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  const selectionVersion = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; selectionVersion.current += 1; }; }, []);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [applied, setApplied] = useState("");
-  const [status, setStatus] = useState("");
-  const [selected, setSelected] = useState<number | null>(null);
+  const [status, setStatus] = useState(() => parseAdminLocation(window.location.hash).params.get("status") ?? "");
+  const [selected, setSelected] = useState<number | null>(() => Number(parseAdminLocation(window.location.hash).params.get("order")) || null);
+  const { panelRef: detailPanelRef, reveal: revealDetail, restore: restoreDetail } = useInlinePanelFocus();
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -105,12 +115,15 @@ export function Orders() {
     revision,
   );
   useEffect(() => {
+    let current = true;
     queueMicrotask(() => {
+      if (!current) return;
       setTrackingCode(detail.data?.trackingCode || "");
       setShippingMethod(detail.data?.shippingMethod || "");
       setNote("");
       setRefundNote("");
     });
+    return () => { current = false; };
   }, [detail.data]);
 
   async function mutate(
@@ -120,18 +133,27 @@ export function Orders() {
     success: string,
     confirmation?: string,
   ) {
-    if (confirmation && !window.confirm(confirmation)) return;
-    setBusy(true);
-    setError("");
-    setMessage("");
+    if (pending.current) return;
+    pending.current = true;
+    const version = selectionVersion.current;
+    const draftOwners = typeof body === "object" && body ? Object.keys(body).flatMap((key) => {
+      const inputName = key === "reason" ? "note" : key;
+      const owner = document.querySelector(`[name="${inputName}"]`)?.closest<HTMLElement>("[data-dirty='true']");
+      return owner ? [owner] : [];
+    }) : [];
     try {
+      if (confirmation && !await confirmAction(confirmation, "تأیید عملیات سفارش")) return;
+      if (!mounted.current || version !== selectionVersion.current) return;
+      setBusy(true); setError(""); setMessage("");
       await request(path, { method, body });
-      setMessage(success);
+      if (!mounted.current) return;
+      draftOwners.forEach(markFormSaved);
       setRevision((value) => value + 1);
+      if (version === selectionVersion.current) setMessage(success);
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current && version === selectionVersion.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
   function searchOrders(event: FormEvent<HTMLFormElement>) {
@@ -191,7 +213,7 @@ export function Orders() {
         {list.data && list.data.data.length > 0 && (
           <>
             <div className="manage-table-wrap">
-              <table className="manage-table">
+              <table className="manage-table manage-table--orders">
                 <thead>
                   <tr>
                     <th>شماره</th>
@@ -214,8 +236,10 @@ export function Orders() {
                         <button
                           className="manage-row-button"
                           type="button"
-                          onClick={() => {
+                          onClick={(event) => {
+                            revealDetail(event.currentTarget);
                             setSelected(item.id);
+                            selectionVersion.current += 1; setError(""); setMessage("");
                             setMessage("");
                             setError("");
                           }}
@@ -233,9 +257,9 @@ export function Orders() {
         )}
       </section>
       {selected && (
-        <section className="manage-card" aria-label="جزئیات سفارش">
+        <section ref={detailPanelRef} tabIndex={-1} className="manage-card" aria-label="جزئیات سفارش">
           <div className="manage-actions">
-            <button type="button" onClick={() => setSelected(null)}>
+            <button type="button" onClick={async (event) => { if (await discardDrafts(event.currentTarget.closest("section"))) { selectionVersion.current += 1; setSelected(null); restoreDetail(); } }}>
               بستن جزئیات
             </button>
           </div>
@@ -256,6 +280,10 @@ export function Orders() {
                     {name(order.user)} ·{" "}
                     <span dir="ltr">{order.user.phone}</span>
                   </dd>
+                </div>
+                <div>
+                  <dt>زمان ثبت</dt>
+                  <dd>{formatDate(order.createdAt)}</dd>
                 </div>
                 <div>
                   <dt>وضعیت</dt>
@@ -313,7 +341,7 @@ export function Orders() {
                   <ul className="manage-sublist">
                     {order.payments.map((payment) => (
                       <li key={payment.id}>
-                        {payment.gateway} · {payment.status} ·{" "}
+                        {gatewayLabel(payment.gateway)} · {paymentStatusLabel(payment.status)} ·{" "}
                         {formatMoney(payment.amount)} ·{" "}
                         {formatDate(payment.createdAt)}
                       </li>
@@ -347,7 +375,6 @@ export function Orders() {
                             : {}),
                         },
                         `وضعیت به ${labels[nextStatus[order.status]!]} تغییر کرد.`,
-                        `تغییر وضعیت این سفارش به ${labels[nextStatus[order.status]!]} ثبت شود؟`,
                       )
                     }
                   >
@@ -360,6 +387,8 @@ export function Orders() {
                   یادداشت پردازش
                   <input
                     value={note}
+                    name="note"
+                    disabled={busy}
                     onChange={(event) => setNote(event.target.value)}
                   />
                 </label>
@@ -374,6 +403,8 @@ export function Orders() {
                       کد رهگیری
                       <input
                         value={trackingCode}
+                        name="trackingCode"
+                        disabled={busy}
                         onChange={(event) =>
                           setTrackingCode(event.target.value)
                         }
@@ -383,6 +414,8 @@ export function Orders() {
                       روش ارسال
                       <input
                         value={shippingMethod}
+                        name="shippingMethod"
+                        disabled={busy}
                         onChange={(event) =>
                           setShippingMethod(event.target.value)
                         }
@@ -422,7 +455,7 @@ export function Orders() {
                         "POST",
                         { reason: note.trim() || undefined },
                         "سفارش لغو شد.",
-                        "سفارش لغو و موجودی آن آزاد شود؟",
+                        `سفارش ${order.orderNumber} لغو و موجودی آن آزاد شود؟`,
                       )
                     }
                   >
@@ -432,6 +465,8 @@ export function Orders() {
                     دلیل لغو
                     <input
                       value={note}
+                      name="note"
+                      disabled={busy}
                       onChange={(event) => setNote(event.target.value)}
                     />
                   </label>
@@ -450,6 +485,8 @@ export function Orders() {
                         شرح استرداد
                         <input
                           value={refundNote}
+                          name="refundNote"
+                          disabled={busy}
                           onChange={(event) =>
                             setRefundNote(event.target.value)
                           }
@@ -467,7 +504,7 @@ export function Orders() {
                             "POST",
                             { refundNote: refundNote.trim() },
                             "استرداد در پرونده ثبت شد.",
-                            "تأیید می‌کنید وجه خارج از سامانه مسترد شده و فقط ثبت آن انجام شود؟",
+                            `وجه سفارش ${order.orderNumber} خارج از سامانه مسترد شده و ثبت آن انجام شود؟`,
                           )
                         }
                       >

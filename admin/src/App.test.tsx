@@ -206,7 +206,7 @@ function mobileViewport(initial = true) {
 
 function adminResponses() {
   const dashboard = {
-    totals: { users: 12, newUsers30d: 2, orders: {}, revenue30d: 600_000,
+    totals: { users: 12, newUsers30d: 2, orders: { PAID: 2, PROCESSING: 3, SHIPPED: 4 }, revenue30d: 600_000,
       paidOrders30d: 3, revenueToday: 50_000, pendingPaymentOrders: 1,
       lowStockVariants: 0, outOfStockVariants: 0, inactiveProducts: 0, failedPayments24h: 0 },
     charts: { sales14d: [], signups14d: [] }, recentOrders: [], topProducts: [],
@@ -222,6 +222,8 @@ function adminResponses() {
     if (url.endsWith("/admin/me")) return Promise.resolve(response({ id: 1, role: "ADMIN", firstName: "مدیر" }));
     if (url.includes("/admin/dashboard")) return Promise.resolve(response(dashboard));
     if (url.includes("/admin/reports/sales")) return Promise.resolve(response(sales));
+    if (url.includes("/admin/reports/users")) return Promise.resolve(response({ totals: { users: 5, admins: 2, customers: 3 } }));
+    if (url.includes("/admin/orders?")) return Promise.resolve(response({ data: [], meta: { page: 1, totalPages: 0, total: 0, limit: 20 } }));
     throw new Error(`Unexpected admin request: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -255,7 +257,7 @@ it("traps mobile drawer focus, hides the workspace, and restores the menu trigge
   expect(workspace.hasAttribute("inert")).toBe(true);
   expect(sidebar.hasAttribute("inert")).toBe(false);
   fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-  expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "تنظیمات" }));
+  expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "محتوای صفحهٔ اصلی" }));
   fireEvent.keyDown(document, { key: "Tab" });
   expect(document.activeElement).toBe(close);
 
@@ -273,6 +275,48 @@ it("traps mobile drawer focus, hides the workspace, and restores the menu trigge
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "نمای کلی" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(trigger);
+});
+
+it("opens the authenticated landing editor and protects its actual edits on section departure", async () => {
+  mobileViewport(false); const fetchMock = adminResponses(); vi.stubGlobal("scrollTo", vi.fn());
+  await loginAdmin();
+  fireEvent.click(screen.getByRole("button", { name: "محتوای صفحهٔ اصلی" }));
+  await screen.findByRole("heading", { name: "محتوای صفحهٔ اصلی" });
+  expect(window.location.hash).toBe("#landing");
+  fireEvent.change(screen.getByLabelText("متن اعلان"), { target: { value: "اعلان پیش‌نویس" } });
+  fireEvent.click(screen.getByRole("button", { name: "سفارش‌ها" }));
+  const dialog = await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "بازگشت" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(window.location.hash).toBe("#landing");
+  expect((screen.getByLabelText("متن اعلان") as HTMLInputElement).value).toBe("اعلان پیش‌نویس");
+  expect(fetchMock.mock.calls.some(([url]) => /\/landing|\/admin\/settings/.test(url))).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "سفارش‌ها" }));
+  const discard = await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
+  fireEvent.click(within(discard).getByRole("button", { name: "کنار گذاشتن تغییرها" }));
+  await screen.findByRole("heading", { name: "سفارش‌ها" });
+  expect(window.location.hash).toBe("#orders");
+});
+
+it("labels operational rows as actions and separates current queues from selected-period customer registrations", async () => {
+  mobileViewport(false);
+  const fetchMock = adminResponses();
+  await loginAdmin();
+  const customerMetric = await screen.findByText("مشتریان جدید ۱۴ روز اخیر");
+  await waitFor(() => expect(customerMetric.closest("article")?.textContent).toContain("۳"));
+  expect(customerMetric.closest("article")?.textContent).toContain("بدون مدیران");
+  const queue = screen.getByRole("region", { name: "پیگیری سفارش‌ها" });
+  const prepare = within(queue).getByRole("link", { name: /آماده‌سازی سفارش/ });
+  expect(prepare.getAttribute("href")).toBe("#orders?status=PAID");
+  expect(prepare.textContent).toContain("۲");
+  expect(within(queue).getByRole("link", { name: /ثبت رهگیری و ارسال/ }).getAttribute("href")).toBe("#orders?status=PROCESSING");
+  expect(screen.getByRole("link", { name: /بررسی محصولات غیرفعال/ }).getAttribute("href")).toBe("#products?active=false");
+  expect(screen.getByRole("link", { name: /بررسی کالاهای ناموجود/ }).getAttribute("href")).toBe("#reports?focus=low");
+  expect(screen.getByText(/شامل سفارش‌های پرداخت‌نشده و لغوشده/)).toBeTruthy();
+  const urls = fetchMock.mock.calls.map(([url]) => String(url));
+  const sales = urls.find(url => url.includes("/admin/reports/sales?"))!.split("?")[1];
+  const registrations = urls.find(url => url.includes("/admin/reports/users?"))!.split("?")[1];
+  expect(registrations).toBe(sales);
 });
 
 it("removes mobile modal state on desktop resize and keeps the desktop sidebar navigable", async () => {
@@ -309,4 +353,59 @@ it("provides daily revenue and order counts as an accessible table while keeping
   expect(within(rows[2]!).getAllByRole("cell")[1]?.textContent).toBe("۲");
   expect(document.querySelector(".chart[aria-hidden='true']")).toBeTruthy();
   expect(fetchMock.mock.calls.every(([, init]) => init?.credentials === "omit")).toBe(true);
+});
+
+it("focuses the current content through the skip link without changing its section hash", async () => {
+  mobileViewport(false); adminResponses(); vi.stubGlobal("scrollTo", vi.fn());
+  await loginAdmin();
+  fireEvent.click(screen.getByRole("button", { name: "سفارش‌ها" }));
+  await screen.findByRole("heading", { name: "سفارش‌ها" });
+  fireEvent.click(screen.getByRole("link", { name: "رفتن به محتوای اصلی" }));
+  expect(window.location.hash).toBe("#orders");
+  expect(document.activeElement).toBe(document.getElementById("admin-content"));
+});
+
+it("focuses the new section after mobile navigation instead of returning to the menu trigger", async () => {
+  mobileViewport(); adminResponses(); vi.stubGlobal("scrollTo", vi.fn());
+  await loginAdmin();
+  fireEvent.click(screen.getByRole("button", { name: "باز کردن فهرست" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "فهرست مدیریت" })).getByRole("button", { name: "سفارش‌ها" }));
+  await screen.findByRole("heading", { name: "سفارش‌ها" });
+  expect(document.activeElement).toBe(document.getElementById("admin-content"));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("guards logout and browser unload while a draft exists, and leaves canceled logout signed in", async () => {
+  mobileViewport(false); adminResponses(); await loginAdmin();
+  const draft = document.createElement("form"); draft.dataset.dirty = "true";
+  document.getElementById("admin-content")!.append(draft);
+  const unload = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "خروج" }));
+  expect(screen.getByRole("dialog", { name: "کنار گذاشتن تغییرها" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));
+  await act(async () => {});
+  expect(screen.getByRole("heading", { name: "نمای کلی" })).toBeTruthy();
+  expect(draft.dataset.dirty).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "خروج" }));
+  fireEvent.click(screen.getByRole("button", { name: "کنار گذاشتن تغییرها" }));
+  await screen.findByRole("heading", { name: "ورود مدیر" });
+});
+
+it("restores a canceled managed history traversal instead of overwriting the previous entry", async () => {
+  mobileViewport(false); adminResponses(); vi.stubGlobal("scrollTo", vi.fn());
+  await loginAdmin();
+  fireEvent.click(screen.getByRole("button", { name: "سفارش‌ها" }));
+  await screen.findByRole("heading", { name: "سفارش‌ها" });
+  const draft = document.createElement("form"); draft.dataset.dirty = "true";
+  document.getElementById("admin-content")!.append(draft);
+  window.history.back();
+  await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));
+  await waitFor(() => expect(window.location.hash).toBe("#orders"));
+  expect(screen.getByRole("heading", { name: "سفارش‌ها" })).toBeTruthy();
+  draft.remove();
+  window.history.back();
+  await waitFor(() => expect(window.location.hash).toBe("#overview"));
+  await screen.findByRole("heading", { name: "نمای کلی" });
 });

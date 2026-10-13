@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAX_PETS_PER_USER } from '../../common/constants';
+import { canonicalSpeciesSlug } from '../../common/utils/species.util';
 
 @Injectable()
 export class PetsService {
@@ -31,7 +32,7 @@ export class PetsService {
 
     return pets.map((pet) => ({
       ...pet,
-      lifeStage: this.computeLifeStage(pet.birthDate),
+      lifeStage: this.computeLifeStage(pet.birthDate, pet.petType),
       tags: pet.tags.map((pt) => pt.tag),
     }));
   }
@@ -59,7 +60,7 @@ export class PetsService {
 
     return {
       ...pet,
-      lifeStage: this.computeLifeStage(pet.birthDate),
+      lifeStage: this.computeLifeStage(pet.birthDate, pet.petType),
       tags: pet.tags.map((pt) => pt.tag),
     };
   }
@@ -129,7 +130,7 @@ export class PetsService {
 
     return {
       ...pet,
-      lifeStage: this.computeLifeStage(pet.birthDate),
+      lifeStage: this.computeLifeStage(pet.birthDate, pet.petType),
       tags: [],
     };
   }
@@ -146,9 +147,21 @@ export class PetsService {
       throw new NotFoundException('حیوان یافت نشد');
     }
 
-    // Validate breed belongs to pet type if both are provided
-    const petTypeId = data.petTypeId || pet.petTypeId;
-    if (data.breedId) {
+    const petTypeId = data.petTypeId === undefined ? pet.petTypeId : data.petTypeId;
+    if (data.petTypeId !== undefined) {
+      if (!Number.isInteger(petTypeId) || petTypeId <= 0) {
+        throw new BadRequestException('نوع حیوان معتبر نیست');
+      }
+      const petType = await this.prisma.petType.findUnique({ where: { id: petTypeId } });
+      if (!petType || !petType.isActive) {
+        throw new BadRequestException('نوع حیوان معتبر نیست');
+      }
+    }
+    // A breed must belong to the selected species, including when only it changes.
+    if (data.breedId !== undefined && data.breedId !== null) {
+      if (!Number.isInteger(data.breedId) || data.breedId <= 0) {
+        throw new BadRequestException('نژاد معتبر نیست');
+      }
       const breed = await this.prisma.breed.findUnique({
         where: { id: data.breedId },
       });
@@ -158,8 +171,17 @@ export class PetsService {
       }
     }
 
-    // Validate birth date
-    if (data.birthDate && new Date(data.birthDate) > new Date()) {
+    // Explicit null clears; an omitted field preserves the current value.
+    const birthDate =
+      data.birthDate === null
+        ? null
+        : data.birthDate === undefined
+          ? undefined
+          : new Date(data.birthDate);
+    if (birthDate && !Number.isFinite(birthDate.getTime())) {
+      throw new BadRequestException('تاریخ تولد معتبر نیست');
+    }
+    if (birthDate && birthDate > new Date()) {
       throw new BadRequestException('تاریخ تولد نمی‌تواند در آینده باشد');
     }
 
@@ -174,7 +196,9 @@ export class PetsService {
       where: { id: petId },
       data: {
         ...data,
-        birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+        // Changing species cannot retain a breed from the previous species.
+        breedId: data.breedId === undefined && petTypeId !== pet.petTypeId ? null : data.breedId,
+        birthDate,
       },
       include: {
         petType: { select: { id: true, name: true, slug: true } },
@@ -189,7 +213,7 @@ export class PetsService {
 
     return {
       ...updated,
-      lifeStage: this.computeLifeStage(updated.birthDate),
+      lifeStage: this.computeLifeStage(updated.birthDate, updated.petType),
       tags: updated.tags.map((pt) => pt.tag),
     };
   }
@@ -278,7 +302,13 @@ export class PetsService {
   /**
    * Compute life stage from birth date
    */
-  private computeLifeStage(birthDate: Date | null): string {
+  private computeLifeStage(
+    birthDate: Date | null,
+    petType?: { slug: string; name: string },
+  ): string {
+    const species = canonicalSpeciesSlug(petType?.slug ?? '', petType?.name);
+    // The accepted age thresholds describe dogs/cats; other species require explicit policy.
+    if (species !== 'dog' && species !== 'cat') return 'ALL';
     if (!birthDate) return 'ALL';
 
     const now = new Date();

@@ -30,10 +30,7 @@ export class AdminPetTypesController {
 
   @Get()
   @ApiOperation({ summary: 'List pet types incl. inactive (admin only)' })
-  async findAll(
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-  ) {
+  async findAll(@Query('search') search?: string, @Query('isActive') isActive?: string) {
     return this.petTypesService.findAllAdmin({
       search,
       isActive: isActive === undefined ? undefined : isActive === 'true',

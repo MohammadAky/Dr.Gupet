@@ -1,13 +1,22 @@
-import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, Param, Query, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ClinicsService } from './clinics.service';
 import { ClinicQueryDto } from './dto/clinic-query.dto';
+import { NearbyClinicDto } from '../../common/dto/nearby.dto';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Clinics')
 @Controller('clinics')
 export class ClinicsController {
   constructor(private clinicsService: ClinicsService) {}
+
+  @Public()
+  @Post('nearby')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Nearest facilities; permission-based coordinates in body, not URL' })
+  async nearby(@Body() query: NearbyClinicDto) {
+    return this.clinicsService.nearby(query);
+  }
 
   @Public()
   @Get()

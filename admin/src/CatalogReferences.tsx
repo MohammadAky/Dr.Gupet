@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ApiError } from "./api/client";
 import { useAuth } from "./auth";
+import { confirmAction, markFormSaved, validateRequiredFields } from "./management";
 import { safeImageUrl, type CatalogTag, type NamedRef } from "./catalog-model";
 
 export type ReferenceKind =
@@ -36,6 +37,7 @@ export function CatalogReferencesManager({
   onChanged: () => void;
 }) {
   const { request } = useAuth();
+  const pending = useRef(false);
   const [kind, setKind] = useState<ReferenceKind>("brands");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [name, setName] = useState("");
@@ -110,7 +112,9 @@ export function CatalogReferencesManager({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    const form = event.currentTarget;
+    if (pending.current) return;
+    if (!validateRequiredFields(form)) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     if (name.trim().length < 2) {
       setError("نام باید دست‌کم دو نویسه باشد.");
       return;
@@ -133,7 +137,7 @@ export function CatalogReferencesManager({
       setError("دسته‌بندی نمی‌تواند والد خودش باشد.");
       return;
     }
-    setBusy(true);
+    pending.current = true; setBusy(true);
     setError("");
     setNotice("");
     try {
@@ -175,24 +179,25 @@ export function CatalogReferencesManager({
       }
       onChanged();
       if (selectedId === null) reset();
+      markFormSaved(form);
       setNotice(
         selectedId === null ? "مورد تازه ثبت شد." : "تغییرات ذخیره شد.",
       );
     } catch (problem) {
       setError(message(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   }
 
   async function remove() {
     if (
       selectedId === null ||
-      busy ||
-      !window.confirm("این مورد حذف یا در صورت استفاده غیرفعال شود؟")
+      pending.current ||
+      !await confirmAction(`${selected?.name ?? selectedId} حذف می‌شود؛ اگر در استفاده باشد، فقط غیرفعال خواهد شد.`, "حذف مورد")
     )
       return;
-    setBusy(true);
+    pending.current = true; setBusy(true);
     setError("");
     setNotice("");
     try {
@@ -203,7 +208,7 @@ export function CatalogReferencesManager({
     } catch (problem) {
       setError(message(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   }
 
@@ -239,6 +244,7 @@ export function CatalogReferencesManager({
               <button
                 type="button"
                 key={item.kind}
+                disabled={busy}
                 aria-pressed={kind === item.kind}
                 onClick={() => {
                   setKind(item.kind);
@@ -261,6 +267,7 @@ export function CatalogReferencesManager({
               <button
                 type="button"
                 key={item.id}
+                disabled={busy}
                 className={
                   selectedId === item.id
                     ? "reference-item reference-item--active"
@@ -301,12 +308,14 @@ export function CatalogReferencesManager({
               <h2>
                 {selected ? `ویرایش ${selected.name}` : `افزودن به ${label}`}
               </h2>
-              <p>تغییرات پس از پاسخ موفق API در فهرست دیده می‌شوند.</p>
+              <p>پس از ذخیره، تغییرات در فهرست دیده می‌شوند.</p>
             </div>
           </div>
           <form
             onSubmit={(event) => void save(event)}
             className="catalog-fields"
+            data-draft-region
+            noValidate
           >
             <label className="catalog-field catalog-field--wide">
               نام <b>*</b>
@@ -459,8 +468,9 @@ export function CatalogReferencesManager({
                   <button
                     type="button"
                     className="button button--ghost"
-                    onClick={reset}
+                    data-draft-exit
                     disabled={busy}
+                    onClick={reset}
                   >
                     مورد تازه
                   </button>

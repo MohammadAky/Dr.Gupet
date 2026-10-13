@@ -34,6 +34,44 @@ describe('schemas', () => {
   });
 
   describe('addressSchema', () => {
+    const validAddress = {
+      title: 'خانه',
+      receiverName: 'سارا',
+      receiverPhone: '09123456789',
+      province: 'خراسان رضوی',
+      city: 'مشهد',
+      fullAddress: 'خیابان نمونه پلاک ۱',
+      postalCode: '',
+    };
+    it('rejects all-whitespace required address text and trims valid surrounding spaces', () => {
+      for (const field of ['title', 'receiverName', 'province', 'city', 'fullAddress']) {
+        expect(addressSchema.safeParse({ ...validAddress, [field]: '   ' }).success).toBe(false);
+      }
+      const normalized = addressSchema.parse({
+        ...validAddress,
+        title: '  خانه  ',
+        city: ' مشهد ',
+        fullAddress: ' خیابان نمونه پلاک ۱ ',
+      });
+      expect(normalized).toMatchObject({
+        title: 'خانه',
+        city: 'مشهد',
+        fullAddress: 'خیابان نمونه پلاک ۱',
+      });
+    });
+    it('uses Persian messages for province and city length errors', () => {
+      const result = addressSchema.safeParse({
+        ...validAddress,
+        province: 'الف'.repeat(51),
+        city: 'ب'.repeat(51),
+      });
+      expect(result.success).toBe(false);
+      if (!result.success)
+        expect(result.error.issues.map((issue) => issue.message)).toEqual([
+          'استان باید حداکثر ۵۰ کاراکتر باشد',
+          'شهر باید حداکثر ۵۰ کاراکتر باشد',
+        ]);
+    });
     it('validates a complete address', () => {
       const res = addressSchema.safeParse({
         title: 'خانه',

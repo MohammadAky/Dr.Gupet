@@ -18,11 +18,11 @@ vi.mock('../api/endpoints', () => ({
 let root: Root;
 let container: HTMLDivElement;
 let client: QueryClient;
-async function mount() {
+async function mount(url = '/login?next=/orders') {
   await act(async () =>
     root.render(
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={['/login?next=/orders']}>
+        <MemoryRouter initialEntries={[url]}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/orders" element={<h2>سفارش‌ها</h2>} />
@@ -94,6 +94,60 @@ it('defaults to password login, normalizes the username and blocks duplicate sub
   expect(container.textContent).toContain('سفارش‌ها');
 });
 
+it('focuses the first invalid password-login field and clears corrected validation and request errors', async () => {
+  loginPassword.mockRejectedValue(new Error('private provider detail'));
+  await mount();
+  await act(async () => submit());
+  await vi.waitFor(() => expect(document.activeElement?.id).toBe('username'));
+  expect(loginPassword).not.toHaveBeenCalled();
+  await fill('username', 'kian');
+  expect(container.querySelector('#username')?.getAttribute('aria-invalid')).not.toBe('true');
+  await act(async () => submit());
+  await vi.waitFor(() => expect(document.activeElement?.id).toBe('password'));
+  await fill('password', 'private password');
+  expect(container.querySelector('#password')?.getAttribute('aria-invalid')).not.toBe('true');
+  expect(container.querySelector<HTMLInputElement>('#password')?.required).toBe(true);
+  await act(async () => submit());
+  expect(container.textContent).toContain('ورود انجام نشد.');
+  expect(container.textContent).not.toContain('private provider detail');
+  await fill('password', 'corrected password');
+  expect(container.textContent).not.toContain('ورود انجام نشد.');
+});
+
+it('opens the SMS phone form when returning from an OTP number change', async () => {
+  await mount('/login?next=/orders&mode=otp');
+  expect(container.querySelector('#phone')).not.toBeNull();
+  expect(container.querySelector('#username')).toBeNull();
+  expect(container.querySelector<HTMLInputElement>('#phone')?.autocomplete).toBe('tel');
+});
+
+it.each([
+  ['رمز عبور را فراموش کرده‌اید؟', 'بازیابی رمز عبور'],
+  ['حساب ندارید؟ ثبت‌نام', 'ساخت حساب کاربری'],
+])(
+  'returns from %s to the password login without opening another flow or carrying credentials',
+  async (action, heading) => {
+    await mount();
+    await click(action);
+    expect(container.querySelector('h1')?.textContent).toBe(heading);
+    await fill('username', 'private-draft');
+    await fill('password-phone', '09120000000');
+    await click('بازگشت به ورود');
+    expect(container.querySelector('h1')?.textContent).toBe('ورود به حساب');
+    expect(container.querySelector<HTMLInputElement>('#username')?.value).toBe('');
+    expect(container.querySelector<HTMLInputElement>('#password')?.value).toBe('');
+    expect(container.querySelector('#password-phone')).toBeNull();
+    expect(container.querySelector('#password-confirm')).toBeNull();
+    expect(
+      [...container.querySelectorAll('button')].some((button) => button.textContent === 'ورود'),
+    ).toBe(true);
+    expect(api.requestPasswordReset).not.toHaveBeenCalled();
+    expect(api.requestRegistrationOtp).not.toHaveBeenCalled();
+    expect(loginPassword).not.toHaveBeenCalled();
+    expect(registerPassword).not.toHaveBeenCalled();
+  },
+);
+
 it('requires matching passwords and verified phone OTP before registration; stores no credentials in browser storage', async () => {
   vi.mocked(api.requestRegistrationOtp).mockResolvedValue({ expiresIn: 300, cooldownSeconds: 7 });
   registerPassword.mockResolvedValue({ isNewUser: true });
@@ -106,7 +160,12 @@ it('requires matching passwords and verified phone OTP before registration; stor
   await act(async () => submit());
   expect(api.requestRegistrationOtp).not.toHaveBeenCalled();
   expect(container.textContent).toContain('تکرار رمز عبور یکسان نیست');
+  await vi.waitFor(() => expect(document.activeElement?.id).toBe('password-confirm'));
   await fill('password-confirm', 'a long password');
+  expect(container.querySelector('#password-confirm')?.getAttribute('aria-invalid')).not.toBe(
+    'true',
+  );
+  expect(container.textContent).not.toContain('تکرار رمز عبور یکسان نیست');
   await act(async () => {
     submit();
     submit();

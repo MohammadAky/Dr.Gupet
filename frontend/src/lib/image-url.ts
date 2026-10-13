@@ -20,7 +20,8 @@ export function safeImageUrl(value: unknown, appOrigin: string, apiBaseUrl: stri
 
   try {
     const app = new URL(appOrigin);
-    const api = new URL(apiBaseUrl);
+    if (apiBaseUrl.startsWith('//') || apiBaseUrl.includes('\\')) return null;
+    const api = new URL(apiBaseUrl, app.origin);
     if (!['http:', 'https:'].includes(app.protocol) || !['http:', 'https:'].includes(api.protocol))
       return null;
 

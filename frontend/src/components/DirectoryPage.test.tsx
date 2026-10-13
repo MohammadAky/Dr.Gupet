@@ -125,7 +125,7 @@ describe('clinic directory presentation preserves real information', () => {
 
   it('shows unknown hours honestly while keeping telephone and non-embedded map navigation', async () => {
     await show('/clinics/12');
-    await vi.waitFor(() => expect(container.querySelector('h1')).not.toBeNull());
+    await vi.waitFor(() => expect(container.querySelector('h1')?.textContent).toBe(clinic.name));
     expect(shopApi.clinic).toHaveBeenCalledWith(12);
     expect(container.textContent).toContain('ساعات کاری ثبت نشده است.');
     expect(container.textContent).toContain('عکس این مرکز نیست');
@@ -157,5 +157,42 @@ describe('clinic directory presentation preserves real information', () => {
     await show('/clinics/NaN');
     expect(container.textContent).toContain('شناسهٔ کلینیک معتبر نیست.');
     expect(shopApi.clinic).not.toHaveBeenCalled();
+  });
+
+  it('submits typed directory filters without remounting or losing the focused input', async () => {
+    await show('/clinics');
+    await vi.waitFor(() => expect(shopApi.clinics).toHaveBeenCalled());
+    const city = container.querySelectorAll<HTMLInputElement>('input[role="combobox"]')[1]!;
+    await act(async () => city.focus());
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        city,
+        'مشهد جدید',
+      );
+      city.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(document.activeElement).toBe(city);
+    expect(shopApi.clinics).toHaveBeenLastCalledWith({
+      province: undefined,
+      city: undefined,
+      is24h: undefined,
+      page: 1,
+    });
+    await act(async () =>
+      container
+        .querySelector('form')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+    );
+    await vi.waitFor(() =>
+      expect(shopApi.clinics).toHaveBeenLastCalledWith({
+        province: undefined,
+        city: 'مشهد جدید',
+        is24h: undefined,
+        page: 1,
+      }),
+    );
+    expect(container.querySelectorAll('input[role="combobox"]')[1]).toBe(city);
+    expect(document.activeElement).toBe(city);
+    expect(city.value).toBe('مشهد جدید');
   });
 });

@@ -1,9 +1,11 @@
+import { SafeImage } from '../components/SafeImage';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
-import { ErrorState, LoadingState } from '../components/states';
+import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { clinicArtwork } from '../lib/image-url';
+import { DirectoryDetailFrame } from '../components/DirectoryDetailFrame';
 
 export function ClinicDetailPage() {
   const { id = '' } = useParams();
@@ -11,16 +13,30 @@ export function ClinicDetailPage() {
   const clinic = useQuery({
     queryKey: queryKeys.clinic(clinicId),
     queryFn: () => shopApi.clinic(clinicId),
-    enabled: Number.isInteger(clinicId) && clinicId > 0,
+    enabled: Number.isSafeInteger(clinicId) && clinicId > 0,
   });
 
-  if (!Number.isInteger(clinicId) || clinicId <= 0) {
-    return <p>شناسهٔ کلینیک معتبر نیست.</p>;
+  if (
+    !Number.isSafeInteger(clinicId) ||
+    clinicId <= 0 ||
+    clinic.isLoading ||
+    clinic.error ||
+    !clinic.data
+  ) {
+    return (
+      <DirectoryDetailFrame title="اطلاعات کلینیک" to="/clinics" backLabel="بازگشت به کلینیک‌ها">
+        {!Number.isSafeInteger(clinicId) || clinicId <= 0 ? (
+          <EmptyState text="شناسهٔ کلینیک معتبر نیست." />
+        ) : clinic.isLoading ? (
+          <LoadingState />
+        ) : clinic.error ? (
+          <ErrorState error={clinic.error} onRetry={() => void clinic.refetch()} />
+        ) : (
+          <EmptyState text="کلینیک مورد نظر پیدا نشد." />
+        )}
+      </DirectoryDetailFrame>
+    );
   }
-  if (clinic.isLoading) return <LoadingState />;
-  if (clinic.error)
-    return <ErrorState error={clinic.error} onRetry={() => void clinic.refetch()} />;
-  if (!clinic.data) return null;
 
   const item = clinic.data;
   const mapUrl =
@@ -31,7 +47,7 @@ export function ClinicDetailPage() {
   return (
     <article className="directory-detail clinic-detail">
       <figure className="clinic-detail__image">
-        <img
+        <SafeImage
           src={`${clinicArtwork(item.id)}-960.webp`}
           width="960"
           height="720"

@@ -1,3 +1,4 @@
+import { PRESENTATION_PREFIX } from '../../common/utils/presentation-sample.util';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AppException } from '../../common/filters/all-exceptions.filter';
@@ -14,6 +15,7 @@ export class OrderStockService {
         where: {
           id: item.variantId,
           stock: { gte: item.quantity },
+          product: { slug: { not: { startsWith: PRESENTATION_PREFIX } } },
         },
         data: {
           stock: { decrement: item.quantity },

@@ -28,10 +28,14 @@ export class UpdatePetDto {
   @IsNumber()
   breedId?: number;
 
-  @ApiPropertyOptional({ example: '2023-01-15' })
+  @ApiPropertyOptional({
+    example: '2023-01-15',
+    nullable: true,
+    description: 'Omit to preserve; null clears the stored date.',
+  })
   @IsOptional()
-  @IsDateString()
-  birthDate?: string;
+  @IsDateString({ strict: true })
+  birthDate?: string | null;
 
   @ApiPropertyOptional({ enum: ['MALE', 'FEMALE'] })
   @IsOptional()

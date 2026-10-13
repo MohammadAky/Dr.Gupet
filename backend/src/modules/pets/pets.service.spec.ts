@@ -10,9 +10,12 @@ function makePrisma(opts: { count?: number; petType?: any; breed?: any } = {}) {
   return {
     pet: {
       count: jest.fn().mockResolvedValue(opts.count ?? 0),
-      create: jest
-        .fn()
-        .mockImplementation(async ({ data }: any) => ({ id: 1, ...data, petType: {}, breed: null })),
+      create: jest.fn().mockImplementation(async ({ data }: any) => ({
+        id: 1,
+        ...data,
+        petType: {},
+        breed: null,
+      })),
     },
     petType: {
       findUnique: jest
@@ -39,10 +42,16 @@ describe('PetsService.create', () => {
     const noType = new PetsService(makePrisma({ petType: null }));
     await expect(noType.create(1, DATA)).rejects.toThrow('نوع حیوان معتبر نیست');
 
-    const inactiveBreed = new PetsService(makePrisma({ breed: { id: 2, isActive: false, petTypeId: 1 } }));
-    await expect(inactiveBreed.create(1, { ...DATA, breedId: 2 })).rejects.toThrow('نژاد معتبر نیست');
+    const inactiveBreed = new PetsService(
+      makePrisma({ breed: { id: 2, isActive: false, petTypeId: 1 } }),
+    );
+    await expect(inactiveBreed.create(1, { ...DATA, breedId: 2 })).rejects.toThrow(
+      'نژاد معتبر نیست',
+    );
 
-    const wrongType = new PetsService(makePrisma({ breed: { id: 2, isActive: true, petTypeId: 9 } }));
+    const wrongType = new PetsService(
+      makePrisma({ breed: { id: 2, isActive: true, petTypeId: 9 } }),
+    );
     await expect(wrongType.create(1, { ...DATA, breedId: 2 })).rejects.toThrow('نژاد معتبر نیست');
   });
 

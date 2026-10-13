@@ -151,6 +151,8 @@ export interface Category {
 
 /** Product card used by /products, /favorites and /products/recommendations. */
 export interface ProductCard {
+  /** Persisted presentation record; never purchasable. Older API versions omit this. */
+  isSample?: boolean;
   id: number;
   name: string;
   slug: string;
@@ -183,6 +185,7 @@ export interface ProductVariant {
 
 /** GET /products/:slug */
 export interface ProductDetail {
+  isSample?: boolean;
   id: number;
   name: string;
   slug: string;
@@ -293,7 +296,7 @@ export interface OrderDetail extends OrderTotals {
   id: number;
   orderNumber: string;
   userId: number;
-  addressSnapshot: AddressSnapshot;
+  addressSnapshot: AddressSnapshot | null;
   status: OrderStatus;
   shippingMethod: string | null;
   trackingCode: string | null;
@@ -303,12 +306,15 @@ export interface OrderDetail extends OrderTotals {
   couponId: number | null;
   createdAt: string;
   updatedAt: string;
+  /** Authoritative server deadline; absent on older API releases. */
+  expiresAt?: string | null;
   items: OrderItemRow[];
   payments: PaymentRow[];
 }
 
 /** GET /medicines item (Prisma scalars + petTypes). */
 export interface Medicine {
+  isSample?: boolean;
   id: number;
   name: string;
   activeIngredient: string | null;
@@ -340,6 +346,12 @@ export interface MedicineDetail extends Medicine {
 
 /** GET /pharmacies */
 export interface Pharmacy {
+  image?: string | null;
+  isSample?: boolean;
+  lat?: number | null;
+  lng?: number | null;
+  /** Straight-line kilometers, present on the consent-based nearby response. */
+  distanceKm?: number;
   id: number;
   name: string;
   city: string;

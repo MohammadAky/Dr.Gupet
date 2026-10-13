@@ -236,6 +236,48 @@ describe("admin identity and browser storage", () => {
     expect(document.cookie).toBe("");
   });
 
+  it("keeps a new admin session when an earlier session returns a delayed 403", async () => {
+    let releaseOldRead: ((value: Response) => void) | undefined;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith("/auth/otp/verify"))
+        return response({ accessToken: "old-access", refreshToken: "old-refresh" });
+      if (url.endsWith("/auth/password/login"))
+        return response({ accessToken: "new-access", refreshToken: "new-refresh" });
+      if (url.endsWith("/admin/me"))
+        return response({ id: 1, role: "ADMIN", phone: "09120000000" });
+      if (url.endsWith("/auth/logout")) return response(null);
+      if (url.endsWith("/admin/dashboard")) {
+        if ((init.headers as Record<string, string>).Authorization === "Bearer old-access")
+          return await new Promise<Response>((resolve) => { releaseOldRead = resolve; });
+        return response({ value: "new-session-ready" });
+      }
+      throw new Error("unexpected request");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(screen.getByText("verify"));
+    await waitFor(() => expect(screen.getByTestId("mode").textContent).toBe("admin"));
+    fireEvent.click(screen.getByText("read"));
+    await waitFor(() => expect(releaseOldRead).toBeDefined());
+    fireEvent.click(screen.getByText("logout"));
+    expect(screen.getByTestId("mode").textContent).toBe("guest");
+    fireEvent.click(screen.getByText("password login"));
+    await waitFor(() => expect(screen.getByTestId("mode").textContent).toBe("admin"));
+
+    releaseOldRead?.(response(null, 403));
+    await waitFor(() => expect(screen.getByTestId("result").textContent).toBe("دسترسی مجاز نیست"));
+    expect(screen.getByTestId("mode").textContent).toBe("admin");
+    fireEvent.click(screen.getByText("read"));
+    await waitFor(() => expect(screen.getByTestId("result").textContent).toBe("new-session-ready"));
+    const reads = fetchMock.mock.calls.filter(([url]) => url.endsWith("/admin/dashboard"));
+    expect(reads).toHaveLength(2);
+    expect(reads[1]?.[1].headers).toMatchObject({ Authorization: "Bearer new-access" });
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(0);
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+    expect(document.cookie).toBe("");
+  });
+
   it("retries a delayed stale 401 with the rotated access token", async () => {
     let releaseLate401: ((value: Response) => void) | undefined;
     let oldReads = 0;

@@ -1,6 +1,7 @@
 import { request, requestData } from './client';
 import { safePaymentUrl } from '../lib/security';
 import type {
+  AddressSnapshot,
   Brand,
   CartView,
   Category,
@@ -21,6 +22,7 @@ import type {
 
 /** GET /products filters (README Phase 6). `inStock` is only sent when true — BE-REQ-03. */
 export interface ProductFilters {
+  sampleOnly?: boolean;
   page?: number;
   limit?: number;
   q?: string;
@@ -42,6 +44,7 @@ export interface Page<T> {
 }
 
 export interface MedicineFilters {
+  sampleOnly?: boolean;
   page?: number;
   limit?: number;
   q?: string;
@@ -50,6 +53,7 @@ export interface MedicineFilters {
 }
 
 export interface PharmacyFilters {
+  sampleOnly?: boolean;
   page?: number;
   limit?: number;
   city?: string;
@@ -58,12 +62,60 @@ export interface PharmacyFilters {
   onDuty?: boolean;
 }
 
-export type ClinicFilters = Omit<PharmacyFilters, 'onDuty'>;
+export type ClinicFilters = Omit<PharmacyFilters, 'onDuty' | 'sampleOnly'>;
+
+export interface NearbyFilters {
+  lat: number;
+  lng: number;
+  page?: number;
+  limit?: number;
+}
 
 export interface CreateOrderInput {
   addressId: number;
   couponCode?: string;
   note?: string;
+}
+
+type OrderResponse = Omit<OrderDetail, 'addressSnapshot'> & { addressSnapshot: unknown };
+
+/** MySQL currently returns this Text column as JSON; accept the object contract too. */
+function normalizeOrder(order: OrderResponse): OrderDetail {
+  let value = order.addressSnapshot;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      value = null;
+    }
+  }
+  let addressSnapshot: AddressSnapshot | null = null;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const fields = [
+      'title',
+      'receiverName',
+      'receiverPhone',
+      'province',
+      'city',
+      'fullAddress',
+    ] as const;
+    if (
+      fields.every((field) => typeof record[field] === 'string' && record[field].trim() !== '') &&
+      (record.postalCode == null || typeof record.postalCode === 'string')
+    ) {
+      addressSnapshot = {
+        title: record.title as string,
+        receiverName: record.receiverName as string,
+        receiverPhone: record.receiverPhone as string,
+        province: record.province as string,
+        city: record.city as string,
+        fullAddress: record.fullAddress as string,
+        postalCode: (record.postalCode as string | null | undefined) ?? null,
+      };
+    }
+  }
+  return { ...order, addressSnapshot };
 }
 
 function productQuery(filters: ProductFilters): Record<string, string | number | undefined> {
@@ -82,6 +134,7 @@ function productQuery(filters: ProductFilters): Record<string, string | number |
     // BE-REQ-03: `inStock=false` would be coerced to true server-side.
     inStock: filters.inStock ? 'true' : undefined,
     sort: filters.sort,
+    sampleOnly: filters.sampleOnly ? 'true' : undefined,
   };
 }
 
@@ -144,12 +197,13 @@ export const shopApi = {
     return { data, meta };
   },
 
-  order: (id: number) => requestData<OrderDetail>(`/orders/${id}`),
+  order: async (id: number) => normalizeOrder(await requestData<OrderResponse>(`/orders/${id}`)),
 
-  createOrder: (body: CreateOrderInput) =>
-    requestData<OrderDetail>('/orders', { method: 'POST', body }),
+  createOrder: async (body: CreateOrderInput) =>
+    normalizeOrder(await requestData<OrderResponse>('/orders', { method: 'POST', body })),
 
-  cancelOrder: (id: number) => requestData<OrderDetail>(`/orders/${id}/cancel`, { method: 'POST' }),
+  cancelOrder: async (id: number) =>
+    normalizeOrder(await requestData<OrderResponse>(`/orders/${id}/cancel`, { method: 'POST' })),
 
   startPayment: async (orderId: number) => {
     const result = await requestData<{ paymentUrl: string }>('/payments/start', {
@@ -183,4 +237,22 @@ export const shopApi = {
   },
 
   clinic: (id: number) => requestData<ClinicDetail>(`/clinics/${id}`),
+
+  nearbyClinics: async (body: NearbyFilters): Promise<Page<Clinic>> => {
+    const { data, meta } = await request<Clinic[]>('/clinics/nearby', {
+      method: 'POST',
+      body,
+      auth: false,
+    });
+    return { data, meta };
+  },
+
+  nearbyPharmacies: async (body: NearbyFilters): Promise<Page<Pharmacy>> => {
+    const { data, meta } = await request<Pharmacy[]>('/pharmacies/nearby', {
+      method: 'POST',
+      body,
+      auth: false,
+    });
+    return { data, meta };
+  },
 };

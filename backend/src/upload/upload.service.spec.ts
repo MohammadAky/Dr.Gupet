@@ -27,7 +27,9 @@ function makeRedis(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService(opts: { maxMb?: number; countLimit?: number; bytesLimit?: number; dir?: string } = {}) {
+function makeService(
+  opts: { maxMb?: number; countLimit?: number; bytesLimit?: number; dir?: string } = {},
+) {
   const dir = opts.dir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'upl-'));
   const values: Record<string, unknown> = {
     'app.uploadDir': dir,

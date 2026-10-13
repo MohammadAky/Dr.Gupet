@@ -42,3 +42,38 @@ it("assigns credentials to the selected account without changing its phone or ro
   await waitFor(() => expect((within(panel).getByLabelText("رمز عبور جدید") as HTMLInputElement).value).toBe(""));
   expect(logout).not.toHaveBeenCalled();
 });
+it("reveals the user record once and restores its opener when closed", async () => {
+  const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+  const scroll = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+  try {
+    mockRequests(); render(<Users />);
+    const opener = await screen.findByRole("button", { name: "بررسی" });
+    fireEvent.click(opener);
+    const panel = screen.getByRole("region", { name: "پروندهٔ کاربر" });
+    expect(document.activeElement).toBe(panel);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "auto" });
+    await within(panel).findByRole("region", { name: "اطلاعات ورود کاربر" });
+    const name = within(panel).getByLabelText("نام");
+    name.focus();
+    fireEvent.change(name, { target: { value: "نام تازه" } });
+    expect(document.activeElement).toBe(name);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(panel).getByRole("button", { name: "بستن پرونده" }));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    expect(screen.queryByRole("region", { name: "پروندهٔ کاربر" })).toBeNull();
+  } finally {
+    if (originalScroll) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScroll);
+    else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  }
+});
+it("focuses the account creation form on explicit open without creating an account", async () => {
+  mockRequests(); render(<Users />);
+  const opener = screen.getByRole("button", { name: "افزودن کاربر" });
+  fireEvent.click(opener);
+  expect(document.activeElement).toBe(screen.getByRole("form", { name: "ساخت حساب کاربر" }));
+  fireEvent.click(screen.getByRole("button", { name: "بستن فرم" }));
+  await waitFor(() => expect(document.activeElement).toBe(opener));
+  expect(request.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+});

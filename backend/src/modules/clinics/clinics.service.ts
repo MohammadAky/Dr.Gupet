@@ -1,3 +1,4 @@
+import { nearbyDirectory, NearbyQuery } from '../../common/utils/nearby.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
@@ -6,6 +7,10 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 @Injectable()
 export class ClinicsService {
   constructor(private prisma: PrismaService) {}
+
+  async nearby(query: NearbyQuery) {
+    return nearbyDirectory(this.prisma, 'Clinic', query);
+  }
 
   /**
    * List clinics with filtering

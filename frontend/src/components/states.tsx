@@ -5,7 +5,8 @@ import { errorText } from '../lib/labels';
 
 export function LoadingState({ text = 'در حال بارگذاری…' }: { text?: string }) {
   return (
-    <p role="status" aria-busy="true">
+    <p className="state-loading" role="status" aria-busy="true">
+      <span className="state-loading__indicator" aria-hidden="true" />
       {text}
     </p>
   );

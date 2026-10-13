@@ -29,7 +29,13 @@ describe('toCsv — formula injection (issue #09)', () => {
   });
 
   it('still escapes quotes/commas/newlines and leaves normal cells alone', () => {
-    const csv = toCsv(['a', 'b'], [['x,y', 'he said "hi"'], ['plain', 42]]);
+    const csv = toCsv(
+      ['a', 'b'],
+      [
+        ['x,y', 'he said "hi"'],
+        ['plain', 42],
+      ],
+    );
     const lines = csv.split('\n');
     expect(lines[1]).toBe('"x,y","he said ""hi"""');
     expect(lines[2]).toBe('plain,42');

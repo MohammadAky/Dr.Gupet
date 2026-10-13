@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { ApiError, type PageMeta, type PageResult } from "./api/client";
 import { useAuth } from "./auth";
+import { discardDrafts, markFormSaved, normalizeDigits, showFieldErrors } from "./management";
 import { safeImageUrl, validateImage } from "./catalog-model";
 import "./care.css";
 
@@ -82,14 +84,17 @@ const fields: Record<Kind, Field[]> = {
     { key: "requiresPrescription", label: "نیازمند نسخه", type: "checkbox" },
     { key: "isActive", label: "نمایش عمومی فعال", type: "checkbox" },
   ],
-  pharmacies: commonPlace,
+  pharmacies: [
+    ...commonPlace,
+    { key: "onDuty", label: "کشیک", type: "checkbox" },
+  ],
   clinics: commonPlace,
 };
 
 function message(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError)
-    return "ارتباط با API برقرار نشد. اتصال بک‌اند را بررسی کنید.";
+    return "اتصال برقرار نشد. ارتباط اینترنت را بررسی کنید و دوباره تلاش کنید.";
   return "درخواست انجام نشد. دوباره تلاش کنید.";
 }
 
@@ -125,7 +130,8 @@ export function carePayload(kind: Kind, form: FormState, petTypeIds: number[]) {
         result[field.key] = null;
         continue;
       }
-      const coordinate = Number(text);
+      const normalized = normalizeDigits(text).replace(/٫/g, ".");
+      const coordinate = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized) ? Number(normalized) : NaN;
       const limit = field.key === "lat" ? 90 : 180;
       if (!Number.isFinite(coordinate) || Math.abs(coordinate) > limit)
         throw new Error(
@@ -143,10 +149,13 @@ export function carePayload(kind: Kind, form: FormState, petTypeIds: number[]) {
 export function Care() {
   const { request } = useAuth();
   const editorRef = useRef<HTMLElement | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const detailGeneration = useRef(0);
   const kindRef = useRef<Kind>("medicines");
   const savingRef = useRef(false);
+  const mounted = useRef(true);
+  const medicineSearchVersion = useRef(0);
   const [kind, setKind] = useState<Kind>("medicines");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
@@ -160,6 +169,8 @@ export function Care() {
   const [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState<Detail | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [form, setForm] = useState<FormState>(() => initialForm("medicines"));
   const [petTypes, setPetTypes] = useState<PetType[]>([]);
   const [petTypeIds, setPetTypeIds] = useState<number[]>([]);
@@ -175,15 +186,23 @@ export function Care() {
     savingRef.current = saving;
   }, [saving]);
 
-  useEffect(() => () => {
-    detailGeneration.current += 1;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false; detailGeneration.current += 1;
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
   }, []);
 
-  const closeEditor = useCallback(() => {
+  const closeEditor = useCallback(async () => {
     if (savingRef.current) return;
+    if (editorRef.current?.querySelector("[data-dirty='true']") && !await discardDrafts(editorRef.current)) return;
     detailGeneration.current += 1;
-    setFormOpen(false);
     setLoading(false);
+    if (typeof matchMedia === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setClosing(true);
+      closeTimer.current = setTimeout(() => { setFormOpen(false); setClosing(false); closeTimer.current = null; }, 180);
+    } else setFormOpen(false);
   }, []);
 
   useEffect(() => {
@@ -192,9 +211,19 @@ export function Care() {
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    const previousOverflow = document.body.style.overflow;
+    const background = Array.from(document.body.children).filter(
+      (element): element is HTMLElement =>
+        element instanceof HTMLElement && element !== backdropRef.current,
+    );
+    const priorInert = background.map((element) => element.hasAttribute("inert"));
+    background.forEach((element) => element.setAttribute("inert", ""));
+    document.body.style.overflow = "hidden";
     closeRef.current?.focus();
     function onKeyDown(event: KeyboardEvent) {
+      if (document.querySelector(".admin-confirm")) return;
       if (event.key === "Escape") {
+        event.preventDefault();
         closeEditor();
         return;
       }
@@ -206,8 +235,15 @@ export function Care() {
       );
       const first = controls[0];
       const last = controls.at(-1);
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (!first || !last) {
+        event.preventDefault();
+        editorRef.current.focus();
+        return;
+      }
+      if (!editorRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -218,7 +254,11 @@ export function Care() {
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      previous?.focus();
+      background.forEach((element, index) => {
+        if (!priorInert[index]) element.removeAttribute("inert");
+      });
+      document.body.style.overflow = previousOverflow;
+      if (previous?.isConnected) previous.focus();
     };
   }, [formOpen, closeEditor]);
 
@@ -264,10 +304,10 @@ export function Care() {
     return () => {
       current = false;
     };
-  }, [request, kind]);
+  }, [request, kind, revision]);
 
   function switchKind(next: Kind) {
-    if (saving) return;
+    if (savingRef.current) return;
     detailGeneration.current += 1;
     kindRef.current = next;
     setKind(next);
@@ -282,7 +322,7 @@ export function Care() {
   }
 
   function startNew() {
-    if (saving) return;
+    if (savingRef.current) return;
     detailGeneration.current += 1;
     setSelected(null);
     setForm(initialForm(kind));
@@ -292,11 +332,14 @@ export function Care() {
     setError("");
     setLoading(false);
     setFormOpen(true);
+    setClosing(false);
+    setMedicineOptions([]); setLinkId(""); setLinkNote(""); setMedicineSearch("");
   }
 
   async function openDetail(id: number) {
     const requestedKind = kindRef.current;
     const generation = ++detailGeneration.current;
+    setMedicineOptions([]); setLinkId(""); setLinkNote(""); setMedicineSearch("");
     const isCurrent = () =>
       detailGeneration.current === generation && kindRef.current === requestedKind;
     setError("");
@@ -319,10 +362,23 @@ export function Care() {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    const formElement = event.currentTarget;
+    if (savingRef.current || closeTimer.current) return;
     setError("");
     setNotice("");
     let payload: Record<string, unknown>;
+    const invalid: Record<string, string> = {};
+    for (const field of fields[kind]) {
+      const value = String(form[field.key] ?? "").trim();
+      if (field.required && value.length < 2) invalid[field.key] = `${field.label} باید دست‌کم دو نویسه داشته باشد.`;
+      if (field.type === "number" && value) {
+        const normalized = normalizeDigits(value).replace(/٫/g, ".");
+        const coordinate = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized) ? Number(normalized) : NaN; const limit = field.key === "lat" ? 90 : 180;
+        if (!Number.isFinite(coordinate) || Math.abs(coordinate) > limit) invalid[field.key] = `عدد معتبر بین ${-limit} و ${limit} وارد کنید.`;
+      }
+    }
+    showFieldErrors(formElement, invalid);
+    if (Object.keys(invalid).length) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     try {
       payload = carePayload(kind, form, petTypeIds);
       if (kind === "clinics" && !selected) {
@@ -335,7 +391,9 @@ export function Care() {
       setError(problem instanceof Error ? problem.message : message(problem));
       return;
     }
-    setSaving(true);
+    const linksDraft = editorRef.current?.querySelector(".care-links") ?? null;
+    if (!await discardDrafts(linksDraft) || !mounted.current || savingRef.current) return;
+    savingRef.current = true; setSaving(true);
     try {
       if (kind === "medicines" && image) {
         const formData = new FormData();
@@ -344,6 +402,7 @@ export function Care() {
           method: "POST",
           formData,
         });
+        if (!mounted.current) return;
         if (!safeImageUrl(uploaded.url))
           throw new Error("نشانی تصویر دریافتی معتبر نیست.");
         payload.image = uploaded.url;
@@ -355,23 +414,28 @@ export function Care() {
           body: payload,
         },
       );
+      if (!mounted.current) return;
+      setSelected(result);
+      markFormSaved(formElement);
+      if (linksDraft instanceof HTMLElement) markFormSaved(linksDraft);
       setNotice(`${labels[kind].singular} ذخیره شد.`);
       setRevision((value) => value + 1);
       setImage(null);
       await openDetail(result.id);
     } catch (problem) {
-      setError(problem instanceof Error ? problem.message : message(problem));
+      if (mounted.current) setError(problem instanceof Error ? problem.message : message(problem));
     } finally {
-      setSaving(false);
+      savingRef.current = false; if (mounted.current) setSaving(false);
     }
   }
 
   async function remove() {
-    if (!selected || saving) return;
-    setSaving(true);
+    if (!selected || savingRef.current || closeTimer.current) return;
+    savingRef.current = true; setSaving(true);
     setError("");
     try {
       await request(`/admin/${kind}/${selected.id}`, { method: "DELETE" });
+      if (!mounted.current) return;
       detailGeneration.current += 1;
       setFormOpen(false);
       setSelected(null);
@@ -379,14 +443,16 @@ export function Care() {
       setNotice(`${labels[kind].singular} حذف شد.`);
       setRevision((value) => value + 1);
     } catch (problem) {
-      setError(message(problem));
+      if (mounted.current) setError(message(problem));
     } finally {
-      setSaving(false);
+      savingRef.current = false; if (mounted.current) setSaving(false);
     }
   }
 
   async function findMedicines(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const generation = detailGeneration.current;
+    const version = ++medicineSearchVersion.current;
     setError("");
     try {
       const parameters = new URLSearchParams({ page: "1", limit: "20" });
@@ -395,20 +461,23 @@ export function Care() {
         `/admin/medicines?${parameters}`,
         { withMeta: true },
       );
-      setMedicineOptions(result.data);
+      if (generation === detailGeneration.current && version === medicineSearchVersion.current) setMedicineOptions(result.data);
     } catch (problem) {
-      setError(message(problem));
+      if (generation === detailGeneration.current && version === medicineSearchVersion.current) setError(message(problem));
     }
   }
 
   async function changeLink(unlink: number | null) {
-    if (!selected || saving) return;
+    if (!selected || savingRef.current || closeTimer.current) return;
     const medicineId = unlink ?? Number(linkId);
-    if (!Number.isInteger(medicineId) || medicineId < 1) {
+    if (!Number.isSafeInteger(medicineId) || medicineId < 1) {
       setError("ابتدا یک دارو انتخاب کنید.");
       return;
     }
-    setSaving(true);
+    const abandonedDraft = unlink === null ? editorRef.current?.querySelector(".care-form") : editorRef.current;
+    if (!await discardDrafts(abandonedDraft ?? null)) return;
+    if (savingRef.current || !mounted.current) return;
+    savingRef.current = true; setSaving(true);
     setError("");
     try {
       await request(
@@ -420,6 +489,8 @@ export function Care() {
             : {}),
         },
       );
+      if (!mounted.current) return;
+      editorRef.current?.querySelectorAll<HTMLElement>("[data-dirty='true']").forEach(markFormSaved);
       setNotice(
         unlink === null ? "دارو به داروخانه پیوند خورد." : "پیوند دارو حذف شد.",
       );
@@ -427,9 +498,9 @@ export function Care() {
       setLinkNote("");
       await openDetail(selected.id);
     } catch (problem) {
-      setError(message(problem));
+      if (mounted.current) setError(message(problem));
     } finally {
-      setSaving(false);
+      savingRef.current = false; if (mounted.current) setSaving(false);
     }
   }
 
@@ -439,7 +510,7 @@ export function Care() {
     <section className="care-page" aria-labelledby="care-title">
       <div className="care-head">
         <div>
-          <span className="eyebrow">داده و مراکز / API زنده</span>
+          <span className="eyebrow">راهنمای سلامت و مراکز</span>
           <h1 id="care-title">{title.title}</h1>
           <p>{title.description}</p>
         </div>
@@ -500,15 +571,26 @@ export function Care() {
           جست‌وجو
         </button>
       </form>
-      {notice && (
+      {notice && !formOpen && (
         <p className="care-notice" role="status">
           {notice}
         </p>
       )}
-      {error && (
-        <p className="form-error care-error" role="alert">
+      {error && !formOpen && (
+        <div className="form-error care-error" role="alert">
           {error}
-        </p>
+          <button
+            type="button"
+            className="button button--text"
+            disabled={loading || saving}
+            onClick={() => {
+              setError("");
+              setRevision((value) => value + 1);
+            }}
+          >
+            تلاش دوباره
+          </button>
+        </div>
       )}
       {loading && (
         <p className="care-state" role="status">
@@ -518,7 +600,7 @@ export function Care() {
       {!loading && !error && rows.length === 0 && (
         <p className="care-state">موردی با این فیلتر پیدا نشد.</p>
       )}
-      {!loading && rows.length > 0 && (
+      {!loading && !error && rows.length > 0 && (
         <div className="care-list">
           {rows.map((row) => (
             <article className="care-row" key={row.id}>
@@ -579,9 +661,10 @@ export function Care() {
           </button>
         </div>
       )}
-      {formOpen && (
+      {formOpen && createPortal(
         <div
-          className="care-editor-backdrop"
+          ref={backdropRef}
+          className={`care-editor-backdrop${closing ? " care-editor-backdrop--closing" : ""}`}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeEditor();
           }}
@@ -590,6 +673,7 @@ export function Care() {
             ref={editorRef}
             className="care-editor"
             role="dialog"
+            tabIndex={-1}
             aria-modal="true"
             aria-label={`${selected ? "ویرایش" : "افزودن"} ${title.singular}`}
           >
@@ -623,7 +707,7 @@ export function Care() {
                 {notice}
               </p>
             )}
-            <form onSubmit={(event) => void save(event)} className="care-form">
+            <form onSubmit={(event) => void save(event)} className="care-form" noValidate>
               {fields[kind].map((field) =>
                 field.type === "checkbox" ? (
                   <label className="care-check" key={field.key}>
@@ -646,6 +730,8 @@ export function Care() {
                     {field.required && " *"}
                     {field.type === "textarea" ? (
                       <textarea
+                        name={field.key}
+                        required={field.required}
                         rows={3}
                         value={String(form[field.key] ?? "")}
                         disabled={saving}
@@ -658,8 +744,9 @@ export function Care() {
                       />
                     ) : (
                       <input
-                        type={field.type === "number" ? "number" : "text"}
-                        step={field.type === "number" ? "any" : undefined}
+                        type="text"
+                        inputMode={field.type === "number" ? "decimal" : undefined}
+                        name={field.key}
                         required={field.required}
                         value={String(form[field.key] ?? "")}
                         disabled={saving}
@@ -722,12 +809,6 @@ export function Care() {
                   )}
                 </>
               )}
-              {kind === "pharmacies" && (
-                <p className="care-hint">
-                  وضعیت کشیک فعلاً از API مدیریت قابل ویرایش نیست؛ گزارش آن در
-                  پوشهٔ .issue ثبت شده است.
-                </p>
-              )}
               <div className="care-actions">
                 <button
                   type="submit"
@@ -747,7 +828,7 @@ export function Care() {
               </div>
             </form>
             {kind === "pharmacies" && selected && (
-              <section className="care-links" aria-label="داروهای داروخانه">
+              <section className="care-links" aria-label="داروهای داروخانه" data-draft-editor>
                 <h3>داروهای ثبت‌شده</h3>
                 {selected.medicines?.length ? (
                   <ul>
@@ -792,6 +873,7 @@ export function Care() {
                     داروی انتخابی{" "}
                     <select
                       value={linkId}
+                      disabled={saving}
                       onChange={(event) => setLinkId(event.target.value)}
                     >
                       <option value="">انتخاب کنید</option>
@@ -807,6 +889,7 @@ export function Care() {
                   یادداشت موجودی / تأیید{" "}
                   <input
                     value={linkNote}
+                    disabled={saving}
                     onChange={(event) => setLinkNote(event.target.value)}
                   />
                 </label>
@@ -824,7 +907,7 @@ export function Care() {
               <section className="care-danger">
                 <h3>حذف {title.singular}</h3>
                 <p>
-                  این عملیات داده را از بک‌اند حذف می‌کند و ممکن است وابستگی‌های
+                  این عملیات اطلاعات را حذف می‌کند و ممکن است وابستگی‌های
                   مرتبط را نیز از بین ببرد.
                 </p>
                 {!confirmDelete ? (
@@ -857,7 +940,8 @@ export function Care() {
               </section>
             )}
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );

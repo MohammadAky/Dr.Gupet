@@ -7,22 +7,30 @@ import { queryKeys } from '../api/query-keys';
 import { Pagination } from '../components/Pagination';
 import { SearchableFilter } from '../components/SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
+import { isSampleReference } from '../lib/sample-records';
 
 /** Medicines (F10) — informational only: no price, no stock. */
 export function MedicinesPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const prescriptionOnly = params.get('requiresPrescription') === '1';
-  const [search, setSearch] = useState(q);
+  const [searchDraft, setSearchDraft] = useState({ q, value: q });
+  const search = searchDraft.q === q ? searchDraft.value : q;
+  const setSearch = (value: string) => setSearchDraft({ q, value });
   const [suggestionTerm, setSuggestionTerm] = useState('');
-  const petTypeId = Number(params.get('petTypeId') ?? '') || undefined;
+  const rawPetTypeId = Number(params.get('petTypeId'));
+  const petTypeId =
+    Number.isSafeInteger(rawPetTypeId) && rawPetTypeId > 0 ? rawPetTypeId : undefined;
   const petTypes = useQuery({ queryKey: queryKeys.petTypes, queryFn: () => api.petTypes() });
 
   const filters = {
     q: q || undefined,
     petTypeId,
     requiresPrescription: prescriptionOnly ? true : undefined,
-    page: Number(params.get('page') ?? '1') || 1,
+    page:
+      Number.isSafeInteger(Number(params.get('page'))) && Number(params.get('page')) > 0
+        ? Number(params.get('page'))
+        : 1,
   };
 
   const medicines = useQuery({
@@ -58,9 +66,12 @@ export function MedicinesPage() {
   }
 
   return (
-    <section>
-      <h1>دارو‌ها</h1>
-      <p>این بخش صرفاً اطلاعاتی است؛ قیمت و موجودی ندارد و پیش از مصرف با دامپزشک مشورت کنید.</p>
+    <section className="medicine-directory">
+      <div className="directory-page__heading">
+        <span className="eyebrow">راهنمای سلامت</span>
+        <h1>اطلاعات داروها</h1>
+        <p>این بخش صرفاً اطلاعاتی است؛ قیمت و موجودی ندارد و پیش از مصرف با دامپزشک مشورت کنید.</p>
+      </div>
 
       <form className="filter-panel" onSubmit={submit}>
         <div className="filter-panel__grid">
@@ -99,6 +110,7 @@ export function MedicinesPage() {
               const next = new URLSearchParams(params);
               if (event.target.checked) next.set('requiresPrescription', '1');
               else next.delete('requiresPrescription');
+              next.delete('page');
               setParams(next);
             }}
           />
@@ -119,12 +131,23 @@ export function MedicinesPage() {
 
       {medicines.data && medicines.data.data.length > 0 && (
         <>
-          <ul>
+          <ul className="medicine-grid">
             {medicines.data.data.map((medicine) => (
-              <li key={medicine.id}>
-                <Link to={`/medicines/${medicine.id}`}>{medicine.name}</Link>
-                {medicine.activeIngredient && <> — {medicine.activeIngredient}</>}
-                {medicine.requiresPrescription && <> (نیازمند نسخه)</>}
+              <li className="medicine-card" key={medicine.id}>
+                <span className="medicine-card__kind">
+                  {isSampleReference(medicine)
+                    ? 'نمونهٔ نمایشی؛ داروی واقعی نیست'
+                    : medicine.requiresPrescription
+                      ? 'نیازمند نسخه'
+                      : 'اطلاعات دارویی'}
+                </span>
+                <h2>
+                  <Link to={`/medicines/${medicine.id}`}>{medicine.name}</Link>
+                </h2>
+                {medicine.activeIngredient && <p>مادهٔ مؤثره: {medicine.activeIngredient}</p>}
+                <Link className="directory-card__link" to={`/medicines/${medicine.id}`}>
+                  مطالعهٔ اطلاعات <span aria-hidden="true">←</span>
+                </Link>
               </li>
             ))}
           </ul>

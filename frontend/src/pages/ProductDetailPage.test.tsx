@@ -10,25 +10,53 @@ import type { CartView, ProductDetail } from '../api/types';
 import { useAuth } from '../auth/auth-provider';
 import { ProductDetailPage } from './ProductDetailPage';
 
-vi.mock('../api/endpoints-shop', () => ({ shopApi: {
-  product: vi.fn(), favorites: vi.fn(), addCartItem: vi.fn(),
-  addFavorite: vi.fn(), removeFavorite: vi.fn(),
-} }));
+vi.mock('../api/endpoints-shop', () => ({
+  shopApi: {
+    product: vi.fn(),
+    favorites: vi.fn(),
+    addCartItem: vi.fn(),
+    addFavorite: vi.fn(),
+    removeFavorite: vi.fn(),
+  },
+}));
 vi.mock('../auth/auth-provider', () => ({ useAuth: vi.fn() }));
 
 const detail: ProductDetail = {
-  id: 1, name: 'غذای سگ', slug: 'dog-food', description: null, ingredientsText: null,
-  lifeStage: 'ADULT', sizeClass: 'ALL', neuterSuitability: 'ANY', isActive: true,
-  createdAt: '', updatedAt: '',
+  id: 1,
+  name: 'غذای سگ',
+  slug: 'dog-food',
+  description: null,
+  ingredientsText: null,
+  lifeStage: 'ADULT',
+  sizeClass: 'ALL',
+  neuterSuitability: 'ANY',
+  isActive: true,
+  createdAt: '',
+  updatedAt: '',
   brand: { id: 2, name: 'برند', slug: 'brand' },
   category: { id: 3, name: 'غذا', slug: 'food' },
   petType: { id: 4, name: 'سگ', slug: 'dog' },
-  images: [], tags: [],
+  images: [],
+  tags: [],
   variants: [
-    { id: 11, sku: 'dog-1', weightGram: 1000, price: 100_000,
-      compareAtPrice: null, inStock: true, lowStock: false },
-    { id: 12, sku: 'dog-2', weightGram: 2000, price: 200_000,
-      compareAtPrice: null, inStock: false, lowStock: false },
+    {
+      id: 11,
+      sku: 'dog-1',
+      weightGram: 1000,
+      price: 100_000,
+      compareAtPrice: null,
+      inStock: true,
+      lowStock: false,
+    },
+    {
+      id: 12,
+      sku: 'dog-2',
+      weightGram: 2000,
+      price: 200_000,
+      compareAtPrice: null,
+      inStock: false,
+      lowStock: false,
+    },
   ],
 };
 const cartView: CartView = { items: [], itemsTotal: 0 };
@@ -36,7 +64,10 @@ const cartView: CartView = { items: [], itemsTotal: 0 };
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((accept, fail) => { resolve = accept; reject = fail; });
+  const promise = new Promise<T>((accept, fail) => {
+    resolve = accept;
+    reject = fail;
+  });
   return { promise, resolve, reject };
 }
 
@@ -57,16 +88,18 @@ describe('product detail private actions', () => {
     root.render(
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={['/products/dog-food']}>
-          <Routes><Route path="/products/:slug" element={<ProductDetailPage />} /></Routes>
+          <Routes>
+            <Route path="/products/:slug" element={<ProductDetailPage />} />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     );
   }
 
   function submitForm() {
-    container.querySelector('form')?.dispatchEvent(
-      new Event('submit', { bubbles: true, cancelable: true }),
-    );
+    container
+      .querySelector('form')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   }
 
   beforeEach(() => {
@@ -77,7 +110,9 @@ describe('product detail private actions', () => {
     root = createRoot(container);
     mounted = true;
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    vi.mocked(useAuth).mockReturnValue({ status: 'authed', user: { id: 7 } } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ status: 'authed', user: { id: 7 } } as ReturnType<
+      typeof useAuth
+    >);
     vi.mocked(shopApi.product).mockResolvedValue(detail);
     vi.mocked(shopApi.favorites).mockResolvedValue({ data: [] });
     vi.mocked(shopApi.addCartItem).mockResolvedValue(cartView);
@@ -98,7 +133,9 @@ describe('product detail private actions', () => {
   }
 
   it('keeps guest cart and favorite requests private', async () => {
-    vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<
+      typeof useAuth
+    >);
     await showPage();
     expect(shopApi.favorites).not.toHaveBeenCalled();
     expect(container.textContent).toContain('برای افزودن به سبد خرید وارد شوید');
@@ -106,6 +143,23 @@ describe('product detail private actions', () => {
     expect(shopApi.addCartItem).not.toHaveBeenCalled();
     expect(shopApi.addFavorite).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { ...detail, isSample: true },
+    { ...detail, slug: 'presentation-v1-dog-food' },
+  ])(
+    'blocks persisted presentation products even when an old response marks the variant in stock',
+    async (sample) => {
+      vi.mocked(shopApi.product).mockResolvedValue(sample);
+      await showPage();
+      expect(container.textContent).toContain('قابل خرید نیست');
+      expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(
+        true,
+      );
+      await act(async () => submitForm());
+      expect(shopApi.addCartItem).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects fractional/out-of-range quantities and sends one integer request per submit', async () => {
     const pending = deferred<CartView>();
@@ -122,7 +176,10 @@ describe('product detail private actions', () => {
     await act(async () => submitForm());
     expect(shopApi.addCartItem).not.toHaveBeenCalled();
     await changeInput(qty, '2');
-    await act(async () => { submitForm(); submitForm(); });
+    await act(async () => {
+      submitForm();
+      submitForm();
+    });
     expect(shopApi.addCartItem).toHaveBeenCalledTimes(1);
     expect(shopApi.addCartItem).toHaveBeenCalledWith(11, 2);
     await act(async () => pending.resolve(cartView));
@@ -143,11 +200,14 @@ describe('product detail private actions', () => {
     const oldRequest = deferred<CartView>();
     const newRequest = deferred<CartView>();
     vi.mocked(shopApi.addCartItem)
-      .mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
+      .mockReturnValueOnce(oldRequest.promise)
+      .mockReturnValueOnce(newRequest.promise);
     const invalidation = vi.spyOn(client, 'invalidateQueries');
     await showPage();
     await act(async () => submitForm());
-    vi.mocked(useAuth).mockReturnValue({ status: 'authed', user: { id: 8 } } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ status: 'authed', user: { id: 8 } } as ReturnType<
+      typeof useAuth
+    >);
     await act(async () => renderPage());
     await act(async () => submitForm());
     expect(shopApi.addCartItem).toHaveBeenCalledTimes(2);
@@ -163,14 +223,23 @@ describe('product detail private actions', () => {
     vi.mocked(shopApi.addFavorite).mockReturnValue(pending.promise);
     const invalidation = vi.spyOn(client, 'invalidateQueries');
     await showPage();
+    await vi.waitFor(() => {
+      const favorite = [...container.querySelectorAll('button')].find((button) =>
+        button.textContent?.includes('افزودن به علاقه‌مندی‌ها'),
+      )!;
+      expect(favorite.disabled).toBe(false);
+    });
     await act(async () => {
-      const favorite = [...container.querySelectorAll('button')]
-        .find((button) => button.textContent?.includes('افزودن به علاقه‌مندی‌ها'))!;
+      const favorite = [...container.querySelectorAll('button')].find((button) =>
+        button.textContent?.includes('افزودن به علاقه‌مندی‌ها'),
+      )!;
       favorite.click();
       favorite.click();
     });
     expect(shopApi.addFavorite).toHaveBeenCalledTimes(1);
-    vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<
+      typeof useAuth
+    >);
     await act(async () => renderPage());
     await act(async () => pending.reject(new Error('old account')));
     expect(invalidation).not.toHaveBeenCalled();
@@ -193,9 +262,133 @@ describe('product detail private actions', () => {
     const pending = deferred<Awaited<ReturnType<typeof shopApi.favorites>>>();
     vi.mocked(shopApi.favorites).mockReturnValue(pending.promise);
     await showPage();
-    vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<
+      typeof useAuth
+    >);
     await act(async () => renderPage());
     await act(async () => pending.resolve({ data: [] }));
-    expect(client.getQueryData(queryKeys.favorites(1))).toBeUndefined();
+    expect(client.getQueryData(['favorites', 'membership', detail.id])).toBeUndefined();
+  });
+
+  it('waits for membership on later favorites pages before choosing the correct toggle action', async () => {
+    const secondPage = deferred<Awaited<ReturnType<typeof shopApi.favorites>>>();
+    vi.mocked(shopApi.favorites)
+      .mockResolvedValueOnce({ data: [], meta: { page: 1, limit: 50, total: 51, totalPages: 2 } })
+      .mockReturnValue(secondPage.promise);
+    await showPage();
+    await vi.waitFor(() => expect(shopApi.favorites).toHaveBeenCalledWith(2, 50));
+    const favorite = [...container.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('افزودن به علاقه‌مندی‌ها'),
+    )!;
+    expect(favorite.disabled).toBe(true);
+    await act(async () => favorite.click());
+    expect(shopApi.addFavorite).not.toHaveBeenCalled();
+    expect(shopApi.removeFavorite).not.toHaveBeenCalled();
+    expect(shopApi.favorites).toHaveBeenCalledWith(1, 50);
+    await act(async () =>
+      secondPage.resolve({
+        data: [
+          {
+            id: detail.id,
+            name: detail.name,
+            slug: detail.slug,
+            brand: detail.brand,
+            image: null,
+            minPrice: 100_000,
+            inStock: true,
+            lifeStage: detail.lifeStage,
+            sizeClass: detail.sizeClass,
+          },
+        ],
+        meta: { page: 2, limit: 50, total: 51, totalPages: 2 },
+      }),
+    );
+    await vi.waitFor(() => expect(favorite.disabled).toBe(false));
+    expect(favorite.textContent).toBe('حذف از علاقه‌مندی‌ها');
+    await act(async () => favorite.click());
+    expect(shopApi.removeFavorite).toHaveBeenCalledWith(detail.id);
+    expect(shopApi.addFavorite).not.toHaveBeenCalled();
+  });
+
+  it('keeps unsafe gallery URLs out of the DOM and lets customers select ordered safe images', async () => {
+    vi.mocked(shopApi.product).mockResolvedValue({
+      ...detail,
+      images: [
+        { id: 10, url: 'https://untrusted.example/track.webp', sortOrder: -10 },
+        { id: 11, url: '/uploads/product-second.webp', sortOrder: 20 },
+        { id: 12, url: '/brand/product-first.webp', sortOrder: 10 },
+        { id: 13, url: 'javascript:alert(1)', sortOrder: 0 },
+      ],
+    });
+    await showPage();
+    let mainImage = container.querySelector<HTMLImageElement>('.product-detail__media img')!;
+    const thumbnails = [
+      ...container.querySelectorAll<HTMLButtonElement>('.product-detail__thumbnails button'),
+    ];
+    expect(thumbnails).toHaveLength(2);
+    expect(mainImage.src).toMatch(/\/brand\/product-first\.webp$/);
+    expect(thumbnails[0]?.getAttribute('aria-pressed')).toBe('true');
+    expect(thumbnails[1]?.getAttribute('aria-pressed')).toBe('false');
+    expect(
+      [...container.querySelectorAll('img')].every(
+        (image) => !image.src.includes('untrusted.example') && !image.src.startsWith('javascript:'),
+      ),
+    ).toBe(true);
+    expect(mainImage.getAttribute('referrerpolicy')).toBe('no-referrer');
+    await act(async () => thumbnails[1]?.click());
+    mainImage = container.querySelector<HTMLImageElement>('.product-detail__media img')!;
+    expect(mainImage.src).toMatch(/\/uploads\/product-second\.webp$/);
+    expect(thumbnails[0]?.getAttribute('aria-pressed')).toBe('false');
+    expect(thumbnails[1]?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('initially chooses the first purchasable variant while respecting a later explicit unavailable selection', async () => {
+    vi.mocked(shopApi.product).mockResolvedValue({
+      ...detail,
+      variants: [detail.variants[1]!, detail.variants[0]!],
+    });
+    await showPage();
+    expect(container.querySelector<HTMLInputElement>('input[value="11"]')?.checked).toBe(true);
+    await act(async () => submitForm());
+    expect(shopApi.addCartItem).toHaveBeenCalledWith(11, 1);
+    await act(async () => container.querySelector<HTMLInputElement>('input[value="12"]')!.click());
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(
+      true,
+    );
+  });
+
+  it('exposes favorite pressed state and a completion message after saving', async () => {
+    await showPage();
+    const favorite = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'افزودن به علاقه‌مندی‌ها',
+    )!;
+    await vi.waitFor(() => expect(favorite.disabled).toBe(false));
+    expect(favorite.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => favorite.click());
+    expect(shopApi.addFavorite).toHaveBeenCalledWith(detail.id);
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      'محصول در علاقه‌مندی‌ها ذخیره شد.',
+    );
+  });
+
+  it('opens an accessible image viewer and returns focus to its trigger after Escape', async () => {
+    vi.mocked(shopApi.product).mockResolvedValue({
+      ...detail,
+      images: [{ id: 12, url: '/brand/product.webp', sortOrder: 0 }],
+    });
+    await showPage();
+    const trigger = container.querySelector<HTMLButtonElement>('.commerce-gallery-open')!;
+    await act(async () => {
+      trigger.focus();
+      trigger.click();
+    });
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    expect(dialog?.querySelector('img')?.getAttribute('src')).toContain('/brand/product.webp');
+    await act(async () =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    );
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 });

@@ -1,10 +1,14 @@
-import { useId, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useAuth } from "./auth";
 import {
+  confirmAction, discardDrafts, hasUnsavedDrafts, markFormSaved, normalizeDigits, showFieldErrors, useInlinePanelFocus,
   errorMessage,
   formatDate,
   formatMoney,
   formatNumber,
+  gatewayLabel,
+  orderStatusLabel,
+  paymentStatusLabel,
   Notice,
   PageHeader,
   Paginator,
@@ -12,6 +16,7 @@ import {
   useDetail,
   usePaged,
 } from "./management";
+import { parseAdminLocation } from "./navigation";
 import "./management.css";
 
 type Payment = {
@@ -61,11 +66,23 @@ const operationTabLabels: Record<OperationTab, string> = {
   audit: "لاگ عملیات",
   settings: "تنظیمات",
 };
+const auditEntityLabels: Record<string, string> = {
+  User: "کاربر", Order: "سفارش", Payment: "پرداخت", Product: "محصول",
+  ProductVariant: "گونهٔ محصول", ProductImage: "تصویر محصول", Coupon: "کد تخفیف",
+  Clinic: "کلینیک", Pharmacy: "داروخانه", PharmacyMedicine: "داروی داروخانه",
+  Medicine: "دارو", Brand: "برند", Category: "دسته‌بندی", PetType: "نوع حیوان",
+  Breed: "نژاد", Tag: "برچسب", Setting: "تنظیمات",
+};
 
 function Payments() {
   const { request } = useAuth();
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  const selectionVersion = useRef(0);
+  const { panelRef, reveal, restore } = useInlinePanelFocus();
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; selectionVersion.current += 1; }; }, []);
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => parseAdminLocation(window.location.hash).params.get("status") ?? "");
   const [selected, setSelected] = useState<number | null>(null);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -82,26 +99,27 @@ function Payments() {
     revision,
   );
   async function markFailed() {
-    if (
-      !selected ||
-      !window.confirm(
-        "این پرداخت ناموفق ثبت شود؟ این کار وضعیت سفارش را تغییر نمی‌دهد.",
-      )
-    )
-      return;
-    setBusy(true);
-    setError("");
-    setMessage("");
+    if (!selected || pending.current || detail.data?.status === "SUCCESS") return;
+    const id = selected;
+    const version = selectionVersion.current;
+    pending.current = true;
     try {
-      await request(`/admin/payments/${selected}/mark-failed`, {
+      if (!await confirmAction(
+        "این پرداخت ناموفق ثبت شود؟ این کار وضعیت سفارش را تغییر نمی‌دهد.",
+        "ثبت پرداخت ناموفق",
+      )) return;
+      if (!mounted.current || version !== selectionVersion.current) return;
+      setBusy(true); setError(""); setMessage("");
+      await request(`/admin/payments/${id}/mark-failed`, {
         method: "POST",
       });
+      if (!mounted.current) return;
       setRevision((value) => value + 1);
-      setMessage("پرداخت ناموفق ثبت شد.");
+      if (version === selectionVersion.current) setMessage("پرداخت ناموفق ثبت شد.");
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current && version === selectionVersion.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
   return (
@@ -152,14 +170,14 @@ function Payments() {
                       <td>{formatNumber(item.id)}</td>
                       <td dir="ltr">{item.order.orderNumber}</td>
                       <td>{formatMoney(item.amount)}</td>
-                      <td>{item.gateway}</td>
-                      <td>{item.status}</td>
+                      <td>{gatewayLabel(item.gateway)}</td>
+                      <td><span className={"manage-badge" + (item.status === "SUCCESS" ? " manage-badge--active" : item.status === "FAILED" ? " manage-badge--warning" : "")}>{paymentStatusLabel(item.status)}</span></td>
                       <td>{formatDate(item.createdAt)}</td>
                       <td>
                         <button
                           type="button"
                           className="manage-row-button"
-                          onClick={() => setSelected(item.id)}
+                          onClick={(event) => { selectionVersion.current += 1; setSelected(item.id); setError(""); setMessage(""); reveal(event.currentTarget); }}
                         >
                           بررسی
                         </button>
@@ -174,9 +192,9 @@ function Payments() {
         )}
       </section>
       {selected && (
-        <section className="manage-card">
+        <section className="manage-card" ref={panelRef} tabIndex={-1} aria-label="جزئیات پرداخت">
           <div className="manage-actions">
-            <button type="button" onClick={() => setSelected(null)}>
+            <button type="button" onClick={() => { selectionVersion.current += 1; setSelected(null); restore(); }}>
               بستن جزئیات
             </button>
           </div>
@@ -203,11 +221,11 @@ function Payments() {
                 </div>
                 <div>
                   <dt>وضعیت سفارش</dt>
-                  <dd>{detail.data.order.status}</dd>
+                  <dd>{orderStatusLabel(detail.data.order.status)}</dd>
                 </div>
                 <div>
                   <dt>درگاه</dt>
-                  <dd>{detail.data.gateway}</dd>
+                  <dd>{gatewayLabel(detail.data.gateway)}</dd>
                 </div>
                 <div>
                   <dt>ارجاع درگاه</dt>
@@ -231,7 +249,7 @@ function Payments() {
               </div>
               <Notice
                 kind="info"
-                message="تطبیق دوبارهٔ پرداخت با درگاه تا رفع خطر تغییر وضعیت سفارش لغوشده در بک‌اند غیرفعال است؛ گزارش فنی در .issue/02 ثبت شده است."
+                message="تطبیق دوبارهٔ پرداخت با درگاه فعلاً در دسترس نیست. برای بررسی وضعیت، اطلاعات پرداخت را با گزارش درگاه مقایسه کنید."
               />
             </>
           )}
@@ -259,14 +277,13 @@ function AuditLogs() {
       <div className="manage-toolbar">
         <label>
           بخش
-          <input
+          <select
             value={entity}
             onChange={(event) => {
               setEntity(event.target.value);
               setPage(1);
             }}
-            placeholder="مثلاً Order"
-          />
+          ><option value="">همهٔ بخش‌ها</option>{Object.entries(auditEntityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         </label>
         <label>
           نوع عمل
@@ -309,8 +326,8 @@ function AuditLogs() {
                   <tr key={item.id}>
                     <td>{formatDate(item.createdAt)}</td>
                     <td>{formatNumber(item.adminId)}</td>
-                    <td>{item.action}</td>
-                    <td>{item.entity}</td>
+                    <td>{({ CREATE: "ایجاد", UPDATE: "ویرایش", DELETE: "حذف" } as Record<string, string>)[item.action] ?? item.action}</td>
+                    <td>{auditEntityLabels[item.entity] ?? item.entity}</td>
                     <td dir="ltr">{item.entityId || "—"}</td>
                     <td>{item.summary || "—"}</td>
                   </tr>
@@ -327,6 +344,10 @@ function AuditLogs() {
 
 function Settings() {
   const { request } = useAuth();
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [revision, setRevision] = useState(0);
   const [key, setKey] = useState<SettingKey>("SHIPPING_FLAT_COST");
   const [value, setValue] = useState("");
@@ -337,9 +358,11 @@ function Settings() {
   const current = settings.data?.data.find((item) => item.key === key);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending.current) return;
+    const form = event.currentTarget;
     setError("");
     setMessage("");
-    const trimmed = value.trim();
+    const trimmed = normalizeDigits(value.trim());
     const n = Number(trimmed);
     if (
       !/^\d+$/.test(trimmed) ||
@@ -347,46 +370,48 @@ function Settings() {
       (key === "ORDER_EXPIRE_MINUTES" ? n < 1 : n < 0)
     ) {
       setError("مقدار باید عدد صحیح و معتبر باشد.");
+      showFieldErrors(form, { value: "مقدار باید عدد صحیح و معتبر باشد." });
       return;
     }
-    if (
-      !window.confirm(`${settingLabels[key]} به ${formatNumber(n)} تغییر کند؟`)
-    )
-      return;
-    setBusy(true);
+    pending.current = true;
     try {
+      if (!await confirmAction(`${settingLabels[key]} به ${formatNumber(n)} تغییر کند؟`, "ذخیرهٔ تنظیم فروشگاه")) return;
+      if (!mounted.current) return;
+      setBusy(true);
       await request("/admin/settings", {
         method: "PUT",
         body: { key, value: trimmed },
       });
+      if (!mounted.current) return;
       setRevision((x) => x + 1);
       setValue("");
+      markFormSaved(form);
       setMessage("تنظیمات ذخیره شد؛ اعمال آن ممکن است تا ۳۰ ثانیه زمان ببرد.");
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
   async function clear() {
-    if (
-      !current ||
-      !window.confirm(
-        `مقدار ${settingLabels[key]} حذف شود تا مقدار پیش‌فرض محیط اعمال شود؟`,
-      )
-    )
-      return;
-    setBusy(true);
-    setError("");
-    setMessage("");
+    if (!current || pending.current) return;
+    pending.current = true;
     try {
+      if (!await confirmAction(
+        `مقدار ${settingLabels[key]} حذف شود تا مقدار پیش‌فرض محیط اعمال شود؟`,
+        "بازگشت به پیش‌فرض",
+      )) return;
+      if (!mounted.current) return;
+      setBusy(true); setError(""); setMessage("");
       await request(`/admin/settings/${key}`, { method: "DELETE" });
+      if (!mounted.current) return;
       setRevision((x) => x + 1);
+      setValue(""); if (formRef.current) markFormSaved(formRef.current);
       setMessage("مقدار سفارشی حذف شد؛ پیش‌فرض محیط اعمال می‌شود.");
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
   return (
@@ -421,15 +446,25 @@ function Settings() {
           </dl>
           <form
             className="manage-toolbar"
+            ref={formRef}
+            data-draft-editor
+            noValidate
             onSubmit={(event) => void submit(event)}
           >
             <label>
               کلید
               <select
                 value={key}
-                onChange={(event) => {
-                  setKey(event.target.value as SettingKey);
+                data-draft-selector
+                disabled={busy}
+                onChange={async (event) => {
+                  const next = event.target.value as SettingKey;
+                  if (pending.current || !await discardDrafts(formRef.current)) return;
+                  if (!mounted.current) return;
+                  if (formRef.current) markFormSaved(formRef.current);
+                  setKey(next);
                   setValue("");
+                  setError(""); setMessage("");
                 }}
               >
                 {settingKeys.map((item) => (
@@ -443,6 +478,8 @@ function Settings() {
               مقدار جدید
               <input
                 inputMode="numeric"
+                name="value"
+                disabled={busy}
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 placeholder={current?.value || "عدد صحیح"}
@@ -453,6 +490,7 @@ function Settings() {
             </button>
             <button
               type="button"
+              data-draft-keep
               disabled={busy || !current}
               onClick={() => void clear()}
             >
@@ -476,6 +514,12 @@ export function Operations({
   const instanceId = useId();
   const tabId = (item: OperationTab) => `${instanceId}-${item}-tab`;
   const panelId = (item: OperationTab) => `${instanceId}-${item}-panel`;
+  async function selectTab(next: OperationTab) {
+    if (next === tab) return;
+    if (hasUnsavedDrafts() && !await confirmAction("تغییرهای ذخیره‌نشده با رفتن به بخش دیگر کنار گذاشته می‌شوند.", "کنار گذاشتن تغییرها")) return;
+    setTab(next);
+    document.getElementById(tabId(next))?.focus();
+  }
 
   function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: OperationTab) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -499,8 +543,7 @@ export function Operations({
     }
     event.preventDefault();
     const next = operationTabs[nextIndex] ?? current;
-    setTab(next);
-    event.currentTarget.ownerDocument.getElementById(tabId(next))?.focus();
+    void selectTab(next);
   }
 
   return (
@@ -521,7 +564,7 @@ export function Operations({
             aria-controls={panelId(item)}
             tabIndex={tab === item ? 0 : -1}
             onKeyDown={(event) => onTabKeyDown(event, item)}
-            onClick={() => setTab(item)}
+            onClick={() => void selectTab(item)}
           >
             {operationTabLabels[item]}
           </button>

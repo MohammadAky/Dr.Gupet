@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../api/endpoints';
 import { readOtpCooldown, storeOtpCooldown, storeOtpPhone } from '../auth/otp-flow';
@@ -13,10 +13,22 @@ vi.mock('../api/endpoints', () => ({ api: { requestOtp: vi.fn() } }));
 vi.mock('../auth/auth-provider', () => ({ useAuth: () => auth }));
 
 const phone = '09120000000';
+function CurrentLocation() {
+  const location = useLocation();
+  return (
+    <output data-testid="location">
+      {location.pathname}
+      {location.search}
+    </output>
+  );
+}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((accept, fail) => { resolve = accept; reject = fail; });
+  const promise = new Promise<T>((accept, fail) => {
+    resolve = accept;
+    reject = fail;
+  });
   return { promise, resolve, reject };
 }
 
@@ -28,31 +40,45 @@ describe('customer OTP pending operations', () => {
   function button(label: string): HTMLButtonElement {
     return [...container.querySelectorAll('button')].find((item) => item.textContent === label)!;
   }
-  async function flush() { await new Promise((resolve) => setTimeout(resolve, 10)); }
+  async function flush() {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
   async function renderPage() {
     await act(async () => {
-      root.render(<StrictMode><QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={['/verify?next=/profile']}>
-          <Link to="/catalog">ترک صفحه</Link>
-          <Routes>
-            <Route path="/verify" element={<VerifyOtpPage />} />
-            <Route path="/profile" element={<h2>حساب</h2>} />
-            <Route path="/catalog" element={<h2>کاتالوگ</h2>} />
-            <Route path="/login" element={<h2>شماره جدید</h2>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider></StrictMode>);
+      root.render(
+        <StrictMode>
+          <QueryClientProvider client={client}>
+            <MemoryRouter initialEntries={['/verify?next=/profile']}>
+              <CurrentLocation />
+              <Link to="/catalog">ترک صفحه</Link>
+              <Routes>
+                <Route path="/verify" element={<VerifyOtpPage />} />
+                <Route path="/profile" element={<h2>حساب</h2>} />
+                <Route path="/catalog" element={<h2>کاتالوگ</h2>} />
+                <Route path="/login" element={<h2>شماره جدید</h2>} />
+              </Routes>
+            </MemoryRouter>
+          </QueryClientProvider>
+        </StrictMode>,
+      );
       await flush();
     });
   }
-  async function enterCode() {
+  async function enterCode(value = '12345') {
     await act(async () => {
       const input = container.querySelector('input')!;
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '12345');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        input,
+        value,
+      );
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
   }
-  function submit() { container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }
+  function submit() {
+    container
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  }
 
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -61,9 +87,23 @@ describe('customer OTP pending operations', () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     vi.mocked(api.requestOtp).mockResolvedValue({ expiresIn: 120, cooldownSeconds: 1 });
     auth.verifyOtp.mockResolvedValue({ isNewUser: false });
+  });
+
+  it('preserves the intended destination when changing the phone number', async () => {
+    await renderPage();
+    await act(async () => {
+      button('تغییر شماره').click();
+      await flush();
+    });
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe(
+      '/login?next=%2Fprofile&mode=otp',
+    );
+    expect(window.sessionStorage.getItem('drgupet.otpPhone')).toBeNull();
   });
   afterEach(async () => {
     await act(async () => root.unmount());
@@ -92,7 +132,10 @@ describe('customer OTP pending operations', () => {
     expect(container.querySelector('input')!.disabled).toBe(true);
     expect(button('ورود').disabled).toBe(true);
     expect(button('تغییر شماره').disabled).toBe(true);
-    await act(async () => { resend.resolve({ expiresIn: 120, cooldownSeconds: 1 }); await flush(); });
+    await act(async () => {
+      resend.resolve({ expiresIn: 120, cooldownSeconds: 1 });
+      await flush();
+    });
     expect(container.querySelector('input')!.value).toBe('');
     expect(container.querySelector('input')!.disabled).toBe(false);
     expect(readOtpCooldown(phone)).toBe(1);
@@ -115,10 +158,35 @@ describe('customer OTP pending operations', () => {
     expect(api.requestOtp).not.toHaveBeenCalled();
     expect(container.querySelector('input')!.disabled).toBe(true);
     expect(button('ارسال مجدد کد').disabled).toBe(true);
-    await act(async () => { verify.reject(new Error('کد معتبر نیست')); await flush(); });
+    await act(async () => {
+      verify.reject(new Error('کد معتبر نیست'));
+      await flush();
+    });
     expect(container.textContent).toContain('کد معتبر نیست');
     expect(button('ارسال مجدد کد').disabled).toBe(false);
     expect(button('ورود').disabled).toBe(false);
+  });
+
+  it('focuses an invalid code and clears obsolete code errors after editing or requesting a new code', async () => {
+    auth.verifyOtp.mockRejectedValue(new Error('کد قبلی معتبر نیست'));
+    await renderPage();
+    await enterCode('12');
+    await act(async () => submit());
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe('otp'));
+    expect(container.querySelector('#otp')?.getAttribute('aria-invalid')).toBe('true');
+    expect(auth.verifyOtp).not.toHaveBeenCalled();
+    await enterCode();
+    expect(container.querySelector('#otp')?.getAttribute('aria-invalid')).not.toBe('true');
+    await act(async () => { submit(); await flush(); });
+    expect(container.textContent).toContain('کد قبلی معتبر نیست');
+    await enterCode('54321');
+    expect(container.textContent).not.toContain('کد قبلی معتبر نیست');
+    await act(async () => { submit(); await flush(); });
+    expect(container.textContent).toContain('کد قبلی معتبر نیست');
+    await act(async () => { button('ارسال مجدد کد').click(); await flush(); });
+    expect(container.textContent).not.toContain('کد قبلی معتبر نیست');
+    expect(container.querySelector<HTMLInputElement>('#otp')?.value).toBe('');
+    expect(container.querySelector('#otp')?.getAttribute('aria-invalid')).not.toBe('true');
   });
 
   it('retains server cooldown and allows a failed resend to be retried', async () => {
@@ -126,11 +194,19 @@ describe('customer OTP pending operations', () => {
     vi.mocked(api.requestOtp).mockRejectedValueOnce(new Error('پیامک ارسال نشد'));
     await renderPage();
     expect(button('ارسال مجدد کد (1 ثانیه)').disabled).toBe(true);
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1100)); });
-    await act(async () => { button('ارسال مجدد کد').click(); await flush(); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    });
+    await act(async () => {
+      button('ارسال مجدد کد').click();
+      await flush();
+    });
     expect(container.textContent).toContain('پیامک ارسال نشد');
     expect(button('ارسال مجدد کد').disabled).toBe(false);
-    await act(async () => { button('ارسال مجدد کد').click(); await flush(); });
+    await act(async () => {
+      button('ارسال مجدد کد').click();
+      await flush();
+    });
     expect(api.requestOtp).toHaveBeenCalledTimes(2);
     expect(readOtpCooldown(phone)).toBe(1);
     expect(container.textContent).not.toContain('پیامک ارسال نشد');
@@ -140,10 +216,19 @@ describe('customer OTP pending operations', () => {
     const resend = deferred<{ expiresIn: number; cooldownSeconds: number }>();
     vi.mocked(api.requestOtp).mockReturnValue(resend.promise);
     await renderPage();
-    await act(async () => { button('ارسال مجدد کد').click(); await flush(); });
-    await act(async () => { (container.querySelector('a') as HTMLAnchorElement).click(); await flush(); });
+    await act(async () => {
+      button('ارسال مجدد کد').click();
+      await flush();
+    });
+    await act(async () => {
+      (container.querySelector('a') as HTMLAnchorElement).click();
+      await flush();
+    });
     expect(container.textContent).toContain('کاتالوگ');
-    await act(async () => { resend.resolve({ expiresIn: 120, cooldownSeconds: 60 }); await flush(); });
+    await act(async () => {
+      resend.resolve({ expiresIn: 120, cooldownSeconds: 60 });
+      await flush();
+    });
     expect(readOtpCooldown(phone)).toBe(0);
     expect(container.textContent).toContain('کاتالوگ');
   });
@@ -153,10 +238,19 @@ describe('customer OTP pending operations', () => {
     auth.verifyOtp.mockReturnValue(verify.promise);
     await renderPage();
     await enterCode();
-    await act(async () => { submit(); await flush(); });
-    await act(async () => { (container.querySelector('a') as HTMLAnchorElement).click(); await flush(); });
+    await act(async () => {
+      submit();
+      await flush();
+    });
+    await act(async () => {
+      (container.querySelector('a') as HTMLAnchorElement).click();
+      await flush();
+    });
     storeOtpPhone('09121111111');
-    await act(async () => { verify.resolve({ isNewUser: false }); await flush(); });
+    await act(async () => {
+      verify.resolve({ isNewUser: false });
+      await flush();
+    });
     expect(container.textContent).toContain('کاتالوگ');
     expect(container.textContent).not.toContain('حساب');
     expect(window.sessionStorage.getItem('drgupet.otpPhone')).toBe('09121111111');

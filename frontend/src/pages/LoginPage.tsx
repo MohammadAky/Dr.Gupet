@@ -1,6 +1,7 @@
+import { SafeImage } from '../components/SafeImage';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { Field } from '../components/Field';
 import { ErrorState } from '../components/states';
@@ -9,6 +10,7 @@ import { sanitizeInternalRedirect } from '../lib/security';
 import { storeOtpCooldown, storeOtpPhone } from '../auth/otp-flow';
 import { useAuth } from '../auth/auth-provider';
 import { PasswordInput } from '../components/PasswordInput';
+import { focusFirstInvalid } from '../lib/form-validation';
 import {
   normalizeUsername,
   passwordError,
@@ -20,79 +22,109 @@ import {
 export function LoginPage() {
   const [params] = useSearchParams();
   const [mode, setMode] = useState<'password' | 'register' | 'forgot' | 'otp'>(() =>
-    params.get('mode') === 'register' ? 'register' : 'password',
+    params.get('mode') === 'register' ? 'register' : params.get('mode') === 'forgot' ? 'forgot'
+      : params.get('mode') === 'otp' ? 'otp' : 'password',
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   return (
-    <section className="auth-page">
-      <h1>
-        {mode === 'register'
-          ? 'ساخت حساب کاربری'
-          : mode === 'forgot'
-            ? 'بازیابی رمز عبور'
-            : 'ورود به حساب'}
-      </h1>
-      <p>
-        {mode === 'register'
-          ? 'نام کاربری و رمز عبور را با تأیید شمارهٔ موبایل به حساب خود اضافه کنید.'
-          : mode === 'forgot'
-            ? 'نام کاربری و شمارهٔ موبایل همان حساب را وارد کنید.'
-            : 'روش ورود به حساب خود را انتخاب کنید.'}
-      </p>
-      <div className="auth-methods" role="group" aria-label="روش ورود">
-        <button
-          type="button"
-          aria-pressed={mode !== 'otp'}
-          disabled={busy}
-          onClick={() => setMode('password')}
-        >
-          نام کاربری و رمز
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === 'otp'}
-          disabled={busy}
-          onClick={() => setMode('otp')}
-        >
-          کد پیامکی
-        </button>
-      </div>
-      {notice && <p role="status">{notice}</p>}
-      {mode === 'otp' ? (
-        <OtpLogin onBusy={setBusy} />
-      ) : (
-        <PasswordLogin
-          key={mode}
-          register={mode === 'register'}
-          forgot={mode === 'forgot'}
-          onBusy={setBusy}
-          onLogin={() => {
-            setMode('password');
-            setNotice('رمز عبور ذخیره شد. با رمز جدید وارد شوید.');
-          }}
+    <section className="auth-shell">
+      <aside className="auth-story">
+        <Link to="/" className="auth-story__brand">
+          <SafeImage src="/brand/logo.jpg" width={48} height={48} alt="دکتر گوپت" />
+          <span>دکتر گوپت</span>
+        </Link>
+        <div className="auth-story__copy">
+          <h2>
+            مراقبت بهتر،
+            <br />
+            از شناخت بیشتر.
+          </h2>
+          <p>حساب شما، خانهٔ اطلاعات و انتخاب‌های شما و همراه کوچکتان است.</p>
+        </div>
+        <SafeImage
+          className="auth-story__image"
+          src="/brand/companion-cat-960.webp"
+          width={960}
+          height={720}
+          alt=""
+          decoding="async"
         />
-      )}
-      {mode !== 'otp' && (
-        <button
-          className="auth-switch"
-          type="button"
-          disabled={busy}
-          onClick={() => setMode(mode === 'register' ? 'password' : 'register')}
-        >
-          {mode === 'password' ? 'حساب ندارید؟ ثبت‌نام' : 'بازگشت به ورود'}
-        </button>
-      )}
-      {mode === 'password' && (
-        <button
-          type="button"
-          className="auth-switch"
-          disabled={busy}
-          onClick={() => setMode('forgot')}
-        >
-          رمز عبور را فراموش کرده‌اید؟
-        </button>
-      )}
+      </aside>
+      <div className="auth-page">
+        <h1>
+          {mode === 'register'
+            ? 'ساخت حساب کاربری'
+            : mode === 'forgot'
+              ? 'بازیابی رمز عبور'
+              : 'ورود به حساب'}
+        </h1>
+        <p>
+          {mode === 'register'
+            ? 'نام کاربری و رمز عبور را با تأیید شمارهٔ موبایل به حساب خود اضافه کنید.'
+            : mode === 'forgot'
+              ? 'نام کاربری و شمارهٔ موبایل همان حساب را وارد کنید.'
+              : 'روش ورود به حساب خود را انتخاب کنید.'}
+        </p>
+        <div className="auth-methods" role="group" aria-label="روش ورود">
+          <button
+            type="button"
+            aria-pressed={mode !== 'otp'}
+            disabled={busy}
+            onClick={() => setMode('password')}
+          >
+            نام کاربری و رمز
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'otp'}
+            disabled={busy}
+            onClick={() => setMode('otp')}
+          >
+            کد پیامکی
+          </button>
+        </div>
+        {notice && <p role="status">{notice}</p>}
+        {mode === 'otp' ? (
+          <OtpLogin onBusy={setBusy} />
+        ) : (
+          <PasswordLogin
+            key={mode}
+            register={mode === 'register'}
+            forgot={mode === 'forgot'}
+            onBusy={setBusy}
+            onLogin={() => {
+              setMode('password');
+              setNotice('رمز عبور ذخیره شد. با رمز جدید وارد شوید.');
+            }}
+          />
+        )}
+        {mode !== 'otp' && (
+          <button
+            className="auth-switch"
+            type="button"
+            disabled={busy}
+            onClick={() => setMode(mode === 'password' ? 'register' : 'password')}
+          >
+            {mode === 'password' ? 'حساب ندارید؟ ثبت‌نام' : 'بازگشت به ورود'}
+          </button>
+        )}
+        {mode === 'password' && (
+          <button
+            type="button"
+            className="auth-switch"
+            disabled={busy}
+            onClick={() => setMode('forgot')}
+          >
+            رمز عبور را فراموش کرده‌اید؟
+          </button>
+        )}
+        <p className="auth-back">
+          <Link to="/">
+            بازگشت به سایت <span aria-hidden="true">←</span>
+          </Link>
+        </p>
+      </div>
     </section>
   );
 }
@@ -124,6 +156,7 @@ function PasswordLogin({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
+  const submitted = useRef(false);
   const mounted = useRef(true);
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -145,6 +178,29 @@ function PasswordLogin({
   }, [cooldownUntil]);
   const remaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
 
+  const values = { username, phone, password, confirm, code, firstName, lastName };
+  function validate(input: typeof values) {
+    return {
+      username: usernameError(input.username),
+      phone: register || forgot ? phoneSchema.safeParse(input.phone).error?.issues[0]?.message : undefined,
+      password: register || (forgot && codeStep)
+        ? passwordError(input.password)
+        : !forgot && !input.password ? 'رمز عبور را وارد کنید.' : undefined,
+      confirm: (register || (forgot && codeStep)) && input.password !== input.confirm
+        ? 'تکرار رمز عبور یکسان نیست.' : undefined,
+      code: codeStep ? otpCodeSchema.safeParse(input.code).error?.issues[0]?.message : undefined,
+      firstName: input.firstName.trim().length > 50 ? 'نام حداکثر ۵۰ نویسه باشد.' : undefined,
+      lastName: input.lastName.trim().length > 50 ? 'نام خانوادگی حداکثر ۵۰ نویسه باشد.' : undefined,
+    };
+  }
+  function update(key: keyof typeof values, value: string) {
+    const setters = { username: setUsername, phone: setPhone, password: setPassword, confirm: setConfirm,
+      code: setCode, firstName: setFirstName, lastName: setLastName };
+    setters[key](value);
+    setError('');
+    if (submitted.current) setErrors(validate({ ...values, [key]: value }));
+  }
+
   async function sendCode() {
     const normalizedPhone = phoneSchema.parse(phone);
     const result = forgot
@@ -163,39 +219,29 @@ function PasswordLogin({
     setCooldownUntil(timestamp + seconds * 1000);
     setCodeStep(true);
     setCode('');
+    setErrors({});
+    submitted.current = false;
     setPhone(normalizedPhone);
     setNotice(
       forgot
         ? 'اگر اطلاعات با حساب مطابقت داشته باشد، کد تأیید ارسال می‌شود.'
         : 'کد تأیید ارسال شد؛ آخرین کد را وارد کنید.',
     );
+    requestAnimationFrame(() => {
+      if (mounted.current) document.getElementById(forgot ? 'password' : 'password-otp')?.focus();
+    });
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (pending.current) return;
-    const problems = {
-      username: usernameError(username),
-      phone:
-        register || forgot ? phoneSchema.safeParse(phone).error?.issues[0]?.message : undefined,
-      password:
-        register || (forgot && codeStep)
-          ? passwordError(password)
-          : !forgot && !password
-            ? 'رمز عبور را وارد کنید.'
-            : undefined,
-      confirm:
-        (register || (forgot && codeStep)) && password !== confirm
-          ? 'تکرار رمز عبور یکسان نیست.'
-          : undefined,
-      code: codeStep ? otpCodeSchema.safeParse(code).error?.issues[0]?.message : undefined,
-      name:
-        firstName.trim().length > 50 || lastName.trim().length > 50
-          ? 'نام و نام خانوادگی هرکدام حداکثر ۵۰ نویسه باشند.'
-          : undefined,
-    };
+    submitted.current = true;
+    const problems = validate(values);
     setErrors(problems);
-    if (Object.values(problems).some(Boolean)) return;
+    if (Object.values(problems).some(Boolean)) {
+      focusFirstInvalid(event.currentTarget as HTMLFormElement);
+      return;
+    }
     if (!codeStep && (register || forgot) && remaining > 0) return;
     pending.current = true;
     setBusy(true);
@@ -274,18 +320,24 @@ function PasswordLogin({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} noValidate>
-      <Field label="نام کاربری" htmlFor="username" error={errors.username} hint={usernameHint}>
+    <form onSubmit={(event) => void submit(event)} noValidate aria-busy={busy}>
+      <Field
+        label="نام کاربری"
+        htmlFor="username"
+        error={errors.username}
+        hint={register ? usernameHint : undefined}
+      >
         <input
           id="username"
           name="username"
+          required
           dir="ltr"
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
           value={username}
           disabled={busy || codeStep}
-          onChange={(event) => setUsername(event.target.value)}
+          onChange={(event) => update('username', event.target.value)}
         />
       </Field>
       {(register || forgot) && (
@@ -293,36 +345,37 @@ function PasswordLogin({
           <input
             id="password-phone"
             name="phone"
+            required
             type="tel"
             inputMode="tel"
             autoComplete="tel"
             dir="ltr"
             value={phone}
             disabled={busy || codeStep}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={(event) => update('phone', event.target.value)}
           />
         </Field>
       )}
       {register && (
         <>
-          <Field label="نام (اختیاری)" htmlFor="signup-firstName" error={errors.name}>
+          <Field label="نام (اختیاری)" htmlFor="signup-firstName" error={errors.firstName}>
             <input
               id="signup-firstName"
               autoComplete="given-name"
               maxLength={50}
               disabled={busy}
               value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
+              onChange={(event) => update('firstName', event.target.value)}
             />
           </Field>
-          <Field label="نام خانوادگی (اختیاری)" htmlFor="signup-lastName">
+          <Field label="نام خانوادگی (اختیاری)" htmlFor="signup-lastName" error={errors.lastName}>
             <input
               id="signup-lastName"
               autoComplete="family-name"
               maxLength={50}
               disabled={busy}
               value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
+              onChange={(event) => update('lastName', event.target.value)}
             />
           </Field>
         </>
@@ -336,8 +389,9 @@ function PasswordLogin({
         >
           <PasswordInput
             id="password"
+            required
             value={password}
-            onChange={setPassword}
+            onChange={(value) => update('password', value)}
             disabled={busy}
             autoComplete={register || forgot ? 'new-password' : 'current-password'}
           />
@@ -347,8 +401,9 @@ function PasswordLogin({
         <Field label="تکرار رمز عبور" htmlFor="password-confirm" error={errors.confirm}>
           <PasswordInput
             id="password-confirm"
+            required
             value={confirm}
-            onChange={setConfirm}
+            onChange={(value) => update('confirm', value)}
             disabled={busy}
             autoComplete="new-password"
           />
@@ -359,13 +414,14 @@ function PasswordLogin({
           <input
             id="password-otp"
             name="code"
+            required
             dir="ltr"
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={6}
             value={code}
             disabled={busy}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => update('code', event.target.value)}
           />
         </Field>
       )}
@@ -399,6 +455,11 @@ function PasswordLogin({
               setCode('');
               setNotice('');
               setError('');
+              setErrors({});
+              submitted.current = false;
+              requestAnimationFrame(() => {
+                if (mounted.current) document.getElementById('username')?.focus();
+              });
             }}
           >
             ویرایش اطلاعات
@@ -424,6 +485,7 @@ function OtpLogin({ onBusy }: { onBusy(value: boolean): void }) {
   const navigate = useNavigate();
   const next = sanitizeInternalRedirect(params.get('next'));
   const pending = useRef(false);
+  const submitted = useRef(false);
   const mounted = useRef(true);
 
   useLayoutEffect(() => {
@@ -451,9 +513,11 @@ function OtpLogin({ onBusy }: { onBusy(value: boolean): void }) {
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (pending.current) return;
+    submitted.current = true;
     const parsed = phoneSchema.safeParse(phone);
     if (!parsed.success) {
       setFieldError(parsed.error.issues[0]?.message);
+      focusFirstInvalid(event.currentTarget as HTMLFormElement);
       return;
     }
     setFieldError(undefined);
@@ -466,18 +530,24 @@ function OtpLogin({ onBusy }: { onBusy(value: boolean): void }) {
     <div>
       <p>کد یک‌بارمصرف به شمارهٔ شما پیامک می‌شود (نیازی به رمز عبور نیست).</p>
 
-      <form onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleSubmit} noValidate aria-busy={requestOtp.isPending}>
         <Field label="شماره موبایل" htmlFor="phone" error={fieldError}>
           <input
             id="phone"
             name="phone"
+            required
             type="tel"
             inputMode="tel"
             autoComplete="tel"
             dir="ltr"
             value={phone}
             disabled={requestOtp.isPending}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setPhone(value);
+              requestOtp.reset();
+              if (submitted.current) setFieldError(phoneSchema.safeParse(value).error?.issues[0]?.message);
+            }}
           />
         </Field>
 

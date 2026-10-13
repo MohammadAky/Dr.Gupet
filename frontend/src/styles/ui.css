@@ -14,8 +14,8 @@
     border-color 0.18s ease,
     transform 0.18s ease;
 }
-.ui-button:hover:not(:disabled) {
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .ui-button:hover:not(:disabled) { transform: translateY(-1px); }
 }
 .ui-button--sm {
   min-height: 44px;
@@ -27,7 +27,7 @@
   color: #fff;
 }
 .ui-button--primary:hover:not(:disabled) {
-  background: var(--forest-soft);
+  background: var(--forest-deep);
 }
 .ui-button--secondary {
   background: #fff;
@@ -45,7 +45,7 @@
   background: var(--sand);
 }
 .ui-button--danger {
-  background: var(--danger);
+  background: #a62424;
   color: #fff;
 }
 .ui-button--danger:hover:not(:disabled) {
@@ -70,7 +70,7 @@
   min-width: 0;
 }
 .ui-field > label {
-  font-weight: 650;
+  font-weight: 600;
   color: var(--forest);
   font-size: 0.9rem;
 }
@@ -134,7 +134,7 @@ textarea.ui-control {
   border-radius: 999px;
   padding: 0.2rem 0.65rem;
   font-size: 0.76rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.4;
 }
 .ui-badge--neutral {
@@ -262,7 +262,7 @@ textarea.ui-control {
   border: 0;
   border-bottom: 3px solid transparent;
   color: var(--forest-soft);
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 .ui-tabs [role='tab'][aria-selected='true'] {
@@ -293,10 +293,10 @@ textarea.ui-control {
   box-shadow: var(--shadow-card);
 }
 .ui-toast--error {
-  background: var(--danger);
+  background: #a62424;
 }
 .ui-toast--info {
-  background: var(--forest-soft);
+  background: var(--forest-deep);
 }
 .ui-toast button {
   border: 0;
@@ -564,6 +564,15 @@ textarea.ui-control {
 .ui-dialog__panel {
   border-radius: 28px;
 }
+@media (prefers-reduced-motion: no-preference) {
+  .ui-dialog__panel[data-motion='enter'] {
+    animation: dialog-enter var(--motion-overlay) var(--ease-out);
+  }
+}
+@keyframes dialog-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
 :root[data-theme='dark'] .ui-card,
 :root[data-theme='dark'] .ui-state,
 :root[data-theme='dark'] .ui-dialog__panel,
@@ -579,6 +588,7 @@ textarea.ui-control {
 }
 :root[data-theme='dark'] .ui-card h3,
 :root[data-theme='dark'] .ui-state h3,
+:root[data-theme='dark'] .ui-dialog__head h2,
 :root[data-theme='dark'] .ui-field > label {
   color: var(--ink);
 }
@@ -625,4 +635,8 @@ textarea.ui-control {
   to {
     opacity: 1;
   }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ui-dialog__backdrop { background: #0c1e0c; }
 }

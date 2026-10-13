@@ -82,14 +82,16 @@ describe('address book mutations', () => {
   });
 
   it('honors delete cancellation then shows success after the server refresh', async () => {
-    vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true);
     vi.mocked(api.listAddresses).mockResolvedValueOnce([first, second]).mockResolvedValueOnce([first]);
     vi.mocked(api.deleteAddress).mockResolvedValue(undefined);
     await renderPage();
     const deleteSecond = [...container.querySelectorAll<HTMLButtonElement>('li[data-default="false"] button')].find((button) => button.textContent === 'حذف')!;
     await act(async () => deleteSecond.click());
     expect(api.deleteAddress).not.toHaveBeenCalled();
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === 'انصراف')!.click());
+    expect(api.deleteAddress).not.toHaveBeenCalled();
     await act(async () => deleteSecond.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === 'حذف آدرس')!.click());
     expect(api.deleteAddress).toHaveBeenCalledWith(11);
     await vi.waitFor(() => expect(container.querySelector('[role="status"]')?.textContent).toBe('آدرس حذف شد.'));
     expect(api.listAddresses).toHaveBeenCalledTimes(2);
@@ -102,6 +104,7 @@ describe('address book mutations', () => {
     await renderPage();
     const deleteSecond = [...container.querySelectorAll<HTMLButtonElement>('li[data-default="false"] button')].find((button) => button.textContent === 'حذف')!;
     await act(async () => deleteSecond.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === 'حذف آدرس')!.click());
     const invalidate = vi.spyOn(client, 'invalidateQueries');
     authState.userId = 2;
     await renderPage();

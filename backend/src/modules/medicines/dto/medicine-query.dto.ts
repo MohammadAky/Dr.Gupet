@@ -5,6 +5,12 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { strictBoolean } from '../../clinics/dto/clinic-query.dto';
 
 export class MedicineQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ description: 'Presentation records only', enum: ['true', 'false'] })
+  @IsOptional()
+  @Transform(strictBoolean)
+  @IsBoolean()
+  sampleOnly?: boolean;
+
   @ApiPropertyOptional({ description: 'Search by name or active ingredient', maxLength: 100 })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))

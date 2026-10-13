@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { canonicalSpeciesSlug } from '../../common/utils/species.util';
 import {
   PUPPY_KITTEN_MAX_MONTHS,
   SENIOR_MIN_MONTHS,
@@ -19,7 +20,7 @@ export class ProductsRecommendationService {
     const pet = await this.prisma.pet.findUnique({
       where: { id: petId, deletedAt: null },
       include: {
-        petType: { select: { slug: true } },
+        petType: { select: { slug: true, name: true } },
         tags: {
           include: {
             tag: { select: { id: true, type: true, slug: true } },
@@ -33,10 +34,10 @@ export class ProductsRecommendationService {
     }
 
     // Compute life stage
-    const lifeStage = this.computeLifeStage(pet.birthDate);
+    const lifeStage = this.computeLifeStage(pet.birthDate, pet.petType);
 
     // Compute size class (dogs only)
-    const sizeClass = this.computeSizeClass(pet.petType.slug, pet.weightKg);
+    const sizeClass = this.computeSizeClass(pet.petType.slug, pet.weightKg, pet.petType.name);
 
     // Get pet's allergen tag IDs
     const allergenTagIds = pet.tags
@@ -70,7 +71,8 @@ export class ProductsRecommendationService {
     }
 
     // Neuter suitability filter
-    if (pet.isNeutered) {
+    const species = canonicalSpeciesSlug(pet.petType.slug, pet.petType.name);
+    if (pet.isNeutered && (species === 'dog' || species === 'cat')) {
       where.neuterSuitability = { in: ['ANY', 'NEUTERED_ONLY'] };
     }
 
@@ -158,7 +160,12 @@ export class ProductsRecommendationService {
   /**
    * Compute life stage from birth date
    */
-  private computeLifeStage(birthDate: Date | null): string | null {
+  private computeLifeStage(
+    birthDate: Date | null,
+    petType: { slug: string; name: string },
+  ): string | null {
+    const species = canonicalSpeciesSlug(petType.slug, petType.name);
+    if (species !== 'dog' && species !== 'cat') return null;
     if (!birthDate) return null;
 
     const now = new Date();
@@ -174,8 +181,12 @@ export class ProductsRecommendationService {
   /**
    * Compute size class (dogs only)
    */
-  private computeSizeClass(petTypeSlug: string, weightKg: any): string | null {
-    if (petTypeSlug !== 'dog' || !weightKg) return null;
+  private computeSizeClass(
+    petTypeSlug: string,
+    weightKg: any,
+    petTypeName?: string,
+  ): string | null {
+    if (canonicalSpeciesSlug(petTypeSlug, petTypeName) !== 'dog' || !weightKg) return null;
 
     const weight = Number(weightKg);
 

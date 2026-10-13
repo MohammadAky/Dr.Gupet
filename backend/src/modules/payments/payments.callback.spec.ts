@@ -52,12 +52,14 @@ function makePrisma(overrides: Record<string, unknown> = {}) {
   return prisma;
 }
 
-function makeService(opts: {
-  driver?: string;
-  nodeEnv?: string;
-  prisma?: any;
-  config?: Record<string, string | undefined>;
-} = {}) {
+function makeService(
+  opts: {
+    driver?: string;
+    nodeEnv?: string;
+    prisma?: any;
+    config?: Record<string, string | undefined>;
+  } = {},
+) {
   const prevEnv = process.env.NODE_ENV;
   if (opts.nodeEnv) process.env.NODE_ENV = opts.nodeEnv;
   try {
@@ -123,9 +125,7 @@ describe('PaymentsService.startPayment (issue #01)', () => {
 describe('PaymentsService.handleCallback (issues #01, #02)', () => {
   it('rejects a callback without a valid signature', async () => {
     const { service } = makeService();
-    await expect(service.handleCallback(3, { statusRaw: 'OK' })).rejects.toThrow(
-      'پرداخت یافت نشد',
-    );
+    await expect(service.handleCallback(3, { statusRaw: 'OK' })).rejects.toThrow('پرداخت یافت نشد');
     await expect(service.handleCallback(3, { statusRaw: 'OK', sig: 'bad' })).rejects.toThrow(
       'پرداخت یافت نشد',
     );
@@ -173,7 +173,10 @@ describe('PaymentsService.handleCallback (issues #01, #02)', () => {
       order: { ...ORDER, status: 'PAID' },
     });
     const { service } = makeService({ prisma });
-    const result = await service.handleCallback(3, { statusRaw: 'OK', sig: validSig(service, 3, 7) });
+    const result = await service.handleCallback(3, {
+      statusRaw: 'OK',
+      sig: validSig(service, 3, 7),
+    });
     expect(result.success).toBe(true);
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
   });
@@ -184,7 +187,10 @@ describe('PaymentsService.handleCallback (issues #01, #02)', () => {
     prisma.order.updateMany = jest.fn().mockResolvedValue({ count: 0 });
     const { service } = makeService({ prisma });
 
-    const result = await service.handleCallback(3, { statusRaw: 'OK', sig: validSig(service, 3, 7) });
+    const result = await service.handleCallback(3, {
+      statusRaw: 'OK',
+      sig: validSig(service, 3, 7),
+    });
     expect(result).toMatchObject({ success: true, needsReview: true });
     expect(prisma.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -198,7 +204,10 @@ describe('PaymentsService.handleCallback (issues #01, #02)', () => {
     const prisma = makePrisma();
     prisma.payment.updateMany = jest.fn().mockResolvedValue({ count: 0 }); // lost the race
     const { service } = makeService({ prisma });
-    const result = await service.handleCallback(3, { statusRaw: 'OK', sig: validSig(service, 3, 7) });
+    const result = await service.handleCallback(3, {
+      statusRaw: 'OK',
+      sig: validSig(service, 3, 7),
+    });
     expect(result).toMatchObject({ success: true, needsReview: false });
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
   });
@@ -254,7 +263,10 @@ describe('ZarinpalPaymentGateway (issue #05)', () => {
     const body = JSON.parse((init as any).body);
     expect(body.Amount).toBe(1200000); // ×10
     expect(body.MerchantID).toBe('M-1');
-    expect(res).toEqual({ gatewayRef: 'A0001', paymentUrl: 'https://www.zarinpal.com/pg/StartPay/A0001' });
+    expect(res).toEqual({
+      gatewayRef: 'A0001',
+      paymentUrl: 'https://www.zarinpal.com/pg/StartPay/A0001',
+    });
   });
 
   it('honours the sandbox base URLs', async () => {
@@ -280,7 +292,13 @@ describe('ZarinpalPaymentGateway (issue #05)', () => {
       [102, false],
       [-51, false],
     ] as const) {
-      const gw = new ZarinpalPaymentGateway('M-1', true, undefined, undefined, fakeFetch({ Status: status }));
+      const gw = new ZarinpalPaymentGateway(
+        'M-1',
+        true,
+        undefined,
+        undefined,
+        fakeFetch({ Status: status }),
+      );
       const res = await gw.verify('A1', 500);
       expect(res.success).toBe(success);
     }
@@ -295,7 +313,14 @@ describe('ZarinpalPaymentGateway (issue #05)', () => {
       fakeFetch({ Status: -9 }),
     );
     await expect(
-      gw.request({ amount: 1, orderId: 1, paymentId: 1, callbackSig: 's', description: 'd', callbackUrl: 'cb' }),
+      gw.request({
+        amount: 1,
+        orderId: 1,
+        paymentId: 1,
+        callbackSig: 's',
+        description: 'd',
+        callbackUrl: 'cb',
+      }),
     ).rejects.toThrow(/Status=-9/);
   });
 });

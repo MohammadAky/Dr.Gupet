@@ -41,9 +41,7 @@ describe('FavoritesService add/remove', () => {
     const pick = (v: unknown, d: unknown) => (v === undefined ? d : v);
     return {
       product: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue(pick(opts.product, { id: 3, isActive: true })),
+        findUnique: jest.fn().mockResolvedValue(pick(opts.product, { id: 3, isActive: true })),
       },
       favorite: {
         findUnique: jest.fn().mockResolvedValue(pick(opts.favorite, null)),

@@ -6,11 +6,11 @@ import { DEFAULT_PAGE_LIMIT } from '../../lib/constants';
  * unit-tested and reused by deep links, the back button and shareable URLs.
  */
 export function parseProductFilters(params: URLSearchParams): ProductFilters {
-  const num = (key: string): number | undefined => {
+  const num = (key: string, minimum = 1): number | undefined => {
     const raw = params.get(key);
     if (!raw) return undefined;
     const value = Number(raw);
-    return Number.isFinite(value) && value > 0 ? value : undefined;
+    return Number.isSafeInteger(value) && value >= minimum ? value : undefined;
   };
 
   const sort = params.get('sort');
@@ -24,8 +24,8 @@ export function parseProductFilters(params: URLSearchParams): ProductFilters {
     lifeStage: params.get('lifeStage') ?? undefined,
     sizeClass: params.get('sizeClass') ?? undefined,
     tagIds: params.get('tagIds') ?? undefined,
-    minPrice: num('minPrice'),
-    maxPrice: num('maxPrice'),
+    minPrice: num('minPrice', 0),
+    maxPrice: num('maxPrice', 0),
     sort: sort === 'price_asc' || sort === 'price_desc' || sort === 'newest' ? sort : undefined,
   };
 

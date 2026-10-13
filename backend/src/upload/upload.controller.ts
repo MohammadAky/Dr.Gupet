@@ -25,10 +25,7 @@ export class UploadController {
   @ApiResponse({ status: 429, description: 'Rate limited' })
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadImage(
-    @UploadedFile() file: Express.Multer.File,
-    @CurrentUser('sub') userId: number,
-  ) {
+  async uploadImage(@UploadedFile() file: Express.Multer.File, @CurrentUser('sub') userId: number) {
     if (!file) {
       throw new BadRequestException('فایل ارسال نشده است');
     }

@@ -10,13 +10,17 @@ import { formatToman, formatWeight } from '../lib/format';
 import { errorText } from '../lib/labels';
 import { safeImageUrl } from '../lib/image-url';
 import { API_BASE_URL } from '../lib/env';
+import { SafeImage } from '../components/SafeImage';
+import { Dialog } from '../components/ui/interactive';
+import { isSampleProduct } from '../lib/sample-records';
+import { SampleRecordNotice } from '../components/SampleRecordNotice';
 
 /** Product detail: variant selection, add-to-cart and favorite toggle (F5/F7/F8 behaviour). */
 export function ProductDetailPage() {
   const { slug = '' } = useParams();
   const { status, user } = useAuth();
   const isAuthenticated = status === 'authed';
-  const identity = isAuthenticated ? user?.id ?? null : null;
+  const identity = isAuthenticated ? (user?.id ?? null) : null;
   const queryClient = useQueryClient();
 
   const product = useQuery({
@@ -26,22 +30,33 @@ export function ProductDetailPage() {
   });
 
   const favorites = useQuery({
-    queryKey: queryKeys.favorites(1),
+    queryKey: ['favorites', 'membership', product.data?.id],
     queryFn: async ({ signal }) => {
       const generation = generationRef.current;
-      const result = await shopApi.favorites(1, 50);
-      if (signal.aborted || !mountedRef.current || identityRef.current !== identity ||
-        generationRef.current !== generation) throw new DOMException('Inactive session', 'AbortError');
-      return result;
+      for (let page = 1; ; page += 1) {
+        const result = await shopApi.favorites(page, 50);
+        if (
+          signal.aborted ||
+          !mountedRef.current ||
+          identityRef.current !== identity ||
+          generationRef.current !== generation
+        )
+          throw new DOMException('Inactive session', 'AbortError');
+        if (result.data.some((card) => card.id === product.data?.id)) return true;
+        if (!result.meta || page >= result.meta.totalPages) return false;
+      }
     },
-    enabled: identity !== null,
+    enabled: identity !== null && product.data !== undefined,
   });
 
   const [variantId, setVariantId] = useState<number | null>(null);
   const [quantityInput, setQuantityInput] = useState('1');
   const [message, setMessage] = useState<string | null>(null);
+  const [messageKind, setMessageKind] = useState<'success' | 'error'>('success');
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [addPending, setAddPending] = useState(false);
   const [favoritePending, setFavoritePending] = useState(false);
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const mountedRef = useRef(true);
   const identityRef = useRef(identity);
   const slugRef = useRef(slug);
@@ -65,6 +80,10 @@ export function ProductDetailPage() {
     setAddPending(false);
     setFavoritePending(false);
     setMessage(null);
+    setSelectedImageId(null);
+    setGalleryOpen(false);
+    setVariantId(null);
+    setQuantityInput('1');
   }, [identity, slug]);
 
   useLayoutEffect(() => {
@@ -78,6 +97,7 @@ export function ProductDetailPage() {
   const activeVariant = useMemo(
     () =>
       product.data?.variants.find((variant) => variant.id === variantId) ??
+      product.data?.variants.find((variant) => variant.inStock) ??
       product.data?.variants[0] ??
       null,
     [product.data, variantId],
@@ -88,9 +108,7 @@ export function ProductDetailPage() {
       shopApi.addCartItem(variantId, count),
   });
 
-  const isFavorite =
-    product.data !== undefined &&
-    (favorites.data?.data.some((card) => card.id === product.data.id) ?? false);
+  const isFavorite = favorites.data === true;
 
   const toggleFavorite = useMutation({
     mutationFn: ({ productId, remove }: { productId: number; remove: boolean }) =>
@@ -98,28 +116,44 @@ export function ProductDetailPage() {
   });
 
   function responseIsCurrent(requestIdentity: number, requestSlug: string, generation: number) {
-    return mountedRef.current && identityRef.current === requestIdentity &&
-      slugRef.current === requestSlug && generationRef.current === generation;
+    return (
+      mountedRef.current &&
+      identityRef.current === requestIdentity &&
+      slugRef.current === requestSlug &&
+      generationRef.current === generation
+    );
   }
 
   function submitAddToCart(event: FormEvent) {
     event.preventDefault();
-    if (!mountedRef.current || addInFlightRef.current || identityRef.current === null || !activeVariant?.inStock ||
-      !validQuantity) return;
+    if (
+      !mountedRef.current ||
+      addInFlightRef.current ||
+      identityRef.current === null ||
+      (product.data && isSampleProduct(product.data)) ||
+      !activeVariant?.inStock ||
+      !validQuantity
+    )
+      return;
     const requestIdentity = identityRef.current;
     const requestSlug = slugRef.current;
     const generation = generationRef.current;
     addInFlightRef.current = true;
     setAddPending(true);
     setMessage(null);
-    void addToCart.mutateAsync({ variantId: activeVariant.id, count: quantity })
+    void addToCart
+      .mutateAsync({ variantId: activeVariant.id, count: quantity })
       .then(() => {
         if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
+        setMessageKind('success');
         setMessage('به سبد خرید اضافه شد.');
         void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       })
       .catch((error: unknown) => {
-        if (responseIsCurrent(requestIdentity, requestSlug, generation)) setMessage(errorText(error));
+        if (responseIsCurrent(requestIdentity, requestSlug, generation)) {
+          setMessageKind('error');
+          setMessage(errorText(error));
+        }
       })
       .finally(() => {
         if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
@@ -129,20 +163,37 @@ export function ProductDetailPage() {
   }
 
   function submitFavorite() {
-    if (!mountedRef.current || favoriteInFlightRef.current || identityRef.current === null || !product.data) return;
+    if (
+      !mountedRef.current ||
+      favoriteInFlightRef.current ||
+      identityRef.current === null ||
+      !product.data ||
+      !favorites.isSuccess ||
+      favorites.isFetching
+    )
+      return;
     const requestIdentity = identityRef.current;
     const requestSlug = slugRef.current;
     const generation = generationRef.current;
     favoriteInFlightRef.current = true;
     setFavoritePending(true);
     setMessage(null);
-    void toggleFavorite.mutateAsync({ productId: product.data.id, remove: isFavorite })
+    void toggleFavorite
+      .mutateAsync({ productId: product.data.id, remove: isFavorite })
       .then(() => {
-        if (responseIsCurrent(requestIdentity, requestSlug, generation))
+        if (responseIsCurrent(requestIdentity, requestSlug, generation)) {
+          setMessageKind('success');
+          setMessage(
+            isFavorite ? 'محصول از علاقه‌مندی‌ها حذف شد.' : 'محصول در علاقه‌مندی‌ها ذخیره شد.',
+          );
           void queryClient.invalidateQueries({ queryKey: ['favorites'] });
+        }
       })
       .catch((error: unknown) => {
-        if (responseIsCurrent(requestIdentity, requestSlug, generation)) setMessage(errorText(error));
+        if (responseIsCurrent(requestIdentity, requestSlug, generation)) {
+          setMessageKind('error');
+          setMessage(errorText(error));
+        }
       })
       .finally(() => {
         if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
@@ -151,14 +202,34 @@ export function ProductDetailPage() {
       });
   }
 
-  if (product.isLoading) return <LoadingState />;
-  if (product.error)
-    return <ErrorState error={product.error} onRetry={() => void product.refetch()} />;
-  if (!product.data) return <ErrorState error="محصول یافت نشد" />;
+  if (product.isLoading || product.error || !product.data)
+    return (
+      <section className="product-detail">
+        <nav aria-label="مسیر">
+          <Link to="/products">بازگشت به محصولات</Link>
+        </nav>
+        <h1>{product.data?.name ?? 'اطلاعات محصول'}</h1>
+        {product.isLoading ? (
+          <LoadingState />
+        ) : (
+          <ErrorState
+            error={product.error ?? 'محصول یافت نشد'}
+            onRetry={() => void product.refetch()}
+          />
+        )}
+      </section>
+    );
 
   const detail = product.data;
-  const leadImage = [...detail.images].sort((a, b) => a.sortOrder - b.sortOrder)[0];
-  const imageUrl = safeImageUrl(leadImage?.url, window.location.origin, API_BASE_URL);
+  const images = [...detail.images]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((image) => ({
+      ...image,
+      safeUrl: safeImageUrl(image.url, window.location.origin, API_BASE_URL),
+    }))
+    .filter((image) => image.safeUrl);
+  const selectedImage = images.find((image) => image.id === selectedImageId) ?? images[0];
+  const imageUrl = selectedImage?.safeUrl;
 
   return (
     <article className="product-detail">
@@ -166,11 +237,43 @@ export function ProductDetailPage() {
         <Link to="/">خانه</Link> / <Link to="/products">محصولات</Link> / {detail.name}
       </nav>
       <div className="product-detail__main">
-        <div className="product-detail__media">
-          {imageUrl ? (
-            <img src={imageUrl} alt={detail.name} referrerPolicy="no-referrer" />
-          ) : (
-            <span className="product-detail__placeholder" aria-hidden="true" />
+        <div className="product-detail__gallery">
+          <div className="product-detail__media">
+            {imageUrl ? (
+              <button
+                className="commerce-gallery-open"
+                type="button"
+                onClick={() => setGalleryOpen(true)}
+                aria-label={`نمایش بزرگ‌تر تصویر ${detail.name}`}
+              >
+                <SafeImage src={imageUrl} alt={detail.name} referrerPolicy="no-referrer" />
+                <span>نمایش بزرگ‌تر</span>
+              </button>
+            ) : (
+              <span className="product-detail__placeholder" aria-hidden="true" />
+            )}
+          </div>
+          {images.length > 1 && (
+            <div className="product-detail__thumbnails" role="group" aria-label="تصاویر محصول">
+              {images.map((image, index) => (
+                <button
+                  key={image.id}
+                  type="button"
+                  aria-label={`تصویر ${index + 1} از ${detail.name}`}
+                  aria-pressed={selectedImage?.id === image.id}
+                  onClick={() => setSelectedImageId(image.id)}
+                >
+                  <SafeImage
+                    src={image.safeUrl!}
+                    alt=""
+                    width="72"
+                    height="72"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </button>
+              ))}
+            </div>
           )}
         </div>
         <div className="product-detail__info">
@@ -178,11 +281,21 @@ export function ProductDetailPage() {
             {detail.brand.name} / {detail.category.name}
           </p>
           <h1>{detail.name}</h1>
+          {isSampleProduct(detail) && <SampleRecordNotice kind="product" />}
           <p>
             {detail.petType.name} · {detail.brand.name} · {detail.category.name}
           </p>
           <form onSubmit={submitAddToCart}>
-            <fieldset>
+            {activeVariant && (
+              <div className="commerce-product-price">
+                <strong>{formatToman(activeVariant.price)}</strong>
+                {activeVariant.compareAtPrice &&
+                activeVariant.compareAtPrice > activeVariant.price ? (
+                  <del aria-label="قیمت پیشین">{formatToman(activeVariant.compareAtPrice)}</del>
+                ) : null}
+              </div>
+            )}
+            <fieldset className="commerce-variants">
               <legend>وزن</legend>
               {detail.variants.map((variant) => (
                 <label key={variant.id}>
@@ -193,10 +306,13 @@ export function ProductDetailPage() {
                     checked={activeVariant?.id === variant.id}
                     onChange={() => setVariantId(variant.id)}
                   />
-                  {formatWeight(variant.weightGram)} — {formatToman(variant.price)}{' '}
-                  {variant.inStock ? '(موجود)' : '(ناموجود)'}
-                  {variant.compareAtPrice ? ` [تا ${formatToman(variant.compareAtPrice)}]` : ''}
-                  {variant.lowStock ? ' (موجودی محدود)' : ''}
+                  <span>
+                    <strong>{formatWeight(variant.weightGram)}</strong>
+                    <span>{formatToman(variant.price)}</span>
+                  </span>
+                  <span className="commerce-variant-stock">
+                    {variant.inStock ? (variant.lowStock ? 'موجودی محدود' : 'موجود') : 'ناموجود'}
+                  </span>
                 </label>
               ))}
             </fieldset>
@@ -214,15 +330,25 @@ export function ProductDetailPage() {
               aria-describedby={!validQuantity ? 'qty-error' : undefined}
               onChange={(event) => setQuantityInput(event.target.value)}
             />
-            {!validQuantity && <p id="qty-error" role="alert">تعداد باید عدد صحیح بین ۱ تا {MAX_CART_ITEM_QTY} باشد.</p>}
+            {!validQuantity && (
+              <p id="qty-error" role="alert">
+                تعداد باید عدد صحیح بین ۱ تا {MAX_CART_ITEM_QTY} باشد.
+              </p>
+            )}
 
             <button
               type="submit"
-              disabled={identity === null || !activeVariant?.inStock || !validQuantity || addPending}
+              disabled={
+                isSampleProduct(detail) ||
+                identity === null ||
+                !activeVariant?.inStock ||
+                !validQuantity ||
+                addPending
+              }
             >
               {addPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
             </button>
-            {identity === null && (
+            {identity === null && !isSampleProduct(detail) && (
               <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
                 برای افزودن به سبد خرید وارد شوید
               </Link>
@@ -231,10 +357,15 @@ export function ProductDetailPage() {
             {identity !== null ? (
               <button
                 type="button"
-                disabled={favoritePending}
+                aria-pressed={isFavorite}
+                disabled={favoritePending || !favorites.isSuccess || favorites.isFetching}
                 onClick={submitFavorite}
               >
-                {isFavorite ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها'}
+                {favoritePending
+                  ? 'در حال ذخیره…'
+                  : isFavorite
+                    ? 'حذف از علاقه‌مندی‌ها'
+                    : 'افزودن به علاقه‌مندی‌ها'}
               </button>
             ) : (
               <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
@@ -242,25 +373,87 @@ export function ProductDetailPage() {
               </Link>
             )}
           </form>
-          {message && <p role="status">{message}</p>}
+          {identity !== null && favorites.isLoading && (
+            <LoadingState text="در حال بررسی علاقه‌مندی‌ها…" />
+          )}
+          {identity !== null && favorites.error && (
+            <ErrorState error={favorites.error} onRetry={() => void favorites.refetch()} />
+          )}
+          {message && (
+            <p role={messageKind === 'error' ? 'alert' : 'status'}>
+              {message}
+              {messageKind === 'success' && message.includes('سبد') && (
+                <>
+                  {' '}
+                  <Link to="/cart">مشاهدهٔ سبد خرید</Link>
+                </>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
       <section className="product-detail__description">
         <h2>توضیحات</h2>
-        <p>{detail.description ?? '—'}</p>
-        <h2>ترکیبات</h2>
-        <p>{detail.ingredientsText ?? '—'}</p>
-        <h2>برچسب‌ها</h2>
-        <ul>
-          {detail.tags.map((tag) => (
-            <li key={tag.id}>{tag.name}</li>
-          ))}
-        </ul>
+        <p>{detail.description || 'توضیحی برای این محصول ثبت نشده است.'}</p>
+        {detail.ingredientsText && (
+          <>
+            <h2>ترکیبات</h2>
+            <p>{detail.ingredientsText}</p>
+          </>
+        )}
+        {detail.tags.length > 0 && (
+          <>
+            <h2>برچسب‌ها</h2>
+            <ul>
+              {detail.tags.map((tag) => (
+                <li key={tag.id}>{tag.name}</li>
+              ))}
+            </ul>
+          </>
+        )}
         <p>
-          <Link to={`/recommendations?petId=`}>محصولات مناسب پت من</Link>
+          <Link to="/recommendations">محصولات مناسب پت من</Link>
         </p>
       </section>
+      <Dialog
+        open={galleryOpen}
+        title={detail.name}
+        description="نمایش بزرگ‌تر تصاویر محصول"
+        onClose={() => setGalleryOpen(false)}
+      >
+        <div className="commerce-gallery-viewer">
+          <SafeImage src={imageUrl ?? undefined} alt={detail.name} referrerPolicy="no-referrer" />
+          {images.length > 1 && (
+            <nav aria-label="تصاویر محصول">
+              <button
+                type="button"
+                onClick={() => {
+                  const index = images.findIndex((image) => image.id === selectedImage?.id);
+                  setSelectedImageId(images[(index - 1 + images.length) % images.length]!.id);
+                }}
+              >
+                تصویر قبلی
+              </button>
+              <span role="status">
+                {(images.findIndex((image) => image.id === selectedImage?.id) + 1).toLocaleString(
+                  'fa-IR',
+                )}{' '}
+                از {images.length.toLocaleString('fa-IR')}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const index = images.findIndex((image) => image.id === selectedImage?.id);
+                  setSelectedImageId(images[(index + 1) % images.length]!.id);
+                }}
+              >
+                تصویر بعدی
+              </button>
+            </nav>
+          )}
+        </div>
+      </Dialog>
     </article>
   );
 }

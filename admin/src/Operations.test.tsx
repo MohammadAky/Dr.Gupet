@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Operations } from "./Operations";
+import { hasUnsavedDrafts, useDraftProtection } from "./management";
 
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 vi.mock("./auth", () => ({ useAuth: () => ({ request: requestMock }) }));
@@ -16,6 +17,39 @@ beforeEach(() => {
     }
     throw new Error(`Unexpected request: ${path}`);
   });
+});
+
+it("protects unsaved settings from key and keyboard tab changes, then clears the draft after one normalized save", async () => {
+  let complete: ((value: unknown) => void) | undefined;
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (options?.method === "PUT") return new Promise((resolve) => { complete = resolve; });
+    if (path === "/admin/settings") return Promise.resolve({ data: [{ key: "SHIPPING_FLAT_COST", value: "20000", updatedAt: "2026-10-01T00:00:00Z", overridable: true }], meta: { page: 1, totalPages: 1 } });
+    return Promise.resolve(emptyPage);
+  });
+  function ProtectedOperations() { useDraftProtection(); return <Operations initialTab="settings" />; }
+  render(<ProtectedOperations />);
+  const input = await screen.findByLabelText("مقدار جدید");
+  fireEvent.change(input, { target: { value: "۳۰۰۰۰" } });
+  expect(hasUnsavedDrafts()).toBe(true);
+  fireEvent.change(screen.getByLabelText("کلید"), { target: { value: "ORDER_EXPIRE_MINUTES" } });
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));
+  await act(async () => {});
+  expect((input as HTMLInputElement).value).toBe("۳۰۰۰۰");
+  expect((screen.getByLabelText("کلید") as HTMLSelectElement).value).toBe("SHIPPING_FLAT_COST");
+  fireEvent.keyDown(screen.getByRole("tab", { name: "تنظیمات" }), { key: "Home" });
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));
+  await act(async () => {});
+  expect(screen.getByRole("tab", { name: "تنظیمات" }).getAttribute("aria-selected")).toBe("true");
+  const form = input.closest("form")!;
+  fireEvent.submit(form); fireEvent.submit(form);
+  fireEvent.click(screen.getByRole("button", { name: "ذخیرهٔ تنظیم فروشگاه" }));
+  await waitFor(() => expect(complete).toBeDefined());
+  expect(requestMock.mock.calls.filter(([, options]) => options?.method === "PUT")).toHaveLength(1);
+  expect(requestMock).toHaveBeenCalledWith("/admin/settings", expect.objectContaining({ method: "PUT", body: { key: "SHIPPING_FLAT_COST", value: "30000" } }));
+  expect((input as HTMLInputElement).disabled).toBe(true);
+  await act(async () => complete?.({}));
+  expect(hasUnsavedDrafts()).toBe(false);
+  expect((input as HTMLInputElement).value).toBe("");
 });
 
 afterEach(() => {

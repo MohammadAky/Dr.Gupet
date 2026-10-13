@@ -1,0 +1,89 @@
+.safe-image-fallback {
+  display: inline-grid;
+  place-items: center;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--sand);
+  color: var(--muted);
+  border-radius: inherit;
+}
+.product-card__media > .safe-image-fallback,
+.product-detail__media > .safe-image-fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 8rem;
+}
+.confirm-dialog {
+  display: grid;
+  gap: 1rem;
+}
+.confirm-dialog__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.confirm-dialog__actions button {
+  min-height: 44px;
+}
+.account-list li:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.account-result-region {
+  min-width: 0;
+}
+.image-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.image-picker__filename {
+  color: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.image-picker > input[hidden] {
+  display: none;
+}
+.recommendation-evidence {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.account-feedback {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--sand);
+}
+.account-feedback button {
+  margin-inline-start: 0.75rem;
+  min-height: 44px;
+}
+.account-page [aria-busy='true'] {
+  cursor: progress;
+}
+.account-page h1:focus {
+  outline: none;
+}
+.account-hero__identity > .safe-image-fallback {
+  flex: 0 0 76px;
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+}
+.account-pet-photo.safe-image-fallback {
+  display: inline-grid;
+  place-items: center;
+}
+@media (max-width: 560px) {
+  .account-hero__identity > .safe-image-fallback {
+    flex-basis: 56px;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+  }
+}

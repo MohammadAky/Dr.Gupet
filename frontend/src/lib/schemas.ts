@@ -23,14 +23,19 @@ export const profileSchema = z.object({
 });
 
 export const addressSchema = z.object({
-  title: z.string().min(1, 'عنوان آدرس را وارد کنید').max(50, 'حداکثر ۵۰ کاراکتر'),
-  receiverName: z.string().min(1, 'نام گیرنده را وارد کنید').max(100, 'حداکثر ۱۰۰ کاراکتر'),
+  title: z.string().trim().min(1, 'عنوان آدرس را وارد کنید').max(50, 'حداکثر ۵۰ کاراکتر'),
+  receiverName: z.string().trim().min(1, 'نام گیرنده را وارد کنید').max(100, 'حداکثر ۱۰۰ کاراکتر'),
   receiverPhone: phoneSchema,
-  province: z.string().min(1, 'استان را وارد کنید').max(50),
-  city: z.string().min(1, 'شهر را وارد کنید').max(50),
-  fullAddress: z.string().min(1, 'نشانی کامل را وارد کنید').max(500, 'حداکثر ۵۰۰ کاراکتر'),
+  province: z
+    .string()
+    .trim()
+    .min(1, 'استان را وارد کنید')
+    .max(50, 'استان باید حداکثر ۵۰ کاراکتر باشد'),
+  city: z.string().trim().min(1, 'شهر را وارد کنید').max(50, 'شهر باید حداکثر ۵۰ کاراکتر باشد'),
+  fullAddress: z.string().trim().min(1, 'نشانی کامل را وارد کنید').max(500, 'حداکثر ۵۰۰ کاراکتر'),
   postalCode: z
     .string()
+    .trim()
     .regex(/^\d{0,10}$/, 'کد پستی فقط رقم و حداکثر ۱۰ رقم است')
     .optional()
     .or(z.literal('')),

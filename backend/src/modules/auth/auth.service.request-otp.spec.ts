@@ -78,10 +78,7 @@ describe('AuthService.requestOtp (OTP delivery via generic SmsService)', () => {
 
     const result = await service.requestOtp('09121234567');
 
-    expect(sms.sendOtp).toHaveBeenCalledWith(
-      '09121234567',
-      expect.stringMatching(/^\d{6}$/),
-    );
+    expect(sms.sendOtp).toHaveBeenCalledWith('09121234567', expect.stringMatching(/^\d{6}$/));
     // Redis holds only the hash, never the plain code
     const stored = await redis.get('otp:09121234567');
     expect(stored).toBeTruthy();
@@ -101,10 +98,7 @@ describe('AuthService.requestOtp (OTP delivery via generic SmsService)', () => {
 
   it('allows an immediate retry after a failed delivery', async () => {
     const sms = {
-      sendOtp: jest
-        .fn()
-        .mockRejectedValueOnce(new Error('boom'))
-        .mockResolvedValueOnce(undefined),
+      sendOtp: jest.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(undefined),
       sendText: jest.fn(),
     };
     const redis = new FakeRedis();

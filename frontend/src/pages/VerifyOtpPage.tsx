@@ -1,6 +1,7 @@
+import { SafeImage } from '../components/SafeImage';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/auth-provider';
 import { Field } from '../components/Field';
@@ -8,6 +9,7 @@ import { ErrorState } from '../components/states';
 import { otpCodeSchema, phoneSchema } from '../lib/schemas';
 import { sanitizeInternalRedirect } from '../lib/security';
 import { clearOtpPhone, readOtpCooldown, readOtpPhone, storeOtpCooldown } from '../auth/otp-flow';
+import { focusFirstInvalid } from '../lib/form-validation';
 
 /** Step 2 of login — POST /auth/otp/verify, then the session is restored via GET /users/me. */
 export function VerifyOtpPage() {
@@ -23,11 +25,14 @@ export function VerifyOtpPage() {
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [cooldown, setCooldown] = useState(() => readOtpCooldown(phone));
   const pending = useRef(false);
+  const submitted = useRef(false);
   const mounted = useRef(true);
 
   useLayoutEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -44,8 +49,11 @@ export function VerifyOtpPage() {
       setCooldown(readOtpCooldown(phone));
       setCode('');
       setFieldError(undefined);
+      submitted.current = false;
     },
-    onSettled: () => { pending.current = false; },
+    onSettled: () => {
+      pending.current = false;
+    },
   });
 
   const login = useMutation({
@@ -55,7 +63,9 @@ export function VerifyOtpPage() {
       clearOtpPhone();
       navigate(next, { replace: true });
     },
-    onSettled: () => { pending.current = false; },
+    onSettled: () => {
+      pending.current = false;
+    },
   });
 
   const busy = login.isPending || resend.isPending;
@@ -65,9 +75,11 @@ export function VerifyOtpPage() {
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (pending.current) return;
+    submitted.current = true;
     const parsed = otpCodeSchema.safeParse(code);
     if (!parsed.success) {
       setFieldError(parsed.error.issues[0]?.message);
+      focusFirstInvalid(event.currentTarget as HTMLFormElement);
       return;
     }
     setFieldError(undefined);
@@ -76,25 +88,36 @@ export function VerifyOtpPage() {
   }
 
   return (
-    <section className="auth-page">
+    <section className="auth-page auth-verify">
+      <Link to="/" className="auth-story__brand">
+        <SafeImage src="/brand/logo.jpg" width={48} height={48} alt="دکتر گوپت" />
+        <span>دکتر گوپت</span>
+      </Link>
       <h1>کد تأیید</h1>
       <p>
         کد پیامک‌شده به <span dir="ltr">{phone}</span> را وارد کنید.
       </p>
 
-      <form onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleSubmit} noValidate aria-busy={busy}>
         <Field label="کد ۵ یا ۶ رقمی" htmlFor="otp" error={fieldError}>
           <input
             id="otp"
             name="otp"
+            required
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={6}
+            className="auth-code-input"
             dir="ltr"
             value={code}
             disabled={busy}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setCode(value);
+              login.reset();
+              if (submitted.current) setFieldError(otpCodeSchema.safeParse(value).error?.issues[0]?.message);
+            }}
           />
         </Field>
         <button className="auth-submit" type="submit" disabled={busy}>
@@ -105,10 +128,13 @@ export function VerifyOtpPage() {
       {login.error && <ErrorState error={login.error} />}
 
       <button
+        className="auth-switch"
         type="button"
         disabled={cooldown > 0 || busy}
         onClick={() => {
           if (pending.current || cooldown > 0) return;
+          login.reset();
+          setFieldError(undefined);
           pending.current = true;
           resend.mutate();
         }}
@@ -118,12 +144,13 @@ export function VerifyOtpPage() {
       {resend.error && <ErrorState error={resend.error} />}
 
       <button
+        className="auth-switch"
         type="button"
         disabled={busy}
         onClick={() => {
           if (pending.current) return;
           clearOtpPhone();
-          navigate('/login');
+          navigate(`/login?${new URLSearchParams({ next, mode: 'otp' }).toString()}`);
         }}
       >
         تغییر شماره

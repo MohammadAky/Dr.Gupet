@@ -5,6 +5,12 @@ const app = 'http://localhost:5173';
 const api = 'http://localhost:3000/api/v1';
 
 describe('safeImageUrl', () => {
+  it('supports the accepted same-origin production API base without allowing protocol-relative hosts', () => {
+    expect(safeImageUrl('/uploads/pet.jpg', 'https://drgupet.ir', '/api/v1')).toBe('https://drgupet.ir/uploads/pet.jpg');
+    expect(safeImageUrl('/brand/logo.jpg', 'https://drgupet.ir', '/api/v1')).toBe('https://drgupet.ir/brand/logo.jpg');
+    expect(safeImageUrl('/uploads/pet.jpg', app, '//foreign.example/api/v1')).toBeNull();
+    expect(safeImageUrl('/uploads/pet.jpg', app, '/\\foreign.example/api/v1')).toBeNull();
+  });
   it('accepts and resolves app and backend-hosted images', () => {
     expect(safeImageUrl('/brand/logo.jpg', app, api)).toBe('http://localhost:5173/brand/logo.jpg');
     expect(safeImageUrl('/uploads/pet.jpg', app, api)).toBe(

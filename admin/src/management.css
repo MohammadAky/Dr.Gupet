@@ -8,9 +8,9 @@
 .manage-head h1 {
   margin: 3px 0 6px;
   color: var(--title);
-  font-size: clamp(30px, 3.5vw, 48px);
+  font-size: clamp(30px, 3vw, 42px);
   line-height: 1.3;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 .manage-head p {
   max-width: 660px;
@@ -21,6 +21,7 @@
   flex: none;
 }
 .manage-card {
+  min-width: 0;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -45,7 +46,7 @@
   display: grid;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   min-width: 145px;
 }
@@ -55,8 +56,8 @@
 .manage-form select,
 .manage-form textarea {
   width: 100%;
-  min-height: 43px;
-  border: 1px solid var(--line);
+  min-height: 48px;
+  border: 1px solid var(--control-border);
   border-radius: 11px;
   padding: 8px 12px;
   color: var(--ink);
@@ -88,7 +89,7 @@
 .manage-pagination button,
 .manage-row-button,
 .manage-state button {
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 7px 15px;
@@ -96,15 +97,15 @@
   color: var(--title);
   font: inherit;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
   cursor: pointer;
 }
 .manage-actions .manage-primary,
 .manage-toolbar .manage-primary,
 .manage-head__action .manage-primary {
-  background: var(--forest, #183c22);
-  border-color: var(--forest, #183c22);
-  color: #fff;
+  background: var(--action-bg);
+  border-color: var(--action-bg);
+  color: var(--action-ink);
 }
 .manage-actions .manage-danger {
   color: #b8493c;
@@ -142,6 +143,8 @@
   text-align: center;
 }
 .manage-table-wrap {
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
   overflow-x: auto;
 }
@@ -160,8 +163,8 @@
 }
 .manage-table th {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
 }
 .manage-table tr:last-child td {
   border-bottom: 0;
@@ -201,7 +204,7 @@
   margin: 3px 0 0;
   color: var(--ink);
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 .manage-sublist {
@@ -216,6 +219,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
+.manage-columns > *, .manage-form > *, .manage-report-head, .manage-page { min-width: 0; }
 .manage-tabs {
   display: flex;
   gap: 8px;
@@ -228,6 +232,7 @@
   background: var(--paper);
   color: var(--ink);
   padding: 8px 17px;
+  min-height: 44px;
   cursor: pointer;
 }
 .manage-tabs button[aria-selected="true"] {
@@ -261,6 +266,57 @@
   color: var(--ink);
   padding: 7px 13px;
   cursor: pointer;
+  min-height: 44px;
+}
+
+.manage-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.manage-section-heading h2 { margin-block-end: 3px; font-size: 18px; }
+.manage-section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+.manage-section-heading .manage-actions { margin: 0; }
+.credential-form { margin-block-start: 24px; }
+.credential-form > div { min-width: 0; }
+.credential-form > div > label { display: block; margin-block-end: 6px; color: var(--ink); font-size: 13px; font-weight: 700; }
+.credential-form > .credential-hint, .credential-form > .manage-notice { grid-column: 1 / -1; }
+.credential-form > .credential-hint { line-height: 1.8; }
+.credential-form .password-input { flex-wrap: nowrap; }
+.credential-form .password-input input { padding-left: 58px; }
+.credential-form .password-input button { flex: none; padding: 8px; }
+.credential-form .manage-actions { margin: 2px 0 0; }
+.manage-table-wrap { overscroll-behavior-inline: contain; }
+.manage-table { font-variant-numeric: tabular-nums; }
+.manage-table th { background: var(--catalog-soft); }
+.manage-table td { font-size: 14px; }
+.manage-table td strong { display: block; font-size: 14px; }
+.manage-table td small { display: block; margin-block-start: 4px; font-size: 12px; color: var(--muted); }
+.manage-table td:first-child { white-space: normal; min-width: 150px; max-width: 280px; overflow-wrap: anywhere; }
+.manage-badge { display: inline-flex; align-items: center; min-height: 28px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 9px; background: var(--catalog-soft); color: var(--muted); font-size: 12px; font-weight: 600; }
+.manage-badge--admin { background: #f8f0dc; border-color: #d9bd7e; color: #715318; }
+.manage-badge--active { background: #eaf5e9; border-color: #afceab; color: #225f2a; }
+.manage-badge--warning { background: #fff0ee; border-color: #dba49e; color: #9a302c; }
+.manage-row-button { min-width: 60px; border-radius: 8px; text-decoration: none; }
+.manage-state { border: 1px dashed var(--line); border-radius: 14px; padding: 30px 18px; margin-block: 16px; line-height: 1.9; }
+.manage-form label, .manage-toolbar label { min-width: 0; }
+.manage-toolbar label { flex: 1 1 160px; }
+.manage-toolbar label:first-child { flex-grow: 2; }
+.manage-toolbar .manage-primary, .manage-actions .manage-primary { min-width: 110px; }
+.manage-card .manage-card { margin-block-start: 24px; box-shadow: none; background: var(--catalog-soft); }
+.manage-facts { margin-block-end: 24px; }
+.manage-facts dt { font-size: 12px; }
+.manage-facts dd { font-size: 14px; }
+.manage-tabs { gap: 6px; padding-block: 4px; }
+.manage-report-head { flex-wrap: wrap; }
+[data-theme="dark"] .manage-actions .manage-danger { color: #ffc1bd; border-color: #a85e56; }
+[data-theme="dark"] .manage-badge--admin { background: #3d321c; color: #f0dba3; border-color: #766034; }
+[data-theme="dark"] .manage-badge--active { background: #203f2b; color: #c9ebca; border-color: #42764c; }
+[data-theme="dark"] .manage-badge--warning { background: #3d2526; color: #f6c0ba; border-color: #7a4241; }
+@media (hover: hover) and (pointer: fine) {
+  .manage-row-button:hover { background: var(--catalog-soft); }
+  .manage-actions .manage-primary:not(:disabled):hover, .manage-toolbar .manage-primary:not(:disabled):hover,
+  .manage-head__action .manage-primary:not(:disabled):hover { background: var(--action-hover); border-color: var(--action-hover); color: var(--action-ink); }
+  .manage-table tbody tr:hover { background: color-mix(in srgb, var(--catalog-soft) 50%, transparent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .manage-row-button, .manage-actions button, .manage-head__action button, .manage-tabs button { transition: background-color 160ms ease, color 160ms ease; }
 }
 [data-theme="dark"] .manage-notice--error {
   background: #3d2526;
@@ -291,12 +347,36 @@
   .manage-form,
   .manage-columns,
   .manage-facts {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .manage-toolbar label {
     flex: 1 1 100%;
   }
   .manage-pagination {
     justify-content: space-between;
+    flex-wrap: wrap;
   }
+  .manage-toolbar input, .manage-toolbar select, .manage-form input, .manage-form select, .manage-form textarea { font-size: 16px; }
+  .manage-head__action, .manage-head__action button { width: 100%; }
+  .manage-section-heading { align-items: start; }
+}
+
+.manage-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.admin-field-error { color: #9a302c; font-size: 12px; line-height: 1.8; font-weight: 400; display: block; }
+[data-theme="dark"] .admin-field-error { color: #ffc1bd; }
+input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"] { border-color: #b8493c !important; }
+.admin-confirm { width: min(460px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 20px; padding: 26px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 80px rgb(0 0 0 / 24%); }
+.admin-confirm::backdrop { background: rgb(7 25 13 / 58%); }
+.admin-confirm h2 { margin: 0 0 12px; font-size: 20px; color: var(--title); }
+.admin-confirm p { margin: 0; line-height: 1.9; }
+.admin-confirm .manage-actions { justify-content: flex-end; }
+@media (max-width: 600px) {
+  .manage-table--orders, .manage-table--users, .manage-table--coupons { min-width: 0; table-layout: fixed; }
+  .manage-table--orders :is(th, td):nth-child(3), .manage-table--orders :is(th, td):nth-child(4),
+  .manage-table--users :is(th, td):nth-child(2), .manage-table--users :is(th, td):nth-child(3), .manage-table--users :is(th, td):nth-child(5), .manage-table--users :is(th, td):nth-child(6),
+  .manage-table--coupons :is(th, td):nth-child(2), .manage-table--coupons :is(th, td):nth-child(4) { display: none; }
+  .manage-table--orders td:first-child, .manage-table--users td:first-child, .manage-table--coupons td:first-child { min-width: 0; }
+  .manage-table--orders :is(th,td), .manage-table--users :is(th,td), .manage-table--coupons :is(th,td) { padding: 12px 5px; overflow-wrap: anywhere; font-size: 12px; }
+  .manage-table--orders :is(th,td):last-child, .manage-table--users :is(th,td):last-child, .manage-table--coupons :is(th,td):last-child { width: 64px; }
+  .manage-row-button { min-width: 44px; padding-inline: 4px; }
 }

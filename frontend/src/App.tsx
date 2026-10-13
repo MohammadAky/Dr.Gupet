@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { type FormEvent, useEffect, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Suspense, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { shopApi } from './api/endpoints-shop';
 import { queryKeys } from './api/query-keys';
 import { useAuth } from './auth/auth-provider';
@@ -10,13 +10,37 @@ import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { ThemeToggle } from './components/layout/ThemeToggle';
 import { ConsentBanner } from './privacy/ConsentBanner';
 import { PageMetadata } from './components/PageMetadata';
+import { RouteBoundary } from './components/RouteBoundary';
+import { LoadingState } from './components/states';
+import { landingSample, safeLandingLink } from './features/landing/content';
 
 export function Shell() {
   const { status, user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const navigationType = useNavigationType();
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(location.pathname);
+  const scrollPositions = useRef(new Map<string, number>());
   const [search, setSearch] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useLayoutEffect(() => {
+    const changed = previousPath.current !== location.pathname;
+    previousPath.current = location.pathname;
+    if (changed && !location.hash) {
+      window.scrollTo({
+        top: navigationType === 'POP' ? (scrollPositions.current.get(location.pathname) ?? 0) : 0,
+        behavior: 'instant',
+      });
+      mainRef.current?.focus({ preventScroll: true });
+    }
+    const path = location.pathname;
+    const positions = scrollPositions.current;
+    return () => {
+      positions.set(path, window.scrollY);
+    };
+  }, [location.pathname, location.hash, navigationType]);
 
   useEffect(() => {
     queueMicrotask(() => setMenuOpen(false));
@@ -39,8 +63,9 @@ export function Shell() {
   const cartCount = status === 'authed' ? (cart.data?.items.length ?? 0) : 0;
 
   async function handleLogout() {
-    await logout();
+    const revocation = logout();
     navigate('/');
+    await revocation;
   }
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -68,9 +93,19 @@ export function Shell() {
       <a className="skip-link" href="#main-content">
         رفتن به محتوای اصلی
       </a>
-      <div className="announcement">
-        دکتر گوپت، همراه شما برای انتخاب آگاهانهٔ محصولات حیوانات خانگی
-      </div>
+      {(location.pathname !== '/' || landingSample.announcement.enabled) && (
+        <div className="announcement">
+          {location.pathname === '/' ? (
+            landingSample.announcement.href && safeLandingLink(landingSample.announcement.href) ? (
+              <a href={landingSample.announcement.href}>{landingSample.announcement.text}</a>
+            ) : (
+              landingSample.announcement.text
+            )
+          ) : (
+            'دکتر گوپت، همراه شما برای انتخاب آگاهانهٔ محصولات حیوانات خانگی'
+          )}
+        </div>
+      )}
       <Header
         status={status}
         userName={user?.firstName ?? null}
@@ -84,11 +119,17 @@ export function Shell() {
         onLogout={() => void handleLogout()}
       />
       <main
+        ref={mainRef}
+        tabIndex={-1}
         key={location.pathname}
         id="main-content"
         className={`app-main${location.pathname === '/' ? '' : ' content-page'}`}
       >
-        <Outlet />
+        <RouteBoundary key={location.pathname}>
+          <Suspense fallback={<LoadingState text="در حال آماده‌سازی صفحه…" />}>
+            <Outlet />
+          </Suspense>
+        </RouteBoundary>
       </main>
       <Footer />
       <MobileBottomNav status={status} />

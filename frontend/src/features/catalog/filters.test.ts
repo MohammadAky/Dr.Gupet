@@ -42,6 +42,42 @@ describe('parseProductFilters', () => {
     expect(filters.petTypeId).toBeUndefined();
     expect(filters.page).toBe(1);
   });
+
+  it('preserves zero-price boundaries without treating them as empty filters', () => {
+    expect(parseProductFilters(new URLSearchParams('minPrice=0&maxPrice=0'))).toMatchObject({
+      minPrice: 0,
+      maxPrice: 0,
+    });
+    const url = serializeProductFilters(new URLSearchParams('page=3'), {
+      minPrice: 0,
+      maxPrice: 0,
+    });
+    expect(url.get('minPrice')).toBe('0');
+    expect(url.get('maxPrice')).toBe('0');
+    expect(url.has('page')).toBe(false);
+  });
+
+  it.each(['1.5', '-1', 'Infinity', '9007199254740992'])(
+    'does not send invalid integer identities, pagination or money from the URL: %s',
+    (value) => {
+      const filters = parseProductFilters(
+        new URLSearchParams({
+          page: value,
+          limit: value,
+          petTypeId: value,
+          brandId: value,
+          minPrice: value,
+          maxPrice: value,
+        }),
+      );
+      expect(filters.page).toBe(1);
+      expect(filters.limit).toBe(20);
+      expect(filters.petTypeId).toBeUndefined();
+      expect(filters.brandId).toBeUndefined();
+      expect(filters.minPrice).toBeUndefined();
+      expect(filters.maxPrice).toBeUndefined();
+    },
+  );
 });
 
 describe('serializeProductFilters', () => {

@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage';
 import { Link } from 'react-router-dom';
 
 export function Footer() {
@@ -5,12 +6,12 @@ export function Footer() {
     <footer className="app-footer">
       <div className="footer-content site-container">
         <div className="footer-brand">
-          <img src="/brand/logo.jpg" alt="" width="58" height="58" loading="lazy" />
+          <SafeImage src="/brand/logo.jpg" alt="" width="58" height="58" loading="lazy" />
           <div>
             <strong>دکتر گوپت</strong>
             <p>
-              انتخاب محصول برای سگ و گربه، با اطلاعات روشن و تجربه‌ای ساده. اطلاعات دارویی جایگزین
-              نظر دامپزشک نیست.
+              انتخاب محصول برای سگ، گربه و پرنده، با اطلاعات روشن و تجربه‌ای ساده. اطلاعات دارویی
+              جایگزین نظر دامپزشک نیست.
             </p>
           </div>
         </div>

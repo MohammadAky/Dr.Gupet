@@ -61,7 +61,9 @@ describe('CartService.addItem', () => {
   });
 
   it('rejects quantities above available stock', async () => {
-    const prisma = makePrisma({ variant: { id: 11, isActive: true, stock: 2, product: { isActive: true } } });
+    const prisma = makePrisma({
+      variant: { id: 11, isActive: true, stock: 2, product: { isActive: true } },
+    });
     await expect(makeService(prisma).addItem(1, 11, 3)).rejects.toMatchObject({
       code: 'OUT_OF_STOCK',
     });

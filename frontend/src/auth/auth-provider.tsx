@@ -14,6 +14,7 @@ import { api, type PasswordCredentials, type PasswordRegistration } from '../api
 import type { AuthResult, UserProfile } from '../api/types';
 import { tokenStorage } from '../lib/storage';
 import { clearPendingOrder } from '../features/checkout/pending-order';
+import { clearCheckoutIntent } from '../features/checkout/intent';
 import { useQueryClient } from '@tanstack/react-query';
 
 export type AuthStatus = 'loading' | 'guest' | 'authed';
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userRef.current = null;
     tokenStorage.clear();
     clearPendingOrder();
+    clearCheckoutIntent();
     queryClient.clear();
     if (mountedRef.current) {
       setUser(null);
@@ -160,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // account's cached data before the new identity can render any page.
       queryClient.clear();
       clearPendingOrder();
+      clearCheckoutIntent();
       if (!keepProfile) {
         userRef.current = null;
         setUser(null);

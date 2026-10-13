@@ -38,10 +38,7 @@ export class BreedsService {
   // Admin
   // -------------------------------------------------------------------
 
-  async findAllAdmin(
-    petTypeId?: number,
-    opts: { search?: string; isActive?: boolean } = {},
-  ) {
+  async findAllAdmin(petTypeId?: number, opts: { search?: string; isActive?: boolean } = {}) {
     const where: any = {};
     if (petTypeId) where.petTypeId = petTypeId;
     if (opts.search) {

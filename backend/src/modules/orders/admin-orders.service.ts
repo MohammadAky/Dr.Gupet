@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { parseAddressSnapshot } from './address-snapshot';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStockService } from './order-stock.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
@@ -115,14 +116,7 @@ export class AdminOrdersService {
       throw new NotFoundException('سفارش یافت نشد');
     }
 
-    let addressSnapshot: unknown = order.addressSnapshot;
-    try {
-      addressSnapshot = JSON.parse(order.addressSnapshot);
-    } catch {
-      // keep raw string when it is not JSON
-    }
-
-    return { ...order, addressSnapshot };
+    return { ...order, addressSnapshot: parseAddressSnapshot(order.addressSnapshot) };
   }
 
   /**

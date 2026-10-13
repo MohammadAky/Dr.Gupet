@@ -22,19 +22,25 @@ export function ProductsPage() {
   const searchFormRef = useRef<HTMLFormElement>(null);
   const priceFormRef = useRef<HTMLFormElement>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeFilterCount = [
-    filters.petTypeId,
-    filters.brandId,
-    filters.lifeStage,
-    filters.sizeClass,
-    filters.inStock,
-    filters.minPrice !== undefined,
-    filters.maxPrice !== undefined,
-    filters.sort && filters.sort !== 'newest',
-  ].filter(Boolean).length;
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const selectedTags = (filters.tagIds ?? '')
+    .split(',')
+    .filter((value) => /^\d+$/.test(value) && Number(value) > 0);
+  const activeFilterCount =
+    [
+      filters.petTypeId,
+      filters.brandId,
+      filters.lifeStage,
+      filters.sizeClass,
+      filters.inStock,
+      filters.minPrice !== undefined,
+      filters.maxPrice !== undefined,
+      filters.sort && filters.sort !== 'newest',
+    ].filter(Boolean).length + selectedTags.length;
 
   const petTypes = useQuery({ queryKey: queryKeys.petTypes, queryFn: () => api.petTypes() });
   const brands = useQuery({ queryKey: queryKeys.brands, queryFn: () => shopApi.brands() });
+  const dietTags = useQuery({ queryKey: queryKeys.tags('DIET'), queryFn: () => api.tags('DIET') });
 
   const products = useQuery({
     queryKey: queryKeys.products({ ...filters }),
@@ -61,21 +67,36 @@ export function ProductsPage() {
       return Number.isFinite(normalized) && normalized >= 0 ? normalized : undefined;
     };
     const values = new FormData(event.currentTarget);
-    patch({
-      minPrice: parse(String(values.get('minPrice') ?? '')),
-      maxPrice: parse(String(values.get('maxPrice') ?? '')),
-    });
+    const rawMin = String(values.get('minPrice') ?? '').trim();
+    const rawMax = String(values.get('maxPrice') ?? '').trim();
+    const minPrice = parse(rawMin);
+    const maxPrice = parse(rawMax);
+    if (
+      (rawMin && !Number.isSafeInteger(minPrice)) ||
+      (rawMax && !Number.isSafeInteger(maxPrice)) ||
+      (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice)
+    ) {
+      setPriceError('قیمت باید عدد صحیح و نامنفی باشد و حداقل از حداکثر بیشتر نباشد.');
+      return;
+    }
+    setPriceError(null);
+    patch({ minPrice, maxPrice });
   }
 
   function clearFilters() {
     setParams(new URLSearchParams());
+    setPriceError(null);
     searchFormRef.current?.reset();
     priceFormRef.current?.reset();
   }
 
   return (
-    <section>
-      <h1>محصولات</h1>
+    <section className="catalog-page">
+      <div className="directory-page__heading">
+        <span className="eyebrow">فروشگاه دکتر گوپت</span>
+        <h1>محصولات</h1>
+        <p>با انتخاب نوع حیوان، برند و ویژگی‌ها، گزینهٔ مناسب همراهتان را پیدا کنید.</p>
+      </div>
 
       <form className="catalog-search" ref={searchFormRef} onSubmit={submitSearch}>
         <label htmlFor="q">جستجو</label>
@@ -92,7 +113,10 @@ export function ProductsPage() {
         aria-expanded={filtersOpen}
         onClick={() => setFiltersOpen((open) => !open)}
       >
-        <span>فیلتر و مرتب‌سازی{activeFilterCount > 0 ? ` · ${activeFilterCount} مورد` : ''}</span>
+        <span>
+          فیلتر و مرتب‌سازی
+          {activeFilterCount > 0 ? ` · ${activeFilterCount.toLocaleString('fa-IR')} مورد` : ''}
+        </span>
         <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
       </button>
       <div
@@ -158,6 +182,39 @@ export function ProductsPage() {
           />
         </div>
 
+        {(petTypes.error || brands.error) && (
+          <ErrorState
+            error="دریافت برخی گزینه‌های فیلتر ممکن نشد."
+            onRetry={() => {
+              void petTypes.refetch();
+              void brands.refetch();
+            }}
+          />
+        )}
+        <fieldset className="catalog-diet-tags" disabled={dietTags.isPending || dietTags.isError}>
+          <legend>ویژگی‌های رژیمی ثبت‌شده</legend>
+          {dietTags.isPending && <LoadingState text="در حال دریافت ویژگی‌ها…" />}
+          {dietTags.data?.map((tag) => (
+            <label key={tag.id} className="filter-check">
+              <input
+                type="checkbox"
+                checked={selectedTags.includes(String(tag.id))}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? [...selectedTags, String(tag.id)]
+                    : selectedTags.filter((id) => id !== String(tag.id));
+                  patch({ tagIds: next.join(',') || undefined });
+                }}
+              />
+              {tag.name}
+            </label>
+          ))}
+          {dietTags.data?.length === 0 && <p>هنوز ویژگی رژیمی برای محصولات ثبت نشده است.</p>}
+        </fieldset>
+        {dietTags.error && (
+          <ErrorState error={dietTags.error} onRetry={() => void dietTags.refetch()} />
+        )}
+
         <label className="filter-check">
           <input
             type="checkbox"
@@ -172,6 +229,9 @@ export function ProductsPage() {
           <input
             id="minPrice"
             name="minPrice"
+            inputMode="numeric"
+            aria-invalid={priceError ? true : undefined}
+            aria-describedby={priceError ? 'price-filter-error' : undefined}
             dir="ltr"
             key={`min-${filters.minPrice ?? ''}`}
             defaultValue={filters.minPrice ?? ''}
@@ -180,6 +240,9 @@ export function ProductsPage() {
           <input
             id="maxPrice"
             name="maxPrice"
+            inputMode="numeric"
+            aria-invalid={priceError ? true : undefined}
+            aria-describedby={priceError ? 'price-filter-error' : undefined}
             dir="ltr"
             key={`max-${filters.maxPrice ?? ''}`}
             defaultValue={filters.maxPrice ?? ''}
@@ -188,6 +251,11 @@ export function ProductsPage() {
             اعمال قیمت
           </button>
         </form>
+        {priceError && (
+          <p id="price-filter-error" role="alert" className="field__error">
+            {priceError}
+          </p>
+        )}
 
         <button type="button" className="filter-clear" onClick={clearFilters}>
           پاک‌کردن فیلترها
@@ -195,6 +263,12 @@ export function ProductsPage() {
       </div>
 
       {products.isLoading && <LoadingState />}
+      {products.data?.meta && (
+        <p className="directory-results" role="status">
+          {products.data.meta.total.toLocaleString('fa-IR')} محصول
+          {products.isFetching ? ' · در حال به‌روزرسانی…' : ''}
+        </p>
+      )}
       {products.error && (
         <ErrorState error={products.error} onRetry={() => void products.refetch()} />
       )}
@@ -215,7 +289,7 @@ export function ProductsPage() {
               <ProductCardView key={card.id} card={card} />
             ))}
           </div>
-          <Pagination meta={products.data.meta} />
+          <Pagination meta={products.data.meta} busy={products.isFetching} />
         </>
       )}
     </section>

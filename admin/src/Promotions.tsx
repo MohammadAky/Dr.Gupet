@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "./auth";
 import {
+  confirmAction, discardDrafts, markFormSaved, normalizeDigits, showFieldErrors,
   errorMessage,
   formatDate,
   formatMoney,
@@ -9,6 +10,7 @@ import {
   PageHeader,
   Paginator,
   QueryState,
+  useInlinePanelFocus,
   useDetail,
   usePaged,
 } from "./management";
@@ -61,10 +63,12 @@ const blank: Draft = {
   perUserLimit: "",
   isActive: true,
 };
-const localDate = (value: string | null) =>
-  value && !Number.isNaN(Date.parse(value))
-    ? new Date(value).toISOString().slice(0, 16)
-    : "";
+const localDate = (value: string | null): string => {
+  if (!value || Number.isNaN(Date.parse(value))) return "";
+  const date = new Date(value);
+  const twoDigits = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}T${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
+};
 const toDraft = (item: Coupon): Draft => ({
   code: item.code,
   type: item.type,
@@ -81,13 +85,17 @@ const toDraft = (item: Coupon): Draft => ({
 const parseInteger = (value: string, min: number): number | null | undefined =>
   value.trim() === ""
     ? null
-    : /^\d+$/.test(value.trim()) &&
-        Number.isSafeInteger(Number(value)) &&
-        Number(value) >= min
-      ? Number(value)
+    : /^\d+$/.test(normalizeDigits(value.trim())) &&
+        Number.isSafeInteger(Number(normalizeDigits(value))) &&
+        Number(normalizeDigits(value)) >= min
+      ? Number(normalizeDigits(value))
       : undefined;
 
 export function Promotions() {
+  const editorGeneration = useRef(0);
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; editorGeneration.current += 1; }; }, []);
   const { request } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -95,6 +103,7 @@ export function Promotions() {
   const [active, setActive] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const { panelRef: editorPanelRef, reveal: revealEditor, restore: restoreEditor } = useInlinePanelFocus();
   const [draft, setDraft] = useState<Draft>(blank);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -112,15 +121,18 @@ export function Promotions() {
     revision,
   );
   useEffect(() => {
+    let current = true;
     if (detail.data && !creating)
       queueMicrotask(() => {
-        if (detail.data) setDraft(toDraft(detail.data));
+        if (current && detail.data) setDraft(toDraft(detail.data));
       });
+    return () => { current = false; };
   }, [detail.data, creating]);
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
   function showCreate() {
+    editorGeneration.current += 1;
     setSelected(null);
     setCreating(true);
     setDraft(blank);
@@ -135,6 +147,9 @@ export function Promotions() {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending.current) return;
+    const form = event.currentTarget;
+    const generation = editorGeneration.current;
     setError("");
     setMessage("");
     const value = parseInteger(draft.value, 1);
@@ -142,6 +157,15 @@ export function Promotions() {
     const maxDiscount = parseInteger(draft.maxDiscount, 0);
     const totalLimit = parseInteger(draft.totalLimit, 1);
     const perUserLimit = parseInteger(draft.perUserLimit, 1);
+    const fieldErrors: Record<string, string> = {};
+    if (draft.code.trim().length < 2) fieldErrors.code = "کد باید دست‌کم دو نویسه داشته باشد.";
+    if (value == null) fieldErrors.value = "مقدار باید عدد صحیح بزرگ‌تر از صفر باشد.";
+    for (const [key, parsed] of Object.entries({ minOrderAmount, maxDiscount, totalLimit, perUserLimit })) {
+      if (parsed === undefined) fieldErrors[key] = "عدد صحیح معتبر وارد کنید.";
+    }
+    if (draft.type === "PERCENT" && value != null && value > 100) fieldErrors.value = "درصد تخفیف بیش از ۱۰۰ مجاز نیست.";
+    showFieldErrors(form, fieldErrors);
+    if (Object.keys(fieldErrors).length) { setError("فیلدهای مشخص‌شده را اصلاح کنید."); return; }
     if (
       !draft.code.trim() ||
       draft.code.trim().length < 2 ||
@@ -157,11 +181,16 @@ export function Promotions() {
       setError("درصد تخفیف بیش از ۱۰۰ مجاز نیست.");
       return;
     }
-    const startAt = draft.startAt
-      ? new Date(draft.startAt).toISOString()
-      : null;
-    const endAt = draft.endAt ? new Date(draft.endAt).toISOString() : null;
+    if ([draft.startAt, draft.endAt].some((date) => date && Number.isNaN(Date.parse(date)))) {
+      setError("تاریخ و ساعت معتبر وارد کنید.");
+      return;
+    }
+    const instant = (value: string, original: string | null | undefined) =>
+      value ? new Date(original && value === localDate(original) ? original : value).toISOString() : null;
+    const startAt = instant(draft.startAt, creating ? null : detail.data?.startAt);
+    const endAt = instant(draft.endAt, creating ? null : detail.data?.endAt);
     if (startAt && endAt && startAt > endAt) {
+      showFieldErrors(form, { endAt: "پایان بازه باید پس از شروع باشد." });
       setError("پایان بازه باید پس از شروع باشد.");
       return;
     }
@@ -177,40 +206,45 @@ export function Promotions() {
       isActive: draft.isActive,
       ...(creating ? { code: draft.code.trim().toUpperCase() } : {}),
     };
-    setBusy(true);
+    pending.current = true; setBusy(true);
     try {
       const result = await request<Coupon>(
         creating ? "/admin/coupons" : `/admin/coupons/${selected}`,
         { method: creating ? "POST" : "PATCH", body },
       );
+      if (!mounted.current) return;
+      markFormSaved(form);
+      setRevision((current) => current + 1);
+      if (generation !== editorGeneration.current) return;
       setCreating(false);
       setSelected(result.id);
-      setRevision((current) => current + 1);
       setMessage("کد تخفیف ثبت شد.");
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current && generation === editorGeneration.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
   async function remove() {
-    if (
-      !selected ||
-      !window.confirm("این کد تخفیف حذف یا در صورت استفاده، غیرفعال شود؟")
-    )
-      return;
-    setBusy(true);
-    setError("");
-    setMessage("");
+    if (!selected || pending.current) return;
+    const id = selected;
+    const generation = editorGeneration.current;
+    pending.current = true;
     try {
-      await request(`/admin/coupons/${selected}`, { method: "DELETE" });
-      setSelected(null);
+      if (!await confirmAction(`کد ${detail.data?.code ?? id} حذف می‌شود؛ اگر استفاده شده باشد، فقط غیرفعال خواهد شد.`, "حذف کد تخفیف")) return;
+      if (!mounted.current || generation !== editorGeneration.current) return;
+      setBusy(true); setError(""); setMessage("");
+      await request(`/admin/coupons/${id}`, { method: "DELETE" });
+      if (!mounted.current) return;
       setRevision((current) => current + 1);
+      if (generation !== editorGeneration.current) return;
+      setSelected(null);
+      restoreEditor();
       setMessage("کد تخفیف حذف یا غیرفعال شد.");
     } catch (problem) {
-      setError(errorMessage(problem));
+      if (mounted.current && generation === editorGeneration.current) setError(errorMessage(problem));
     } finally {
-      setBusy(false);
+      pending.current = false; if (mounted.current) setBusy(false);
     }
   }
   return (
@@ -220,7 +254,7 @@ export function Promotions() {
         title="کدهای تخفیف"
         description="قواعد تخفیف را پیش از انتشار بررسی کنید؛ مبالغ به تومان هستند."
         action={
-          <button type="button" className="manage-primary" onClick={showCreate}>
+          <button type="button" className="manage-primary" data-draft-exit disabled={busy} onClick={(event) => { showCreate(); revealEditor(event.currentTarget); }}>
             + کد جدید
           </button>
         }
@@ -262,7 +296,7 @@ export function Promotions() {
         {list.data && list.data.data.length > 0 && (
           <>
             <div className="manage-table-wrap">
-              <table className="manage-table">
+              <table className="manage-table manage-table--coupons">
                 <thead>
                   <tr>
                     <th>کد</th>
@@ -289,7 +323,9 @@ export function Promotions() {
                         <button
                           className="manage-row-button"
                           type="button"
-                          onClick={() => {
+                          onClick={(event) => {
+                            editorGeneration.current += 1;
+                            revealEditor(event.currentTarget);
                             setSelected(item.id);
                             setCreating(false);
                             setError("");
@@ -310,15 +346,20 @@ export function Promotions() {
       </section>
       {(selected || creating) && (
         <section
+          ref={editorPanelRef}
+          tabIndex={-1}
           className="manage-card"
           aria-label={creating ? "ساخت کد تخفیف" : "جزئیات کد تخفیف"}
         >
           <div className="manage-actions">
             <button
               type="button"
-              onClick={() => {
+              onClick={async (event) => {
+                if (!pending.current && !await discardDrafts(event.currentTarget.closest("section"))) return;
+                editorGeneration.current += 1;
                 setSelected(null);
                 setCreating(false);
+                restoreEditor();
               }}
             >
               بستن فرم
@@ -340,12 +381,14 @@ export function Promotions() {
               </h2>
               <Notice message={error} />
               <Notice message={message} kind="success" />
-              <form onSubmit={(event) => void save(event)}>
+              <form onSubmit={(event) => void save(event)} noValidate>
+                <fieldset className="manage-fieldset" disabled={busy}>
                 <div className="manage-form">
                   <label>
                     کد
                     <input
                       required
+                      name="code"
                       minLength={2}
                       maxLength={50}
                       dir="ltr"
@@ -371,6 +414,7 @@ export function Promotions() {
                     <input
                       required
                       inputMode="numeric"
+                      name="value"
                       value={draft.value}
                       onChange={(event) => set("value", event.target.value)}
                     />
@@ -380,6 +424,7 @@ export function Promotions() {
                     <input
                       inputMode="numeric"
                       value={draft.minOrderAmount}
+                      name="minOrderAmount"
                       onChange={(event) =>
                         set("minOrderAmount", event.target.value)
                       }
@@ -390,6 +435,7 @@ export function Promotions() {
                     <input
                       inputMode="numeric"
                       value={draft.maxDiscount}
+                      name="maxDiscount"
                       onChange={(event) =>
                         set("maxDiscount", event.target.value)
                       }
@@ -400,6 +446,7 @@ export function Promotions() {
                     <input
                       inputMode="numeric"
                       value={draft.totalLimit}
+                      name="totalLimit"
                       onChange={(event) =>
                         set("totalLimit", event.target.value)
                       }
@@ -410,6 +457,7 @@ export function Promotions() {
                     <input
                       inputMode="numeric"
                       value={draft.perUserLimit}
+                      name="perUserLimit"
                       onChange={(event) =>
                         set("perUserLimit", event.target.value)
                       }
@@ -420,6 +468,7 @@ export function Promotions() {
                     <input
                       type="datetime-local"
                       value={draft.startAt}
+                      name="startAt"
                       onChange={(event) => set("startAt", event.target.value)}
                     />
                   </label>
@@ -428,9 +477,11 @@ export function Promotions() {
                     <input
                       type="datetime-local"
                       value={draft.endAt}
+                      name="endAt"
                       onChange={(event) => set("endAt", event.target.value)}
                     />
                   </label>
+                  <p className="credential-hint manage-full">تاریخ و ساعت بر اساس منطقهٔ زمانی دستگاه شماست.</p>
                   <label>
                     فعال
                     <select
@@ -463,6 +514,7 @@ export function Promotions() {
                     </button>
                   )}
                 </div>
+                </fieldset>
               </form>
               {detail.data && !creating && (
                 <>

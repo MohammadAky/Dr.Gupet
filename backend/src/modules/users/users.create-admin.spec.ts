@@ -9,7 +9,7 @@ function makePrisma(existing: any = null) {
   return {
     user: {
       findUnique: jest.fn().mockResolvedValue(existing),
-      create: jest.fn().mockImplementation(async ({ data, select }: any) => ({ id: 1, ...data })),
+      create: jest.fn().mockImplementation(async ({ data }: any) => ({ id: 1, ...data })),
     },
   } as any;
 }

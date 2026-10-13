@@ -30,10 +30,7 @@ export class AdminBrandsController {
 
   @Get()
   @ApiOperation({ summary: 'List brands incl. inactive (admin only)' })
-  async findAll(
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-  ) {
+  async findAll(@Query('search') search?: string, @Query('isActive') isActive?: string) {
     return this.brandsService.findAllAdmin({
       search,
       isActive: isActive === undefined ? undefined : isActive === 'true',
