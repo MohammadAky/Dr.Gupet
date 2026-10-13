@@ -36,7 +36,8 @@ export function SearchableFilter({
   const [active, setActive] = useState(0);
   const chosen = options.find((option) => option.value === value)?.label ?? value;
 
-  const matches = options.filter((option) => normalize(option.label).includes(normalize(query)));
+  const normalizedQuery = normalize(query);
+  const matches = options.filter((option) => normalize(option.label).includes(normalizedQuery));
   useEffect(() => {
     if (open) list.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView?.({ block: 'nearest' });
   }, [active, open]);

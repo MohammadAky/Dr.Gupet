@@ -15,7 +15,7 @@ import { useAuth } from '../auth/auth-provider';
 /** Orders list (F9): newest first, page-based. */
 export function OrdersPage() {
   const { status, user } = useAuth();
-  if (status === 'loading') return <AccountFrame title="سفارش‌های من"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="سفارش‌های من"><LoadingState layout="rows" /></AccountFrame>;
   if (status !== 'authed' || !user) return <p>برای دیدن سفارش‌ها وارد حساب شوید.</p>;
   return <OrdersSession key={user.id} />;
 }
@@ -43,7 +43,7 @@ function OrdersSession() {
     placeholderData: keepPreviousData,
   });
 
-  if (orders.isLoading) return <AccountFrame title="سفارش‌های من"><LoadingState /></AccountFrame>;
+  if (orders.isLoading) return <AccountFrame title="سفارش‌های من"><LoadingState layout="rows" /></AccountFrame>;
   if (orders.error)
     return <AccountFrame title="سفارش‌های من"><ErrorState error={orders.error} onRetry={() => void orders.refetch()} /></AccountFrame>;
 

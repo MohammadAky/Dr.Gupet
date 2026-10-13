@@ -10,6 +10,7 @@ import { SearchableFilter } from '../components/SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { parseProductFilters, serializeProductFilters } from '../features/catalog/filters';
 import { toEnDigits } from '../lib/format';
+import { publicRecordName } from '../lib/sample-records';
 
 /**
  * Catalog list. All filters live in the URL (convention §5.5), so the list is
@@ -143,7 +144,7 @@ export function ProductsPage() {
               { value: '', label: 'همهٔ برندها' },
               ...(brands.data ?? []).map((brand) => ({
                 value: String(brand.id),
-                label: brand.name,
+                label: publicRecordName(brand),
               })),
             ]}
             onSelect={(value) => patch({ brandId: value ? Number(value) : undefined })}
@@ -262,7 +263,7 @@ export function ProductsPage() {
         </button>
       </div>
 
-      {products.isLoading && <LoadingState />}
+      {products.isLoading && <LoadingState layout="cards" />}
       {products.data?.meta && (
         <p className="directory-results" role="status">
           {products.data.meta.total.toLocaleString('fa-IR')} محصول

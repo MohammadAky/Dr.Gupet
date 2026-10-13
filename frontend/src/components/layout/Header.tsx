@@ -5,6 +5,7 @@ import { shopApi, type Page } from '../../api/endpoints-shop';
 import type { Clinic, Medicine, Pharmacy, ProductCard } from '../../api/types';
 import type { AuthStatus } from '../../auth/auth-provider';
 import { formatAmount } from '../../lib/format';
+import { isSampleReference, publicRecordName } from '../../lib/sample-records';
 
 type SearchSource = 'desktop' | 'mobile';
 type SuggestionGroup = 'products' | 'medicines' | 'pharmacies' | 'clinics';
@@ -79,8 +80,8 @@ function productSuggestion(item: ProductCard): Suggestion | null {
   return {
     key: `products-${item.id}`,
     group: 'products',
-    name: item.name,
-    detail: item.brand?.name ?? '',
+    name: publicRecordName(item),
+    detail: item.brand ? publicRecordName(item.brand) : '',
     to: `/products/${encodeURIComponent(item.slug)}`,
   };
 }
@@ -93,8 +94,8 @@ function namedSuggestion(
   return {
     key: `${group}-${item.id}`,
     group,
-    name: item.name,
-    detail: 'city' in item ? item.city : (item.activeIngredient ?? ''),
+    name: publicRecordName(item),
+    detail: isSampleReference(item) ? '' : 'city' in item ? item.city : (item.activeIngredient ?? ''),
     to: `/${group}/${item.id}`,
   };
 }
@@ -407,7 +408,7 @@ export function Header({
             <Icon name="menu" />
           </button>
           <Link to="/" className="app-logo" aria-label="دکتر گوپت، صفحهٔ اصلی" onClick={() => { closeSuggestions(); onMenuClose(); }}>
-            <SafeImage src="/brand/logo.jpg" alt="" width="55" height="55" />
+            <SafeImage src="/brand/logo.webp" alt="" width="55" height="55" />
             <span>
               دکتر گوپت<small>DR. GUPET</small>
             </span>

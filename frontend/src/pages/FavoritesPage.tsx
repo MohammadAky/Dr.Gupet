@@ -15,7 +15,7 @@ import { AccountFrame, AccountNav } from '../components/AccountNav';
 export function FavoritesPage() {
   const { status, user } = useAuth();
   const userId = status === 'authed' ? (user?.id ?? null) : null;
-  if (status === 'loading') return <AccountFrame title="علاقه‌مندی‌ها"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="علاقه‌مندی‌ها"><LoadingState layout="cards" /></AccountFrame>;
   if (userId === null) return <p>برای مشاهدهٔ علاقه‌مندی‌ها وارد حساب شوید.</p>;
   return <FavoritesContent key={userId} />;
 }
@@ -94,7 +94,7 @@ function FavoritesContent() {
     }
   }
 
-  if (favorites.isLoading) return <AccountFrame title="علاقه‌مندی‌ها"><LoadingState /></AccountFrame>;
+  if (favorites.isLoading) return <AccountFrame title="علاقه‌مندی‌ها"><LoadingState layout="cards" /></AccountFrame>;
   if (favorites.error)
     return <AccountFrame title="علاقه‌مندی‌ها"><ErrorState error={favorites.error} onRetry={() => void favorites.refetch()} /></AccountFrame>;
 

@@ -12,8 +12,7 @@ import { safeImageUrl } from '../lib/image-url';
 import { API_BASE_URL } from '../lib/env';
 import { SafeImage } from '../components/SafeImage';
 import { Dialog } from '../components/ui/interactive';
-import { isSampleProduct } from '../lib/sample-records';
-import { SampleRecordNotice } from '../components/SampleRecordNotice';
+import { isSampleProduct, publicRecordName } from '../lib/sample-records';
 
 /** Product detail: variant selection, add-to-cart and favorite toggle (F5/F7/F8 behaviour). */
 export function ProductDetailPage() {
@@ -210,7 +209,7 @@ export function ProductDetailPage() {
         </nav>
         <h1>{product.data?.name ?? 'اطلاعات محصول'}</h1>
         {product.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="detail" />
         ) : (
           <ErrorState
             error={product.error ?? 'محصول یافت نشد'}
@@ -234,7 +233,7 @@ export function ProductDetailPage() {
   return (
     <article className="product-detail">
       <nav className="product-detail__breadcrumb" aria-label="مسیر">
-        <Link to="/">خانه</Link> / <Link to="/products">محصولات</Link> / {detail.name}
+        <Link to="/">خانه</Link> / <Link to="/products">محصولات</Link> / {publicRecordName(detail)}
       </nav>
       <div className="product-detail__main">
         <div className="product-detail__gallery">
@@ -244,9 +243,9 @@ export function ProductDetailPage() {
                 className="commerce-gallery-open"
                 type="button"
                 onClick={() => setGalleryOpen(true)}
-                aria-label={`نمایش بزرگ‌تر تصویر ${detail.name}`}
+                aria-label={`نمایش بزرگ‌تر تصویر ${publicRecordName(detail)}`}
               >
-                <SafeImage src={imageUrl} alt={detail.name} referrerPolicy="no-referrer" />
+                <SafeImage src={imageUrl} alt={publicRecordName(detail)} referrerPolicy="no-referrer" />
                 <span>نمایش بزرگ‌تر</span>
               </button>
             ) : (
@@ -259,7 +258,7 @@ export function ProductDetailPage() {
                 <button
                   key={image.id}
                   type="button"
-                  aria-label={`تصویر ${index + 1} از ${detail.name}`}
+                  aria-label={`تصویر ${index + 1} از ${publicRecordName(detail)}`}
                   aria-pressed={selectedImage?.id === image.id}
                   onClick={() => setSelectedImageId(image.id)}
                 >
@@ -278,12 +277,11 @@ export function ProductDetailPage() {
         </div>
         <div className="product-detail__info">
           <p className="product-detail__eyebrow">
-            {detail.brand.name} / {detail.category.name}
+            {publicRecordName(detail.brand)} / {publicRecordName(detail.category)}
           </p>
-          <h1>{detail.name}</h1>
-          {isSampleProduct(detail) && <SampleRecordNotice kind="product" />}
+          <h1>{publicRecordName(detail)}</h1>
           <p>
-            {detail.petType.name} · {detail.brand.name} · {detail.category.name}
+            {detail.petType.name} · {publicRecordName(detail.brand)} · {publicRecordName(detail.category)}
           </p>
           <form onSubmit={submitAddToCart}>
             {activeVariant && (
@@ -311,7 +309,7 @@ export function ProductDetailPage() {
                     <span>{formatToman(variant.price)}</span>
                   </span>
                   <span className="commerce-variant-stock">
-                    {variant.inStock ? (variant.lowStock ? 'موجودی محدود' : 'موجود') : 'ناموجود'}
+                    {!isSampleProduct(detail) && variant.inStock ? (variant.lowStock ? 'موجودی محدود' : 'موجود') : 'ناموجود'}
                   </span>
                 </label>
               ))}
@@ -346,7 +344,7 @@ export function ProductDetailPage() {
                 addPending
               }
             >
-              {addPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
+              {isSampleProduct(detail) ? 'ناموجود' : addPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
             </button>
             {identity === null && !isSampleProduct(detail) && (
               <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
@@ -394,9 +392,8 @@ export function ProductDetailPage() {
       </div>
 
       <section className="product-detail__description">
-        <h2>توضیحات</h2>
-        <p>{detail.description || 'توضیحی برای این محصول ثبت نشده است.'}</p>
-        {detail.ingredientsText && (
+        {!isSampleProduct(detail) && detail.description && <><h2>توضیحات</h2><p>{detail.description}</p></>}
+        {!isSampleProduct(detail) && detail.ingredientsText && (
           <>
             <h2>ترکیبات</h2>
             <p>{detail.ingredientsText}</p>
@@ -418,12 +415,12 @@ export function ProductDetailPage() {
       </section>
       <Dialog
         open={galleryOpen}
-        title={detail.name}
+        title={publicRecordName(detail)}
         description="نمایش بزرگ‌تر تصاویر محصول"
         onClose={() => setGalleryOpen(false)}
       >
         <div className="commerce-gallery-viewer">
-          <SafeImage src={imageUrl ?? undefined} alt={detail.name} referrerPolicy="no-referrer" />
+          <SafeImage src={imageUrl ?? undefined} alt={publicRecordName(detail)} referrerPolicy="no-referrer" />
           {images.length > 1 && (
             <nav aria-label="تصاویر محصول">
               <button

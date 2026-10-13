@@ -90,7 +90,7 @@ export function VerifyOtpPage() {
   return (
     <section className="auth-page auth-verify">
       <Link to="/" className="auth-story__brand">
-        <SafeImage src="/brand/logo.jpg" width={48} height={48} alt="دکتر گوپت" />
+        <SafeImage src="/brand/logo.webp" width={48} height={48} alt="دکتر گوپت" />
         <span>دکتر گوپت</span>
       </Link>
       <h1>کد تأیید</h1>

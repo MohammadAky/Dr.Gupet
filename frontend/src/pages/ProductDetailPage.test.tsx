@@ -152,7 +152,8 @@ describe('product detail private actions', () => {
     async (sample) => {
       vi.mocked(shopApi.product).mockResolvedValue(sample);
       await showPage();
-      expect(container.textContent).toContain('قابل خرید نیست');
+      expect(container.querySelector('.sample-record-note')).toBeNull();
+      expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe('ناموجود');
       expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(
         true,
       );

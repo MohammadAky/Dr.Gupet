@@ -53,7 +53,7 @@ export function PetEditPage() {
   if (status === 'loading')
     return (
       <AccountFrame title="پروفایل حیوان">
-        <LoadingState />
+        <LoadingState layout="form" />
       </AccountFrame>
     );
   if (status !== 'authed' || !user) return <p>برای مدیریت حیوانات خود وارد حساب شوید.</p>;
@@ -299,7 +299,7 @@ function PetEditSession() {
       <section className="account-page">
         <AccountNav />
         <h1>ویرایش حیوان</h1>
-        <LoadingState />
+        <LoadingState layout="form" />
       </section>
     );
   if (id !== undefined && !validEditingId)
@@ -343,7 +343,7 @@ function PetEditSession() {
       <section className="account-page">
         <AccountNav />
         <h1>{editingId ? 'ویرایش حیوان' : 'ثبت حیوان جدید'}</h1>
-        <LoadingState />
+        <LoadingState layout="form" />
       </section>
     );
 

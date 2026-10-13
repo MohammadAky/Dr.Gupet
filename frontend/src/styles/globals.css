@@ -682,7 +682,7 @@ img {
   display: block;
   width: 70px;
   height: 70px;
-  background: url('/brand/logo.jpg') center / contain no-repeat;
+  background: url('/brand/logo.webp') center / contain no-repeat;
   opacity: 0.35;
 }
 .product-card h3 {
@@ -1191,6 +1191,11 @@ img {
   .footer-brand {
     grid-column: 1 / -1;
   }
+  .footer-bottom {
+    justify-content: center;
+    text-align: center;
+    line-height: 1.9;
+  }
   .privacy-banner {
     display: block;
     bottom: calc(80px + env(safe-area-inset-bottom));
@@ -1245,10 +1250,10 @@ img {
     font-size: 0.72rem;
   }
   .footer-content {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .footer-brand {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 340px) {
@@ -2252,7 +2257,7 @@ img {
   width: 96px;
   height: 96px;
   opacity: 0.4;
-  background: url('/brand/logo.jpg') center / contain no-repeat;
+  background: url('/brand/logo.webp') center / contain no-repeat;
 }
 .product-detail__eyebrow {
   color: #916b1e;
@@ -2623,11 +2628,6 @@ img {
   }
   .not-found__art {
     aspect-ratio: 1.8;
-  }
-}
-@media (max-width: 500px) {
-  .medicine-grid {
-    grid-template-columns: 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

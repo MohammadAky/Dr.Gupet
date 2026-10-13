@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import type { AuthStatus } from '../../auth/auth-provider';
 
-type NavIconName = 'home' | 'products' | 'pharmacies' | 'account';
+type NavIconName = 'home' | 'products' | 'favorites' | 'account';
 
 function NavIcon({ name }: { name: NavIconName }) {
   const paths = {
@@ -19,12 +19,7 @@ function NavIcon({ name }: { name: NavIconName }) {
         <rect x="13" y="14" width="8" height="7" rx="1" />
       </>
     ),
-    pharmacies: (
-      <>
-        <path d="M4 7h16v14H4zM3 7l2-4h14l2 4" />
-        <path d="M10 12h4m-2-2v4M7 21v-4h10v4" />
-      </>
-    ),
+    favorites: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />,
     account: (
       <>
         <circle cx="12" cy="8" r="4" />
@@ -60,9 +55,9 @@ export function MobileBottomNav({ status }: { status: AuthStatus }) {
         <NavIcon name="products" />
         <span>محصولات</span>
       </NavLink>
-      <NavLink to="/pharmacies">
-        <NavIcon name="pharmacies" />
-        <span>داروخانه‌ها</span>
+      <NavLink to="/favorites">
+        <NavIcon name="favorites" />
+        <span>علاقه‌مندی‌ها</span>
       </NavLink>
       <NavLink to={status === 'authed' ? '/profile' : '/login'}>
         <NavIcon name="account" />

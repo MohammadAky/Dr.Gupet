@@ -28,7 +28,7 @@ export function ClinicDetailPage() {
         {!Number.isSafeInteger(clinicId) || clinicId <= 0 ? (
           <EmptyState text="شناسهٔ کلینیک معتبر نیست." />
         ) : clinic.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="detail" />
         ) : clinic.error ? (
           <ErrorState error={clinic.error} onRetry={() => void clinic.refetch()} />
         ) : (

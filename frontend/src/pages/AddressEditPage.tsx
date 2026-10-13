@@ -37,7 +37,7 @@ const EMPTY: FormState = {
 export function AddressEditPage() {
   const { status, user } = useAuth();
   const { id } = useParams();
-  if (status === 'loading') return <AccountFrame title="آدرس"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="آدرس"><LoadingState layout="form" /></AccountFrame>;
   if (status !== 'authed' || !user) return <p>برای مدیریت آدرس‌ها وارد حساب شوید.</p>;
   return <AddressEditSession key={`${user.id}:${id ?? 'new'}`} />;
 }
@@ -126,7 +126,7 @@ function AddressEditSession() {
     },
   });
 
-  if (editingId && addresses.isLoading) return <section className="account-page"><AccountNav /><h1>ویرایش آدرس</h1><LoadingState /></section>;
+  if (editingId && addresses.isLoading) return <section className="account-page"><AccountNav /><h1>ویرایش آدرس</h1><LoadingState layout="form" /></section>;
   if (editingId && !invalidId && !existing && !addresses.isLoading && !addresses.error) {
     return (
       <section className="account-page">

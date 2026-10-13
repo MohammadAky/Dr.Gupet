@@ -16,7 +16,7 @@ import { useAuth } from '../auth/auth-provider';
 export function PetDetailPage() {
   const { status, user } = useAuth();
   const { id } = useParams();
-  if (status === 'loading') return <AccountFrame title="پروفایل حیوان"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="پروفایل حیوان"><LoadingState layout="detail" /></AccountFrame>;
   if (status !== 'authed' || !user) return <p>برای دیدن حیوان خود وارد حساب شوید.</p>;
   return <PetDetailSession key={`${user.id}:${id}`} userId={user.id} />;
 }
@@ -55,7 +55,7 @@ function PetDetailSession({ userId }: { userId: number }) {
         <Link to="/pets">بازگشت به حیوانات من</Link>
       </section>
     );
-  if (pet.isLoading) return <AccountFrame title="پروفایل حیوان"><LoadingState /></AccountFrame>;
+  if (pet.isLoading) return <AccountFrame title="پروفایل حیوان"><LoadingState layout="detail" /></AccountFrame>;
   if (pet.error) return <AccountFrame title="پروفایل حیوان"><ErrorState error={pet.error} onRetry={() => void pet.refetch()} /></AccountFrame>;
   if (!pet.data || pet.data.id !== petId || pet.data.userId !== userId) return null;
 

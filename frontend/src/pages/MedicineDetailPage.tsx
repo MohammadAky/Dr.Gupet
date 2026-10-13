@@ -6,8 +6,7 @@ import { queryKeys } from '../api/query-keys';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { formatRelativeJalali } from '../lib/jalali';
 import { DirectoryDetailFrame } from '../components/DirectoryDetailFrame';
-import { isSampleReference } from '../lib/sample-records';
-import { SampleRecordNotice } from '../components/SampleRecordNotice';
+import { isSampleReference, publicRecordName } from '../lib/sample-records';
 import { SafeImage } from '../components/SafeImage';
 import { safeImageUrl } from '../lib/image-url';
 import { API_BASE_URL } from '../lib/env';
@@ -36,7 +35,7 @@ export function MedicineDetailPage() {
         {!Number.isSafeInteger(medicineId) || medicineId <= 0 ? (
           <EmptyState text="داروی مورد نظر پیدا نشد." />
         ) : medicine.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="detail" />
         ) : medicine.error ? (
           <ErrorState error={medicine.error} onRetry={() => void medicine.refetch()} />
         ) : (
@@ -57,29 +56,28 @@ export function MedicineDetailPage() {
       <Link className="detail-back" to="/medicines">
         بازگشت به داروها ←
       </Link>
-      <h1>{item.name}</h1>
-      {sample && <SampleRecordNotice kind="medicine" />}
+      <h1>{publicRecordName(item)}</h1>
       {image && (
-        <SafeImage className="sample-record-image" src={image} alt={item.name} loading="lazy" />
+        <SafeImage className="sample-record-image" src={image} alt={publicRecordName(item)} loading="lazy" />
       )}
       <p>
-        {item.activeIngredient && <>مادهٔ مؤثره: {item.activeIngredient} · </>}
+        {!sample && item.activeIngredient && <>مادهٔ مؤثره: {item.activeIngredient} · </>}
         {!sample && item.type && <>{item.type} · </>}
-        {sample ? 'اطلاعات نمایشی' : item.requiresPrescription ? 'نیازمند نسخه' : 'بدون نسخه'}
+        {sample ? 'اطلاعات دارویی' : item.requiresPrescription ? 'نیازمند نسخه' : 'بدون نسخه'}
       </p>
       <ul>
         {item.petTypes.map((type) => (
           <li key={type.id}>{type.name}</li>
         ))}
       </ul>
-      <p>{item.usage ?? '—'}</p>
-      {item.notes && <p>{item.notes}</p>}
+      {!sample && item.usage && <p>{item.usage}</p>}
+      {!sample && item.notes && <p>{item.notes}</p>}
 
       <p role="note" className="disclaimer">
-        {item.disclaimer}
+        {sample ? 'پیش از مصرف هر دارو با دامپزشک مشورت کنید.' : item.disclaimer}
       </p>
 
-      <section>
+      {!sample && <section>
         <h2>داروخانه‌های دارندهٔ این دارو</h2>
         <label htmlFor="cityFilter">فیلتر شهر</label>
         <input id="cityFilter" value={city} onChange={(event) => setCity(event.target.value)} />
@@ -105,7 +103,7 @@ export function MedicineDetailPage() {
             </li>
           ))}
         </ul>
-      </section>
+      </section>}
 
       <p>
         <Link to="/medicines">بازگشت به فهرست دارو‌ها</Link>

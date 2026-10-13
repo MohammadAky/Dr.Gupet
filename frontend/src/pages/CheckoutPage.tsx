@@ -243,7 +243,7 @@ function CheckoutSession({ userId }: { userId: number | null }) {
           <Link to="/cart">بازگشت به سبد خرید</Link>
         </header>
         {addresses.isLoading || cart.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="form" />
         ) : (
           <ErrorState
             error={addresses.error ?? cart.error}

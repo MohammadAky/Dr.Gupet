@@ -22,7 +22,7 @@ export function ProfilePage() {
       <section className="account-page">
         <AccountNav />
         <h1>حساب من</h1>
-        <LoadingState />
+        <LoadingState layout="form" />
       </section>
     );
   if (status !== 'authed' || !user) return <p>برای دیدن پروفایل وارد حساب شوید.</p>;
@@ -81,7 +81,7 @@ function ProfileSession() {
     },
   });
 
-  if (status === 'loading') return <LoadingState />;
+  if (status === 'loading') return <LoadingState layout="form" />;
   if (!user) return null;
 
   function submit(event: FormEvent) {

@@ -4,8 +4,7 @@ import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { DirectoryDetailFrame } from '../components/DirectoryDetailFrame';
-import { isSampleReference } from '../lib/sample-records';
-import { SampleRecordNotice } from '../components/SampleRecordNotice';
+import { isSampleReference, publicRecordName } from '../lib/sample-records';
 import { SafeImage } from '../components/SafeImage';
 import { safeImageUrl } from '../lib/image-url';
 import { API_BASE_URL } from '../lib/env';
@@ -38,7 +37,7 @@ export function PharmacyDetailPage() {
         {!Number.isSafeInteger(pharmacyId) || pharmacyId <= 0 ? (
           <EmptyState text="داروخانهٔ مورد نظر پیدا نشد." />
         ) : pharmacy.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="detail" />
         ) : pharmacy.error ? (
           <ErrorState error={pharmacy.error} onRetry={() => void pharmacy.refetch()} />
         ) : (
@@ -60,18 +59,17 @@ export function PharmacyDetailPage() {
       <Link className="detail-back" to="/pharmacies">
         بازگشت به داروخانه‌ها ←
       </Link>
-      <h1>{item.name}</h1>
-      {sample && <SampleRecordNotice kind="pharmacy" />}
+      <h1>{publicRecordName(item)}</h1>
       {image && (
-        <SafeImage className="sample-record-image" src={image} alt={item.name} loading="lazy" />
+        <SafeImage className="sample-record-image" src={image} alt={publicRecordName(item)} loading="lazy" />
       )}
-      <p>
+      {!sample && <p>
         {item.isVerified && 'تأییدشده · '}
         {item.is24h && '۲۴ ساعته · '}
         {item.province}، {item.city}
-      </p>
-      <p>{item.address}</p>
-      {item.workingHours && <p>ساعات کاری: {item.workingHours}</p>}
+      </p>}
+      {!sample && item.address && <p>{item.address}</p>}
+      {!sample && item.workingHours && <p>ساعات کاری: {item.workingHours}</p>}
       {!sample && item.phone && (
         <p>
           <a dir="ltr" href={`tel:${item.phone}`}>

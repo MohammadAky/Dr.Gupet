@@ -14,7 +14,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 export function AddressesPage() {
   const { status, user } = useAuth();
   const userId = status === 'authed' ? (user?.id ?? null) : null;
-  if (status === 'loading') return <AccountFrame title="آدرس‌های من"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="آدرس‌های من"><LoadingState layout="rows" /></AccountFrame>;
   if (userId === null) return <p>برای مشاهدهٔ آدرس‌های خود وارد حساب شوید.</p>;
   return <AddressesContent key={userId} />;
 }
@@ -81,7 +81,7 @@ function AddressesContent() {
     }
   }
 
-  if (addresses.isLoading) return <AccountFrame title="آدرس‌های من"><LoadingState /></AccountFrame>;
+  if (addresses.isLoading) return <AccountFrame title="آدرس‌های من"><LoadingState layout="rows" /></AccountFrame>;
   if (addresses.error)
     return <AccountFrame title="آدرس‌های من"><ErrorState error={addresses.error} onRetry={() => void addresses.refetch()} /></AccountFrame>;
 

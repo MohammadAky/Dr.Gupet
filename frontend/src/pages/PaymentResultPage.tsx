@@ -215,7 +215,7 @@ function PaymentResultSession({
       {!paymentConfirmed && callbackStatus !== 'success' && (
         <p>تأیید پرداخت دریافت نشده است. وضعیت سفارش را بررسی کنید.</p>
       )}
-      {(order.isLoading || scan.isLoading) && <LoadingState />}
+      {(order.isLoading || scan.isLoading) && <LoadingState layout="rows" />}
       {userId !== null && (
         <button
           type="button"

@@ -20,7 +20,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 export function OrderDetailPage() {
   const { status, user } = useAuth();
   const { id } = useParams();
-  if (status === 'loading') return <LoadingState />;
+  if (status === 'loading') return <LoadingState layout="detail" />;
   if (status !== 'authed' || !user) return <p>برای دیدن سفارش وارد حساب شوید.</p>;
   return <OrderDetailSession key={`${user.id}:${id}`} userId={user.id} />;
 }
@@ -123,7 +123,7 @@ function OrderDetailSession({ userId }: { userId: number }) {
         <h1>جزئیات سفارش</h1>
         <Link to="/orders">بازگشت به سفارش‌ها</Link>
         {order.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="detail" />
         ) : (
           <ErrorState error={order.error} onRetry={() => void order.refetch()} />
         )}

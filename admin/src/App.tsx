@@ -59,7 +59,7 @@ function humanError(error: unknown): string {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`brand ${compact ? "brand--compact" : ""}`}>
-      <img src="/brand/logo.jpg" width="48" height="48" alt="" />
+      <img src="/brand/logo.webp" width="48" height="48" alt="" />
       <div>
         <strong>دکتر گوپت</strong>
         <span>مدیریت فروشگاه</span>

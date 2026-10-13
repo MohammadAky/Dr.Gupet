@@ -11,7 +11,7 @@ import { ThemeToggle } from './components/layout/ThemeToggle';
 import { ConsentBanner } from './privacy/ConsentBanner';
 import { PageMetadata } from './components/PageMetadata';
 import { RouteBoundary } from './components/RouteBoundary';
-import { LoadingState } from './components/states';
+import { RouteLoading } from './components/RouteLoading';
 import { landingSample, safeLandingLink } from './features/landing/content';
 
 export function Shell() {
@@ -126,7 +126,7 @@ export function Shell() {
         className={`app-main${location.pathname === '/' ? '' : ' content-page'}`}
       >
         <RouteBoundary key={location.pathname}>
-          <Suspense fallback={<LoadingState text="در حال آماده‌سازی صفحه…" />}>
+          <Suspense fallback={<RouteLoading pathname={location.pathname} />}>
             <Outlet />
           </Suspense>
         </RouteBoundary>

@@ -123,6 +123,26 @@ describe('clinic directory presentation preserves real information', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
+  it('keeps sample records browseable without sample suffixes, placeholder locations or fake status', async () => {
+    vi.mocked(shopApi.pharmacies).mockResolvedValue({ data: [{
+      ...clinic,
+      name: 'داروخانه سپید — نمونه نمایشی',
+      isSample: true,
+      city: 'نمونه نمایشی',
+      province: 'نمونه نمایشی',
+      address: 'نشانی ساختگی',
+      isVerified: true,
+      image: '/brand/discovery-pharmacy-480.webp',
+    }] });
+    await show('/pharmacies', 'pharmacies');
+    await vi.waitFor(() => expect(container.querySelector('h2 a')?.textContent).toBe('داروخانه سپید'));
+    expect(container.querySelector('h2 a')?.getAttribute('href')).toBe(`/pharmacies/${clinic.id}`);
+    expect(container.textContent).not.toContain('نمونه نمایشی');
+    expect(container.textContent).not.toContain('نشانی ساختگی');
+    expect(container.textContent).not.toContain('تأییدشده');
+    expect(container.querySelector('figcaption')).toBeNull();
+  });
+
   it('shows unknown hours honestly while keeping telephone and non-embedded map navigation', async () => {
     await show('/clinics/12');
     await vi.waitFor(() => expect(container.querySelector('h1')?.textContent).toBe(clinic.name));

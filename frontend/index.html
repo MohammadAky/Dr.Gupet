@@ -6,11 +6,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#122F12" />
     <meta name="description" content="دکتر گوپت؛ مرور و انتخاب محصولات سگ و گربه و مطالعهٔ اطلاعات دارویی و داروخانه‌ها." />
-    <link rel="icon" href="/brand/logo.jpg" type="image/jpeg" />
+    <link rel="icon" href="/brand/logo.webp" type="image/webp" />
+    <link rel="stylesheet" href="/src/styles/loading.css" />
+    <script>document.documentElement.dataset.bootPage = location.pathname === '/' ? 'landing' : 'page';</script>
     <title>دکتر گوپت</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Real document/module bootstrap state; React replaces this immediately on mount. -->
+      <div class="landing-bootstrap" role="status" aria-busy="true">
+        <div class="landing-bootstrap__mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="64" height="64" fill="currentColor"><ellipse cx="15" cy="24" rx="7" ry="9" transform="rotate(-25 15 24)"/><ellipse cx="28" cy="15" rx="7" ry="9"/><ellipse cx="43" cy="17" rx="7" ry="9" transform="rotate(15 43 17)"/><ellipse cx="52" cy="30" rx="6" ry="8" transform="rotate(35 52 30)"/><path d="M14 47c0-9 10-20 18-20s20 11 20 20c0 12-13 7-19 7s-19 5-19-7Z"/></svg>
+        </div>
+        <strong>دکتر گوپت</strong>
+        <p>در حال آماده‌سازی برای همراه کوچک شما…</p>
+        <span class="landing-bootstrap__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <div class="page-bootstrap loading-wireframe" role="status" aria-busy="true">
+        <span class="loading-wireframe__status">در حال آماده‌سازی صفحه…</span>
+        <div class="loading-wireframe__body" aria-hidden="true"><div class="loading-wireframe__heading"><span class="loading-wireframe__line loading-wireframe__line--short"></span><span class="loading-wireframe__line"></span></div><div class="loading-wireframe__grid"><div class="loading-wireframe__card"><span class="loading-wireframe__media"></span><span class="loading-wireframe__line"></span><span class="loading-wireframe__line loading-wireframe__line--short"></span></div><div class="loading-wireframe__card"><span class="loading-wireframe__media"></span><span class="loading-wireframe__line"></span><span class="loading-wireframe__line loading-wireframe__line--short"></span></div></div></div>
+      </div>
+    </div>
+    <noscript>
+      <style>#root { display: none; }</style>
+      <p>برای نمایش فروشگاه، جاوااسکریپت مرورگر را فعال کنید.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

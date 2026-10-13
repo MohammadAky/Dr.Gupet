@@ -31,7 +31,7 @@ export function LoginPage() {
     <section className="auth-shell">
       <aside className="auth-story">
         <Link to="/" className="auth-story__brand">
-          <SafeImage src="/brand/logo.jpg" width={48} height={48} alt="دکتر گوپت" />
+          <SafeImage src="/brand/logo.webp" width={48} height={48} alt="دکتر گوپت" />
           <span>دکتر گوپت</span>
         </Link>
         <div className="auth-story__copy">

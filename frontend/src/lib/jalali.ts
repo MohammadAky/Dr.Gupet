@@ -8,17 +8,24 @@ import { todayTehran } from '../components/calendar';
 export type JalaliKind = 'date' | 'datetime';
 
 const PERSIAN_LOCALE = 'fa-IR-u-ca-persian';
+const dateOptions: Intl.DateTimeFormatOptions = {
+  timeZone: 'Asia/Tehran',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+};
+const dateFormatter = new Intl.DateTimeFormat(PERSIAN_LOCALE, dateOptions);
+const dateTimeFormatter = new Intl.DateTimeFormat(PERSIAN_LOCALE, {
+  ...dateOptions,
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const relativeFormatter = new Intl.RelativeTimeFormat('fa-IR', { numeric: 'auto' });
 
 export function formatJalali(iso: string | number | Date, kind: JalaliKind = 'date'): string {
   const date = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(PERSIAN_LOCALE, {
-    timeZone: 'Asia/Tehran',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    ...(kind === 'datetime' ? { hour: '2-digit', minute: '2-digit' } : {}),
-  }).format(date);
+  return (kind === 'datetime' ? dateTimeFormatter : dateFormatter).format(date);
 }
 
 /** "۳ روز پیش" style relative time for lastConfirmedAt etc. */
@@ -26,7 +33,7 @@ export function formatRelativeJalali(iso: string | number | Date, now: Date = ne
   const date = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   const diffMs = date.getTime() - now.getTime();
-  const rtf = new Intl.RelativeTimeFormat('fa-IR', { numeric: 'auto' });
+  const rtf = relativeFormatter;
   const minutes = Math.round(diffMs / 60000);
   if (Math.abs(minutes) < 60) return rtf.format(minutes, 'minute');
   const hours = Math.round(minutes / 60);

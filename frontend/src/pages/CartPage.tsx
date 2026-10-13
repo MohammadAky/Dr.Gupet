@@ -225,7 +225,7 @@ export function CartPage() {
           <Link to="/products">ادامه خرید</Link>
         </header>
         {cart.isLoading ? (
-          <LoadingState />
+          <LoadingState layout="rows" />
         ) : (
           <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />
         )}

@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../lib/env';
 import { safeImageUrl } from '../lib/image-url';
 import { LIFE_STAGE_FA, SIZE_CLASS_FA } from '../lib/labels';
 import { SafeImage } from './SafeImage';
-import { isSampleProduct } from '../lib/sample-records';
+import { isSampleProduct, publicRecordName } from '../lib/sample-records';
 
 /**
  * The single product card renderer used by home, catalog, favorites and
@@ -29,13 +29,13 @@ export function ProductCardView({
         <div className="product-card__media">
           <SafeImage
             src={imageUrl ?? undefined}
-            alt={card.name}
+            alt={publicRecordName(card)}
             loading="lazy"
             referrerPolicy="no-referrer"
           />
         </div>
-        <h3>{card.name}</h3>
-        <p className="product-card__brand">{card.brand.name}</p>
+        <h3>{publicRecordName(card)}</h3>
+        <p className="product-card__brand">{publicRecordName({ ...card.brand, isSample: sample })}</p>
         <div className="product-card__bottom">
           <div className="product-card__prices">
             {typeof card.compareAtPrice === 'number' && card.compareAtPrice > card.minPrice && (
@@ -46,7 +46,7 @@ export function ProductCardView({
             <p className="product-card__price">{formatToman(card.minPrice)}</p>
           </div>
           <span className={`stock-pill${card.inStock && !sample ? '' : ' stock-pill--out'}`}>
-            {sample ? 'نمونهٔ نمایشی؛ غیرقابل خرید' : card.inStock ? 'موجود' : 'ناموجود'}
+            {card.inStock && !sample ? 'موجود' : 'ناموجود'}
           </span>
         </div>
         <p className="product-card__meta">

@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { createRequire } from 'module';
 import { RedisService } from '../redis/redis.service';
+
+// This project retains CommonJS/node resolution; Sharp exposes split ESM/CJS types.
+const sharp: typeof import('sharp').default = createRequire(__filename)('sharp');
 
 // Magic bytes for file type validation
 const MAGIC_BYTES: Record<string, Buffer[]> = {
@@ -17,6 +21,8 @@ const MAGIC_BYTES: Record<string, Buffer[]> = {
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const QUOTA_TTL_SECONDS = 48 * 3600; // keep the daily window + slack
+const MAX_IMAGE_PIXELS = 40_000_000;
+const MAX_IMAGE_EDGE = 1920;
 
 @Injectable()
 export class UploadService {
@@ -104,22 +110,52 @@ export class UploadService {
       throw new BadRequestException('نوع فایل معتبر نیست');
     }
 
+    // Decode and normalize before consuming quota; a renamed file is not WebP.
+    let image: Buffer;
+    try {
+      const decoder = sharp(file.buffer, {
+        animated: true,
+        limitInputPixels: MAX_IMAGE_PIXELS,
+        failOn: 'error',
+      });
+      const metadata = await decoder.metadata();
+      if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
+        throw new Error('Unsupported decoded format');
+      }
+      const pixels =
+        (metadata.width ?? 0) *
+        (metadata.pageHeight ?? metadata.height ?? 0) *
+        (metadata.pages ?? 1);
+      if (!pixels || pixels > MAX_IMAGE_PIXELS) throw new Error('Image exceeds pixel limit');
+      // Rotation is only meaningful/supported for a single frame. Preserve animation.
+      if ((metadata.pages ?? 1) === 1) decoder.rotate();
+      image = await decoder
+        .resize(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82, effort: 4 })
+        .timeout({ seconds: 10 })
+        .toBuffer();
+      if (image.length > maxSize) throw new Error('Encoded image exceeds byte limit');
+    } catch {
+      throw new BadRequestException('تصویر معتبر نیست یا ابعاد آن بیش از حد مجاز است');
+    }
+
     // Per-user daily quota (issue #07)
     await this.consumeQuota(userId, file.size);
 
     // Generate random filename
-    const ext = this.getExtension(file.mimetype);
-    const filename = `${crypto.randomUUID()}.${ext}`;
+    const filename = `${crypto.randomUUID()}.webp`;
     const filepath = path.join(this.uploadDir, filename);
 
     // Write file — remove it again if the write fails halfway (issue #07).
     try {
-      fs.writeFileSync(filepath, file.buffer);
+      await fs.promises.writeFile(filepath, image, { flag: 'wx' });
     } catch (error) {
-      try {
-        fs.unlinkSync(filepath);
-      } catch {
-        /* nothing to clean up */
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        try {
+          await fs.promises.unlink(filepath);
+        } catch {
+          /* nothing to clean up */
+        }
       }
       this.logger.error(`upload write failed: ${(error as Error).message}`);
       throw new BadRequestException('ذخیره فایل ناموفق بود');
@@ -139,18 +175,5 @@ export class UploadService {
       }
     }
     return null;
-  }
-
-  private getExtension(mimetype: string): string {
-    switch (mimetype) {
-      case 'image/jpeg':
-        return 'jpg';
-      case 'image/png':
-        return 'png';
-      case 'image/webp':
-        return 'webp';
-      default:
-        return 'bin';
-    }
   }
 }

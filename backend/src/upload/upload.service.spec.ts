@@ -2,6 +2,9 @@ import { UploadService } from './upload.service';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as crypto from 'crypto';
+import { createRequire } from 'module';
+const sharp: typeof import('sharp').default = createRequire(__filename)('sharp');
 
 /**
  * Issue #07 — upload hardening: magic-byte validation, size limits from env,
@@ -31,6 +34,7 @@ function makeService(
   opts: { maxMb?: number; countLimit?: number; bytesLimit?: number; dir?: string } = {},
 ) {
   const dir = opts.dir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'upl-'));
+  temporaryDirs.push(dir);
   const values: Record<string, unknown> = {
     'app.uploadDir': dir,
     'app.uploadMaxMb': opts.maxMb ?? 5,
@@ -44,21 +48,135 @@ function makeService(
   return { service, redis, dir };
 }
 
-const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64)]);
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(64)]);
+let JPEG: Buffer;
+let PNG: Buffer;
+let WEBP: Buffer;
+const temporaryDirs: string[] = [];
+
+beforeAll(async () => {
+  const source = {
+    create: {
+      width: 24,
+      height: 16,
+      channels: 4 as const,
+      background: { r: 21, g: 92, b: 32, alpha: 0.5 },
+    },
+  };
+  [JPEG, PNG, WEBP] = await Promise.all([
+    sharp(source).jpeg().toBuffer(),
+    sharp(source).png().toBuffer(),
+    sharp(source).webp().toBuffer(),
+  ]);
+});
+afterEach(() => jest.restoreAllMocks());
+afterAll(async () => {
+  await Promise.all(
+    temporaryDirs.map((dir) => {
+      if (!path.resolve(dir).startsWith(`${path.resolve(os.tmpdir())}${path.sep}`)) {
+        throw new Error('Refusing cleanup outside the temporary test directory');
+      }
+      return fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }),
+  );
+});
 
 function file(buffer: Buffer, mimetype = 'image/jpeg', size?: number) {
   return { buffer, mimetype, size: size ?? buffer.length, originalname: 'x.jpg' } as any;
 }
 
 describe('UploadService validation (issue #07)', () => {
-  it('accepts JPEG/PNG/WebP by magic bytes and stores a random name', async () => {
+  it('decodes JPEG/PNG/WebP and stores real WebP with random names and alpha preserved', async () => {
     const { service, dir } = makeService();
-    const res = await service.uploadImage(1, file(JPEG));
-    expect(res.url).toMatch(/^http:\/\/api\/uploads\/[0-9a-f-]+\.jpg$/);
-    const saved = fs.readdirSync(dir);
-    expect(saved).toHaveLength(1);
-    await expect(service.uploadImage(1, file(PNG, 'image/png'))).resolves.toBeTruthy();
+    for (const [input, mime] of [
+      [JPEG, 'image/jpeg'],
+      [PNG, 'image/png'],
+      [WEBP, 'image/webp'],
+    ] as const) {
+      const res = await service.uploadImage(1, file(input, mime));
+      expect(res.url).toMatch(/^http:\/\/api\/uploads\/[0-9a-f-]+\.webp$/);
+      const saved = await fs.promises.readFile(path.join(dir, path.basename(res.url)));
+      const metadata = await sharp(saved).metadata();
+      expect(metadata).toMatchObject({ format: 'webp', width: 24, height: 16 });
+      if (mime !== 'image/jpeg') expect(metadata.hasAlpha).toBe(true);
+    }
+    expect(fs.readdirSync(dir)).toHaveLength(3);
+  });
+
+  it('rejects truncated image data with valid magic bytes before quota or write', async () => {
+    const { service, redis, dir } = makeService();
+    await expect(service.uploadImage(1, file(JPEG.subarray(0, 12)))).rejects.toThrow(
+      'تصویر معتبر نیست',
+    );
+    expect(redis.store.size).toBe(0);
+    expect(fs.readdirSync(dir)).toHaveLength(0);
+  });
+
+  it('preserves animated WebP frames, timing and loop count', async () => {
+    // Original two-frame 8x6 fixture: red/green at 100/200ms, looping twice.
+    const animated = Buffer.from(
+      'UklGRoQAAABXRUJQVlA4WAoAAAASAAAABwAABQAAQU5JTQYAAAAAAAAAAgBBTk1GKAAAAAAAAAAAAAcAAAUAAGQAAAJWUDhMDwAAAC8HQAEQBxD9jwIGIqL/AQBBTk1GKAAAAAAAAAAAAAcAAAUAAMgAAAJWUDhMDwAAAC8HQAEQB9D/iAIGIqL/AQA=',
+      'base64',
+    );
+    const { service, dir } = makeService();
+    const result = await service.uploadImage(1, file(animated, 'image/webp'));
+    const saved = await fs.promises.readFile(path.join(dir, path.basename(result.url)));
+    const metadata = await sharp(saved, { animated: true }).metadata();
+    expect(metadata).toMatchObject({
+      format: 'webp',
+      pages: 2,
+      pageHeight: 6,
+      width: 8,
+      loop: 2,
+      delay: [100, 200],
+    });
+  });
+
+  it('respects orientation, caps dimensions and strips metadata', async () => {
+    const source = await sharp({
+      create: { width: 2400, height: 1200, channels: 3, background: '#123412' },
+    })
+      .jpeg()
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    const { service, dir } = makeService();
+    const result = await service.uploadImage(1, file(source));
+    const saved = await fs.promises.readFile(path.join(dir, path.basename(result.url)));
+    const metadata = await sharp(saved).metadata();
+    expect(metadata).toMatchObject({ width: 960, height: 1920, format: 'webp' });
+    expect(metadata.exif).toBeUndefined();
+    expect(metadata.orientation).toBeUndefined();
+  });
+
+  it('rejects images exceeding the decoded pixel cap before consuming quota', async () => {
+    const huge = await sharp({
+      create: { width: 6400, height: 6400, channels: 3, background: '#fff' },
+    })
+      .png()
+      .toBuffer();
+    const { service, redis } = makeService();
+    await expect(service.uploadImage(1, file(huge, 'image/png'))).rejects.toThrow('ابعاد');
+    expect(redis.store.size).toBe(0);
+  });
+
+  it('removes a partial file after asynchronous write failure', async () => {
+    const { service, dir } = makeService();
+    const original = fs.promises.writeFile;
+    jest.spyOn(fs.promises, 'writeFile').mockImplementation(async (...args) => {
+      await original(...args);
+      throw new Error('simulated write failure');
+    });
+    await expect(service.uploadImage(1, file(JPEG))).rejects.toThrow('ذخیره فایل ناموفق');
+    expect(fs.readdirSync(dir)).toHaveLength(0);
+  });
+
+  it('preserves an existing file if a random filename collides', async () => {
+    const { service, dir } = makeService();
+    const id = '00000000-0000-0000-0000-000000000001';
+    const destination = path.join(dir, `${id}.webp`);
+    await fs.promises.writeFile(destination, WEBP);
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(id);
+    await expect(service.uploadImage(1, file(JPEG))).rejects.toThrow('ذخیره فایل ناموفق');
+    expect(await fs.promises.readFile(destination)).toEqual(WEBP);
   });
 
   it('rejects spoofed content types (magic bytes mismatch)', async () => {

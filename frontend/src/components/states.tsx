@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { errorText } from '../lib/labels';
+import { PageSkeleton, type LoadingLayout } from './RouteLoading';
 
 /** Loading / error / empty primitives shared by every data view (convention §5.10). */
 
-export function LoadingState({ text = 'در حال بارگذاری…' }: { text?: string }) {
+export function LoadingState({ text, layout }: { text?: string; layout?: LoadingLayout }) {
+  // Small in-place operations retain their compact status; page data reserves its outline.
+  if (!text || layout) return <PageSkeleton layout={layout} text={text} />;
   return (
     <p className="state-loading" role="status" aria-busy="true">
       <span className="state-loading__indicator" aria-hidden="true" />

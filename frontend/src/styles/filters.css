@@ -457,6 +457,8 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
   gap: 24px;
 }
+
+
 .directory-card.clinic-card {
   display: flex;
   flex-direction: column;
@@ -1789,5 +1791,87 @@
   }
   .account-empty-cart .account-actions a {
     flex: 1 1 180px;
+  }
+}
+
+/* Compact public directories keep two readable choices visible on a phone. */
+@media (max-width: 760px) {
+  .directory-grid,
+  .clinic-directory .directory-grid,
+  .medicine-directory .medicine-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .directory-card,
+  .medicine-card {
+    min-width: 0;
+    padding: 12px;
+    border-radius: 16px;
+  }
+  .directory-card.clinic-card,
+  .pharmacy-card:has(.clinic-card__image) {
+    padding: 0;
+    overflow: hidden;
+  }
+  .clinic-card__body,
+  .pharmacy-card:has(.clinic-card__image) .directory-card__body {
+    padding: 12px;
+  }
+  .directory-card h2,
+  .clinic-card h2,
+  .medicine-card h2 {
+    margin-block: 10px 8px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+  .directory-card p,
+  .clinic-card .clinic-card__location,
+  .medicine-card p {
+    font-size: 0.76rem;
+    line-height: 1.8;
+  }
+  .clinic-card .directory-card__address,
+  .directory-card__address {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    margin-block: 6px 10px;
+    font-size: 0.74rem;
+  }
+  .directory-card__meta {
+    gap: 4px;
+    margin-block-start: 8px;
+  }
+  .directory-card__meta span {
+    padding: 3px 6px;
+    font-size: 0.66rem;
+  }
+  .clinic-card__image figcaption {
+    inset-inline-start: 6px;
+    inset-block-end: 6px;
+    padding: 3px 6px;
+    font-size: 0.6rem;
+  }
+  .clinic-card__actions {
+    gap: 4px;
+    padding-block-start: 8px;
+  }
+  .directory-card__link,
+  .clinic-card .directory-card__link,
+  .clinic-card__contact {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-block-start: 8px;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+  .clinic-card__contact {
+    padding-inline: 8px;
+  }
+  .medicine-card__kind {
+    font-size: 0.68rem;
   }
 }

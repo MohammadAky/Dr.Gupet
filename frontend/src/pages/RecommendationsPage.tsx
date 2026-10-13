@@ -24,7 +24,7 @@ export function parseRecommendationPage(params: URLSearchParams): number {
 /** Recommendations (F6): pick a pet, show matched diet tags. */
 export function RecommendationsPage() {
   const { status, user } = useAuth();
-  if (status === 'loading') return <AccountFrame title="پیشنهادها"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="پیشنهادها"><LoadingState layout="cards" /></AccountFrame>;
   if (status !== 'authed' || !user) return <p>برای دیدن پیشنهادها وارد حساب شوید.</p>;
   return <RecommendationsSession key={user.id} />;
 }
@@ -73,7 +73,7 @@ function RecommendationsSession() {
     setParams(query);
   }
 
-  if (pets.isLoading) return <AccountFrame title="پیشنهادها"><LoadingState /></AccountFrame>;
+  if (pets.isLoading) return <AccountFrame title="پیشنهادها"><LoadingState layout="cards" /></AccountFrame>;
   if (pets.error) return <AccountFrame title="پیشنهادها"><ErrorState error={pets.error} onRetry={() => void pets.refetch()} /></AccountFrame>;
 
   const petList = pets.data ?? [];
@@ -125,7 +125,7 @@ function RecommendationsSession() {
         جداگانه نمایش داده می‌شود؛ این نتیجه تضمین سازگاری یا جایگزین مشاورهٔ دامپزشک نیست.
       </p>
 
-      {recommendations.isLoading && <LoadingState />}
+      {recommendations.isLoading && <LoadingState layout="cards" />}
       {recommendations.error && (
         <ErrorState error={recommendations.error} onRetry={() => void recommendations.refetch()} />
       )}

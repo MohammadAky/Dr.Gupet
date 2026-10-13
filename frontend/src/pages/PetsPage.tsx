@@ -17,7 +17,7 @@ import { safeImageUrl } from '../lib/image-url';
 export function PetsPage() {
   const { status, user } = useAuth();
   const userId = status === 'authed' ? (user?.id ?? null) : null;
-  if (status === 'loading') return <AccountFrame title="حیوانات من"><LoadingState /></AccountFrame>;
+  if (status === 'loading') return <AccountFrame title="حیوانات من"><LoadingState layout="cards" /></AccountFrame>;
   if (userId === null) return <p>برای مشاهدهٔ حیوانات خود وارد حساب شوید.</p>;
   return <PetsContent key={userId} />;
 }
@@ -68,7 +68,7 @@ function PetsContent() {
     }
   }
 
-  if (pets.isLoading) return <AccountFrame title="حیوانات من"><LoadingState /></AccountFrame>;
+  if (pets.isLoading) return <AccountFrame title="حیوانات من"><LoadingState layout="cards" /></AccountFrame>;
   if (pets.error) return <AccountFrame title="حیوانات من"><ErrorState error={pets.error} onRetry={() => void pets.refetch()} /></AccountFrame>;
 
   const items = pets.data ?? [];

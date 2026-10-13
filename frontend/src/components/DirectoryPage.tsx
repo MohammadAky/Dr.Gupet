@@ -10,7 +10,7 @@ import { citySuggestions, provinces } from '../lib/locations';
 import { Pagination } from './Pagination';
 import { SearchableFilter } from './SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from './states';
-import { isSampleReference } from '../lib/sample-records';
+import { isSampleReference, publicRecordName } from '../lib/sample-records';
 
 export function DirectoryPage({ kind }: { kind: 'pharmacies' | 'clinics' }) {
   return <DirectoryContent key={kind} kind={kind} />;
@@ -150,7 +150,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
         </p>
       )}
 
-      {directory.isLoading && <LoadingState />}
+      {directory.isLoading && <LoadingState layout="cards" />}
       {directory.error && (
         <ErrorState error={directory.error} onRetry={() => void directory.refetch()} />
       )}
@@ -159,7 +159,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
         <>
           <div className="directory-grid">
             {data.data.map((place) => (
-              <article className={`directory-card${clinics ? ' clinic-card' : ''}`} key={place.id}>
+              <article className={`directory-card${clinics ? ' clinic-card' : ' pharmacy-card'}`} key={place.id}>
                 {(clinics || place.image) && (
                   <figure className="clinic-card__image">
                     <SafeImage
@@ -174,32 +174,29 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
                           ? `${clinicArtwork(place.id)}-480.webp 480w, ${clinicArtwork(place.id)}-960.webp 960w`
                           : undefined
                       }
-                      sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 360px"
+                      sizes="(max-width: 760px) calc((100vw - 52px) / 2), (max-width: 1000px) 45vw, 360px"
                       width="960"
                       height="720"
                       loading="lazy"
                       decoding="async"
                       alt=""
                     />
-                    <figcaption>
-                      {isSampleReference(place) ? 'تصویر نمونهٔ نمایشی' : 'تصویر نمادین'}
-                    </figcaption>
+                    {!isSampleReference(place) && <figcaption>تصویر نمادین</figcaption>}
                   </figure>
                 )}
-                <div className={clinics ? 'clinic-card__body' : undefined}>
+                <div className={clinics ? 'clinic-card__body' : 'directory-card__body'}>
                   <div className="directory-card__meta">
-                    {isSampleReference(place) && <span>نمونهٔ نمایشی؛ مرکز واقعی نیست</span>}
-                    {place.isVerified && <span>تأییدشده</span>}
-                    {place.is24h && <span>۲۴ ساعته</span>}
-                    {!clinics && place.onDuty && <span>کشیک</span>}
+                    {!isSampleReference(place) && place.isVerified && <span>تأییدشده</span>}
+                    {!isSampleReference(place) && place.is24h && <span>۲۴ ساعته</span>}
+                    {!isSampleReference(place) && !clinics && place.onDuty && <span>کشیک</span>}
                   </div>
                   <h2>
-                    <Link to={`${base}/${place.id}`}>{place.name}</Link>
+                    <Link to={`${base}/${place.id}`}>{publicRecordName(place)}</Link>
                   </h2>
-                  <p className={clinics ? 'clinic-card__location' : undefined}>
+                  {!isSampleReference(place) && <p className={clinics ? 'clinic-card__location' : undefined}>
                     {place.province}، {place.city}
-                  </p>
-                  <p className="directory-card__address">{place.address}</p>
+                  </p>}
+                  {!isSampleReference(place) && place.address && <p className="directory-card__address">{place.address}</p>}
                   <div className={clinics ? 'clinic-card__actions' : undefined}>
                     <Link className="directory-card__link" to={`${base}/${place.id}`}>
                       مشاهدهٔ اطلاعات <span aria-hidden="true">←</span>

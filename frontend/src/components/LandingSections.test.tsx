@@ -142,7 +142,7 @@ describe('persisted landing records and shared consent-based nearby centers', ()
     await vi.waitFor(() => expect(shopApi.nearbyClinics).toHaveBeenCalled());
   }
 
-  it('uses persisted public API records and their real catalog detail identifiers with clear sample labels', async () => {
+  it('uses persisted records and their real detail identifiers without public sample clutter', async () => {
     await show();
     expect(shopApi.products).toHaveBeenCalledWith({ page: 1, limit: 8, sampleOnly: true });
     expect(shopApi.medicines).toHaveBeenCalledWith({ page: 1, limit: 8, sampleOnly: true });
@@ -155,13 +155,11 @@ describe('persisted landing records and shared consent-based nearby centers', ()
     expect(container.querySelector('.landing-pharmacies h3 a')?.getAttribute('href')).toBe(
       '/pharmacies/11',
     );
-    expect(container.querySelector('.landing-bestsellers')?.textContent).toContain('غیرقابل خرید');
-    expect(container.querySelector('.landing-medicines')?.textContent).toContain(
-      'داروی واقعی نیست',
-    );
-    expect(container.querySelector('.landing-pharmacies')?.textContent).toContain(
-      'مرکز واقعی نیست',
-    );
+    expect(container.querySelector('.landing-bestsellers')?.textContent).toContain('ناموجود');
+    expect(container.querySelector('.landing-demo-notice')).toBeNull();
+    expect(container.textContent).not.toContain('داروی واقعی نیست');
+    expect(container.textContent).not.toContain('مرکز واقعی نیست');
+    expect(container.textContent).not.toContain('— نمونه نمایشی');
     expect(container.textContent).not.toContain('کلینیک نمونهٔ سپید');
   });
 
@@ -251,7 +249,7 @@ describe('persisted landing records and shared consent-based nearby centers', ()
     );
     expect(container.querySelector('.landing-pharmacies .landing-center__distance')).toBeNull();
     expect(container.querySelector('.landing-pharmacies')?.textContent).toContain(
-      'داروخانهٔ واقعی دارای موقعیت معتبر پیدا نشد',
+      'موقعیت معتبری برای داروخانه‌های این فهرست ثبت نشده است.',
     );
   });
 
@@ -262,7 +260,7 @@ describe('persisted landing records and shared consent-based nearby centers', ()
     expect(container.querySelector('.landing-clinics h3')?.textContent).toContain('99');
     expect(container.querySelector('.landing-clinics .landing-center__distance')).not.toBeNull();
     expect(container.querySelector('.landing-pharmacies [role="alert"]')).not.toBeNull();
-    expect(container.querySelector('.landing-pharmacies h3')?.textContent).toContain(pharmacy.name);
+    expect(container.querySelector('.landing-pharmacies h3')?.textContent).toBe('داروخانهٔ نمایشی');
   });
 
   it('rejects sample or invalid-distance nearby rows instead of falsely showing their distance', async () => {
@@ -275,7 +273,7 @@ describe('persisted landing records and shared consent-based nearby centers', ()
     await show();
     await grant();
     expect(container.querySelector('.landing-pharmacies .landing-center__distance')).toBeNull();
-    expect(container.querySelector('.landing-pharmacies h3')?.textContent).toContain(pharmacy.name);
+    expect(container.querySelector('.landing-pharmacies h3')?.textContent).toBe('داروخانهٔ نمایشی');
   });
 
   it('keeps genuine paid rankings unavailable instead of passing ordinary newest products off as bestsellers', async () => {

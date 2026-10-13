@@ -12,7 +12,7 @@ import { API_BASE_URL } from '../lib/env';
 import { SafeImage } from './SafeImage';
 import { LandingCarousel } from './LandingCarousel';
 import { ProductCardView } from './ProductCardView';
-import { isSampleProduct, isSampleReference } from '../lib/sample-records';
+import { isSampleProduct, isSampleReference, publicRecordName } from '../lib/sample-records';
 import { EmptyState, ErrorState, LoadingState } from './states';
 
 const centerFilters = { page: 1, limit: 4 };
@@ -108,14 +108,12 @@ function CenterCard({
             loading="lazy"
             decoding="async"
           />
-          <figcaption>{sample ? 'تصویر نمونهٔ نمایشی' : 'تصویر نمادین'}</figcaption>
+          {!sample && <figcaption>تصویر نمادین</figcaption>}
         </figure>
       )}
       <div className="landing-center__body">
         <div className="landing-center__meta">
-          {sample ? (
-            <span>نمونهٔ نمایشی؛ مرکز واقعی نیست</span>
-          ) : (
+          {!sample && (
             <>
               {place.isVerified && <span>تأییدشده</span>}
               {place.is24h && <span>۲۴ ساعته</span>}
@@ -124,12 +122,12 @@ function CenterCard({
           )}
         </div>
         <h3>
-          <Link to={`/${kind}/${place.id}`}>{place.name}</Link>
+          <Link to={`/${kind}/${place.id}`}>{publicRecordName(place)}</Link>
         </h3>
-        <p>
+        {!sample && <p>
           {place.province}، {place.city}
-        </p>
-        <p className="landing-center__address">{place.address}</p>
+        </p>}
+        {!sample && place.address && <p className="landing-center__address">{place.address}</p>}
         {!sample && distance !== undefined && (
           <p className="landing-center__distance">
             فاصلهٔ مستقیم تقریبی: {distance.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}{' '}
@@ -174,16 +172,14 @@ function MedicineCard({ medicine }: { medicine: Medicine }) {
         />
       )}
       <span>
-        {sample
-          ? 'نمونهٔ نمایشی؛ داروی واقعی نیست'
-          : medicine.requiresPrescription
+        {!sample && medicine.requiresPrescription
             ? 'نیازمند نسخه'
             : 'اطلاعات دارویی'}
       </span>
       <h3>
-        <Link to={`/medicines/${medicine.id}`}>{medicine.name}</Link>
+        <Link to={`/medicines/${medicine.id}`}>{publicRecordName(medicine)}</Link>
       </h3>
-      {medicine.activeIngredient && <p>مادهٔ مؤثره: {medicine.activeIngredient}</p>}
+      {!sample && medicine.activeIngredient && <p>مادهٔ مؤثره: {medicine.activeIngredient}</p>}
       <Link className="landing-center__action" to={`/medicines/${medicine.id}`}>
         مطالعهٔ اطلاعات<span aria-hidden="true">←</span>
       </Link>
@@ -338,7 +334,7 @@ export function LandingSections({ content = landingSample }: { content?: Landing
           to="/products"
           action="همهٔ محصولات"
         />
-        {types.isLoading && <LoadingState />}
+        {types.isLoading && <LoadingState layout="rows" />}
         {types.error && <ErrorState error={types.error} onRetry={() => void types.refetch()} />}
         {types.data?.length === 0 && <EmptyState text="دسته‌بندی حیوانات فعلاً در دسترس نیست." />}
         <nav className="landing-species__row" aria-label="محصولات بر اساس نوع حیوان">
@@ -368,16 +364,12 @@ export function LandingSections({ content = landingSample }: { content?: Landing
         />
         {content.sections.products.demo ? (
           <>
-            <p className="landing-demo-notice">
-              <span>نمونهٔ نمایشی</span>این محصولات در فهرست فروشگاه هم وجود دارند، قابل خرید نیستند
-              و آمار پرفروش واقعی نیستند.
-            </p>
             {products.isLoading && <LoadingState />}
             {products.error && (
               <ErrorState error={products.error} onRetry={() => void products.refetch()} />
             )}
             {products.data && sampleProducts.length === 0 && (
-              <EmptyState text="هنوز محصول نمایشی ثبت نشده است." />
+              <EmptyState text="هنوز محصولی ثبت نشده است." />
             )}
             {sampleProducts.length > 0 && (
               <LandingCarousel title={content.sections.products.title}>
@@ -476,10 +468,10 @@ export function LandingSections({ content = landingSample }: { content?: Landing
         />
         <p className="landing-section__note">
           {locationState === 'idle'
-            ? 'برای مرتب‌سازی داروخانه‌ها بر اساس فاصله، دکمهٔ موقعیت در بخش کلینیک‌ها را انتخاب کنید.'
+            ? 'مراکز نزدیک را با انتخاب موقعیت در بخش کلینیک‌ها ببینید.'
             : locationState === 'pending'
               ? 'در حال بررسی داروخانه‌های نزدیک شما…'
-              : 'فاصله فقط برای مراکز واقعی دارای مختصات نمایش داده می‌شود.'}
+              : 'فاصلهٔ مراکز دارای موقعیت معتبر نمایش داده می‌شود.'}
         </p>
         {pharmacies.isLoading && <LoadingState />}
         {pharmacies.error && (
@@ -490,8 +482,7 @@ export function LandingSections({ content = landingSample }: { content?: Landing
         )}
         {nearby.pharmacies?.data.length === 0 && (
           <p className="landing-section__note">
-            داروخانهٔ واقعی دارای موقعیت معتبر پیدا نشد؛ فهرست عادی و موارد نمایشی بدون فاصله نمایش
-            داده می‌شوند.
+            موقعیت معتبری برای داروخانه‌های این فهرست ثبت نشده است.
           </p>
         )}
         {pharmacies.data?.data.length === 0 && !nearby.pharmacies?.data.length && (
@@ -521,12 +512,6 @@ export function LandingSections({ content = landingSample }: { content?: Landing
         <p className="landing-section__note">
           اطلاعات داروها برای آشنایی است؛ پیش از مصرف با دامپزشک مشورت کنید.
         </p>
-        {content.sections.medicines.demo && (
-          <p className="landing-demo-notice">
-            <span>نمونهٔ نمایشی</span>این موارد در فهرست داروها هم وجود دارند و دارو یا توصیهٔ
-            درمانی واقعی نیستند.
-          </p>
-        )}
         {medicines.isLoading && <LoadingState />}
         {medicines.error && (
           <ErrorState error={medicines.error} onRetry={() => void medicines.refetch()} />

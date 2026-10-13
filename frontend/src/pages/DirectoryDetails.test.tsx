@@ -145,7 +145,7 @@ it.each(cases)(
   },
 );
 
-it('labels persisted medicine samples and keeps their source artwork without suggesting prescription availability', async () => {
+it('keeps sample medicine artwork and a clean heading without suggesting prescription availability', async () => {
   vi.mocked(shopApi.medicine).mockResolvedValue({
     ...cases[0].result,
     name: 'اطلاعات دارویی — نمونه نمایشی',
@@ -156,15 +156,17 @@ it('labels persisted medicine samples and keeps their source artwork without sug
     pharmacies: [],
   });
   await show(cases[0], '1');
-  await vi.waitFor(() => expect(container.querySelector('.sample-record-note')).not.toBeNull());
-  expect(container.textContent).toContain('داروی واقعی یا توصیهٔ درمانی نیست');
+  await vi.waitFor(() => expect(container.querySelector('h1')?.textContent).toBe('اطلاعات دارویی'));
+  expect(container.querySelector('.sample-record-note')).toBeNull();
+  expect(container.textContent).not.toContain('نمونه نمایشی');
+  expect(container.textContent).toContain('پیش از مصرف هر دارو با دامپزشک مشورت کنید.');
   expect(container.textContent).not.toContain('بدون نسخه');
   expect(container.querySelector('img')?.getAttribute('src')).toContain(
     '/brand/discovery-medicine-480.webp',
   );
 });
 
-it('labels persisted pharmacy samples and suppresses fake contact/map actions even if an inconsistent response includes them', async () => {
+it('cleans sample pharmacy headings while suppressing fake location/contact/map actions', async () => {
   vi.mocked(shopApi.pharmacy).mockResolvedValue({
     ...cases[1].result,
     name: 'داروخانهٔ نمایشی — نمونه نمایشی',
@@ -173,10 +175,15 @@ it('labels persisted pharmacy samples and suppresses fake contact/map actions ev
     lat: 35.7,
     lng: 51.4,
     image: '/brand/discovery-pharmacy-480.webp',
+    city: 'نمونه نمایشی',
+    province: 'نمونه نمایشی',
+    address: 'نشانی ساختگی نباید نمایش داده شود',
   });
   await show(cases[1], '1');
-  await vi.waitFor(() => expect(container.querySelector('.sample-record-note')).not.toBeNull());
-  expect(container.textContent).toContain('یک داروخانهٔ واقعی نیست');
+  await vi.waitFor(() => expect(container.querySelector('h1')?.textContent).toBe('داروخانهٔ نمایشی'));
+  expect(container.querySelector('.sample-record-note')).toBeNull();
+  expect(container.textContent).not.toContain('نمونه نمایشی');
+  expect(container.textContent).not.toContain('نشانی ساختگی');
   expect(container.querySelector('a[href^="tel:"]')).toBeNull();
   expect(container.querySelector('a[href*="openstreetmap"]')).toBeNull();
   expect(container.querySelector('img')?.getAttribute('src')).toContain(

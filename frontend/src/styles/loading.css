@@ -1,0 +1,109 @@
+/* Present while the document/module is genuinely pending; no minimum display time. */
+.landing-bootstrap {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  box-sizing: border-box;
+  color: #f8f6ee;
+  background: #122f12;
+  text-align: center;
+  font-family: Vazirmatn, Tahoma, sans-serif;
+}
+.landing-bootstrap__mark {
+  display: grid;
+  place-items: center;
+  width: 7rem;
+  height: 7rem;
+  border: 1px solid #e4c67f;
+  border-radius: 50%;
+  color: #e4c67f;
+}
+.landing-bootstrap strong { font-size: 1.75rem; }
+.landing-bootstrap p { margin: 0; font-size: .95rem; line-height: 1.8; }
+.landing-bootstrap__dots { display: flex; gap: .5rem; margin-top: .5rem; }
+.landing-bootstrap__dots i {
+  width: .4rem;
+  height: .4rem;
+  background: #e4c67f;
+  border-radius: 50%;
+  animation: bootstrap-dot 900ms ease-in-out infinite alternate;
+}
+.landing-bootstrap__dots i:nth-child(2) { animation-delay: 150ms; }
+.landing-bootstrap__dots i:nth-child(3) { animation-delay: 300ms; }
+.page-bootstrap { display: none; max-width: 75rem; margin: 0 auto; padding: 3rem 1.25rem; }
+:root[data-boot-page='page'] .landing-bootstrap { display: none; }
+:root[data-boot-page='page'] .page-bootstrap { display: block; }
+
+/* Neutral outlines preserve the destination's shape without looking interactive. */
+.loading-wireframe {
+  --loading-block: #e2e5e3;
+  --loading-surface: #f2f3f2;
+  width: 100%;
+  min-width: 0;
+  padding-block: 1rem;
+  box-sizing: border-box;
+}
+:root[data-theme='dark'] .loading-wireframe {
+  --loading-block: #39413d;
+  --loading-surface: #252d28;
+}
+.loading-wireframe__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.loading-wireframe__body { animation: wireframe-pulse 1.3s ease-in-out infinite alternate; }
+.loading-wireframe__heading { display: grid; gap: .9rem; margin-bottom: 2rem; max-width: 30rem; }
+.loading-wireframe__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.loading-wireframe__card,
+.loading-wireframe__form,
+.loading-wireframe__row {
+  border: 1px solid var(--loading-block);
+  background: var(--loading-surface);
+  border-radius: 1.25rem;
+  padding: .9rem;
+}
+.loading-wireframe__card,
+.loading-wireframe__panel,
+.loading-wireframe__field,
+.loading-wireframe__rows,
+.loading-wireframe__form { display: grid; gap: .85rem; min-width: 0; }
+.loading-wireframe__media,
+.loading-wireframe__line,
+.loading-wireframe__input,
+.loading-wireframe__action,
+.loading-wireframe__thumb { display: block; background: var(--loading-block); border-radius: .5rem; }
+.loading-wireframe__media { aspect-ratio: 4 / 3; width: 100%; border-radius: .9rem; }
+.loading-wireframe__line { width: 100%; height: .8rem; }
+.loading-wireframe__line--short { width: 58%; }
+.loading-wireframe__input { height: 3rem; }
+.loading-wireframe__action { height: 2.5rem; width: 70%; margin-top: .5rem; border-radius: .75rem; }
+.loading-wireframe__detail { display: grid; gap: 2rem; }
+.loading-wireframe__detail > .loading-wireframe__media { max-height: 23rem; }
+.loading-wireframe__detail .loading-wireframe__panel { align-content: start; padding-block: 1rem; }
+.loading-wireframe__form { width: 100%; max-width: 40rem; padding: 1.25rem; box-sizing: border-box; }
+.loading-wireframe__row { display: flex; align-items: center; gap: 1rem; }
+.loading-wireframe__row .loading-wireframe__panel { flex: 1; }
+.loading-wireframe__thumb { width: 4rem; height: 4rem; flex: none; }
+@keyframes bootstrap-dot { from { opacity: .3; } to { opacity: 1; } }
+@keyframes wireframe-pulse { from { opacity: .6; } to { opacity: 1; } }
+@media (min-width: 800px) {
+  .loading-wireframe__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .loading-wireframe__detail { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 420px) {
+  .loading-wireframe__grid { gap: .65rem; }
+  .loading-wireframe__card { padding: .65rem; border-radius: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-bootstrap__dots i, .loading-wireframe__body { animation: none; }
+}

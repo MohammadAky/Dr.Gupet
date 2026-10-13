@@ -2,13 +2,14 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth-provider';
 import { sanitizeInternalRedirect } from '../lib/security';
+import { RouteLoading } from '../components/RouteLoading';
 
 /** Keeps the intended destination across the login flow (`?next=`). */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const location = useLocation();
 
-  if (status === 'loading') return <p>در حال بارگذاری…</p>;
+  if (status === 'loading') return <RouteLoading pathname={location.pathname} />;
   if (status === 'guest') {
     const rawTarget = `${location.pathname}${location.search}`;
     const next = encodeURIComponent(sanitizeInternalRedirect(rawTarget));
@@ -22,7 +23,7 @@ export function RequireGuest({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const location = useLocation();
 
-  if (status === 'loading') return <p>در حال بارگذاری…</p>;
+  if (status === 'loading') return <RouteLoading pathname={location.pathname} />;
   if (status === 'authed') {
     const params = new URLSearchParams(location.search);
     const target = sanitizeInternalRedirect(params.get('next'));

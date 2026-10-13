@@ -7,7 +7,7 @@ import { queryKeys } from '../api/query-keys';
 import { Pagination } from '../components/Pagination';
 import { SearchableFilter } from '../components/SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
-import { isSampleReference } from '../lib/sample-records';
+import { isSampleReference, publicRecordName } from '../lib/sample-records';
 
 /** Medicines (F10) — informational only: no price, no stock. */
 export function MedicinesPage() {
@@ -51,8 +51,8 @@ export function MedicinesPage() {
   });
   const medicineOptions = [
     ...new Set([
-      ...(suggestions.data?.data ?? []).map((medicine) => medicine.name),
-      ...(medicines.data?.data ?? []).map((medicine) => medicine.name),
+      ...(suggestions.data?.data ?? []).map(publicRecordName),
+      ...(medicines.data?.data ?? []).map(publicRecordName),
     ]),
   ].map((name) => ({ value: name, label: name }));
 
@@ -121,7 +121,7 @@ export function MedicinesPage() {
         </button>
       </form>
 
-      {medicines.isLoading && <LoadingState />}
+      {medicines.isLoading && <LoadingState layout="cards" />}
       {medicines.error && (
         <ErrorState error={medicines.error} onRetry={() => void medicines.refetch()} />
       )}
@@ -135,16 +135,14 @@ export function MedicinesPage() {
             {medicines.data.data.map((medicine) => (
               <li className="medicine-card" key={medicine.id}>
                 <span className="medicine-card__kind">
-                  {isSampleReference(medicine)
-                    ? 'نمونهٔ نمایشی؛ داروی واقعی نیست'
-                    : medicine.requiresPrescription
+                  {!isSampleReference(medicine) && medicine.requiresPrescription
                       ? 'نیازمند نسخه'
                       : 'اطلاعات دارویی'}
                 </span>
                 <h2>
-                  <Link to={`/medicines/${medicine.id}`}>{medicine.name}</Link>
+                  <Link to={`/medicines/${medicine.id}`}>{publicRecordName(medicine)}</Link>
                 </h2>
-                {medicine.activeIngredient && <p>مادهٔ مؤثره: {medicine.activeIngredient}</p>}
+                {!isSampleReference(medicine) && medicine.activeIngredient && <p>مادهٔ مؤثره: {medicine.activeIngredient}</p>}
                 <Link className="directory-card__link" to={`/medicines/${medicine.id}`}>
                   مطالعهٔ اطلاعات <span aria-hidden="true">←</span>
                 </Link>
