@@ -25,8 +25,8 @@ it("preserves coupon instants when an admin opens and saves the local datetime f
   render(<Promotions />);
   fireEvent.click(await screen.findByRole("button", { name: "بررسی" }));
   const start = await screen.findByLabelText("شروع");
-  const expectedLocalHour = new Date(coupon.startAt).getHours();
-  await waitFor(() => expect((start as HTMLInputElement).value.slice(11, 13)).toBe(String(expectedLocalHour).padStart(2, "0")));
+  await waitFor(() => expect(start.textContent).toContain("۱۲:۰۰"));
+  expect(start.textContent).toContain("۱۶ مهر ۱۴۰۵");
   fireEvent.submit(start.closest("form")!);
   await waitFor(() => expect(request).toHaveBeenCalledWith("/admin/coupons/7", expect.objectContaining({ method: "PATCH", body: expect.objectContaining({ startAt: coupon.startAt, endAt: coupon.endAt }) })));
 });

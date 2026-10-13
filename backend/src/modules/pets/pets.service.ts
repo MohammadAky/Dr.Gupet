@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { MAX_PETS_PER_USER } from '../../common/constants';
 import { canonicalSpeciesSlug } from '../../common/utils/species.util';
+import { dayKey } from '../../common/day-bucket';
 
 @Injectable()
 export class PetsService {
@@ -98,8 +99,12 @@ export class PetsService {
       }
     }
 
-    // Validate birth date not in future
-    if (data.birthDate && new Date(data.birthDate) > new Date()) {
+    // Date-only birthdays use Tehran's current civil day, not the UTC instant.
+    const birthDate = data.birthDate ? new Date(data.birthDate) : null;
+    if (birthDate && !Number.isFinite(birthDate.getTime())) {
+      throw new BadRequestException('تاریخ تولد معتبر نیست');
+    }
+    if (birthDate && birthDate.toISOString().slice(0, 10) > dayKey(new Date(), 'Asia/Tehran')) {
       throw new BadRequestException('تاریخ تولد نمی‌تواند در آینده باشد');
     }
 
@@ -116,7 +121,7 @@ export class PetsService {
         name: data.name,
         petTypeId: data.petTypeId,
         breedId: data.breedId || null,
-        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+        birthDate,
         gender: data.gender || null,
         isNeutered: data.isNeutered || false,
         weightKg: data.weightKg || null,
@@ -181,7 +186,7 @@ export class PetsService {
     if (birthDate && !Number.isFinite(birthDate.getTime())) {
       throw new BadRequestException('تاریخ تولد معتبر نیست');
     }
-    if (birthDate && birthDate > new Date()) {
+    if (birthDate && birthDate.toISOString().slice(0, 10) > dayKey(new Date(), 'Asia/Tehran')) {
       throw new BadRequestException('تاریخ تولد نمی‌تواند در آینده باشد');
     }
 

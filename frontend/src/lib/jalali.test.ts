@@ -29,3 +29,7 @@ describe('todayIso', () => {
     expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
+
+it('renders a Tehran date even when the instant is still the previous UTC day', () => {
+  expect(formatJalali('2026-03-20T21:00:00.000Z')).toContain('۱۴۰۵');
+});

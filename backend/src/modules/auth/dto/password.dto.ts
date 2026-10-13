@@ -19,7 +19,7 @@ export class PasswordPolicy implements ValidatorConstraintInterface {
     return validPassword(value);
   }
   defaultMessage(): string {
-    return 'رمز عبور باید حداقل ۱۲ کاراکتر و حداکثر ۷۲ بایت باشد';
+    return 'رمز عبور باید حداقل ۸ کاراکتر و حداکثر ۷۲ بایت باشد';
   }
 }
 

@@ -15,6 +15,7 @@ import {
   usePaged,
 } from "./management";
 import "./management.css";
+import { JalaliDateInput } from "./JalaliDateInput";
 
 type Coupon = {
   id: number;
@@ -63,12 +64,6 @@ const blank: Draft = {
   perUserLimit: "",
   isActive: true,
 };
-const localDate = (value: string | null): string => {
-  if (!value || Number.isNaN(Date.parse(value))) return "";
-  const date = new Date(value);
-  const twoDigits = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}T${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
-};
 const toDraft = (item: Coupon): Draft => ({
   code: item.code,
   type: item.type,
@@ -76,8 +71,8 @@ const toDraft = (item: Coupon): Draft => ({
   minOrderAmount:
     item.minOrderAmount == null ? "" : String(item.minOrderAmount),
   maxDiscount: item.maxDiscount == null ? "" : String(item.maxDiscount),
-  startAt: localDate(item.startAt),
-  endAt: localDate(item.endAt),
+  startAt: item.startAt ?? "",
+  endAt: item.endAt ?? "",
   totalLimit: item.totalLimit == null ? "" : String(item.totalLimit),
   perUserLimit: item.perUserLimit == null ? "" : String(item.perUserLimit),
   isActive: item.isActive,
@@ -185,10 +180,8 @@ export function Promotions() {
       setError("تاریخ و ساعت معتبر وارد کنید.");
       return;
     }
-    const instant = (value: string, original: string | null | undefined) =>
-      value ? new Date(original && value === localDate(original) ? original : value).toISOString() : null;
-    const startAt = instant(draft.startAt, creating ? null : detail.data?.startAt);
-    const endAt = instant(draft.endAt, creating ? null : detail.data?.endAt);
+    const startAt = draft.startAt || null;
+    const endAt = draft.endAt || null;
     if (startAt && endAt && startAt > endAt) {
       showFieldErrors(form, { endAt: "پایان بازه باید پس از شروع باشد." });
       setError("پایان بازه باید پس از شروع باشد.");
@@ -463,25 +456,15 @@ export function Promotions() {
                       }
                     />
                   </label>
-                  <label>
-                    شروع
-                    <input
-                      type="datetime-local"
-                      value={draft.startAt}
-                      name="startAt"
-                      onChange={(event) => set("startAt", event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    پایان
-                    <input
-                      type="datetime-local"
-                      value={draft.endAt}
-                      name="endAt"
-                      onChange={(event) => set("endAt", event.target.value)}
-                    />
-                  </label>
-                  <p className="credential-hint manage-full">تاریخ و ساعت بر اساس منطقهٔ زمانی دستگاه شماست.</p>
+                  <div>
+                    <label htmlFor="startAt">شروع</label>
+                    <JalaliDateInput id="startAt" name="startAt" value={draft.startAt} withTime disabled={busy} onChange={(value) => set("startAt", value)} />
+                  </div>
+                  <div>
+                    <label htmlFor="endAt">پایان</label>
+                    <JalaliDateInput id="endAt" name="endAt" value={draft.endAt} withTime disabled={busy} onChange={(value) => set("endAt", value)} />
+                  </div>
+                  <p className="credential-hint manage-full">تقویم شمسی؛ ساعت بر اساس منطقهٔ زمانی تهران است.</p>
                   <label>
                     فعال
                     <select

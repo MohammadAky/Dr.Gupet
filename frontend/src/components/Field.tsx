@@ -1,5 +1,6 @@
 import { Children, cloneElement, isValidElement, useId, type ReactNode } from 'react';
 import { PasswordInput } from './PasswordInput';
+import { JalaliDateInput } from './JalaliDateInput';
 import { ImagePicker } from './ImagePicker';
 
 /** Label + control + Persian error message. Presentation belongs to the design layer. */
@@ -22,6 +23,7 @@ export function Field({
       isValidElement<{ id?: string }>(child) &&
       (child.type === PasswordInput ||
         child.type === ImagePicker ||
+        child.type === JalaliDateInput ||
         (typeof child.type === 'string' && ['input', 'select', 'textarea'].includes(child.type))),
   );
   const controlId =
@@ -41,6 +43,7 @@ export function Field({
     if (
       child.type !== PasswordInput &&
       child.type !== ImagePicker &&
+      child.type !== JalaliDateInput &&
       (typeof child.type !== 'string' || !['input', 'select', 'textarea'].includes(child.type))
     )
       return child;

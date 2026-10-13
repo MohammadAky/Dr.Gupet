@@ -286,7 +286,10 @@ it('clears optional pet fields and a saved birthday using explicit nulls', async
   await fill('breed', '');
   await fill('gender', '');
   await fill('weightKg', '');
-  await fill('birthDate', '');
+  await act(async () => container.querySelector<HTMLButtonElement>('#birthDate')!.click());
+  const clearDate = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'پاک کردن تاریخ')!;
+  await act(async () => clearDate.click());
+  expect(container.querySelector('#birthDate')!.textContent).toContain('انتخاب تاریخ شمسی');
   await submit();
   expect(api.updatePet).toHaveBeenCalledWith(
     5,

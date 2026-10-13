@@ -7,7 +7,7 @@ jest.mock('bcrypt', () => ({
   compare: jest.fn().mockResolvedValue(true),
 }));
 
-const password = 'a-safe-test-password';
+const password = 'safe1234';
 const phone = '09121234567';
 const user = {
   id: 7,
@@ -219,7 +219,7 @@ describe('Credential changes and recovery', () => {
       passwordHash: 'old-hash',
       user,
     });
-    await h.service.change(7, password, 'a-new-safe-test-password', '127.0.0.1');
+    await h.service.change(7, password, 'fresh123', '127.0.0.1');
     expect(h.prisma.passwordCredential.updateMany).toHaveBeenCalledWith({
       where: { userId: 7, passwordHash: 'old-hash' },
       data: { passwordHash: 'stored-password-hash' },
@@ -252,9 +252,9 @@ describe('Credential changes and recovery', () => {
       user,
     });
     h.prisma.passwordCredential.updateMany.mockResolvedValue({ count: 0 });
-    await expect(
-      h.service.change(7, password, 'a-new-safe-test-password', '127.0.0.1'),
-    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+    await expect(h.service.change(7, password, 'fresh123', '127.0.0.1')).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS',
+    });
     expect(h.prisma.user.update).not.toHaveBeenCalled();
     expect(h.auth.issueSession).not.toHaveBeenCalled();
   });
@@ -384,4 +384,67 @@ describe('Credential changes and recovery', () => {
     });
     expect(h.auth.issueSession).not.toHaveBeenCalled();
   });
+});
+
+describe('Service-level eight-character policy for customer and administrator writes', () => {
+  const short = 'safe123';
+  const rejectedCases = [
+    {
+      flow: 'customer registration',
+      run: (h: ReturnType<typeof harness>) => h.service.register({ ...register, password: short }),
+    },
+    {
+      flow: 'administrator account creation',
+      run: (h: ReturnType<typeof harness>) =>
+        h.service.createAccount({ username: 'admin2', phone, password: short }, 'ADMIN'),
+    },
+    {
+      flow: 'administrator credential assignment',
+      run: (h: ReturnType<typeof harness>) =>
+        h.service.setAccount(7, { username: 'sara', password: short }),
+    },
+    {
+      flow: 'password change',
+      run: (h: ReturnType<typeof harness>) => h.service.change(7, password, short, '127.0.0.1'),
+    },
+    {
+      flow: 'password recovery',
+      run: (h: ReturnType<typeof harness>) =>
+        h.service.forgotReset({ username: 'sara', phone, code: '123456', newPassword: short }),
+    },
+  ];
+
+  it.each(rejectedCases)(
+    'rejects seven characters before ownership or database effects for $flow',
+    async ({ run }) => {
+      const h = harness();
+      await expect(run(h)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(h.otp.verify).not.toHaveBeenCalled();
+      expect(h.prisma.$transaction).not.toHaveBeenCalled();
+      expect(h.prisma.user.create).not.toHaveBeenCalled();
+      expect(h.prisma.passwordCredential.upsert).not.toHaveBeenCalled();
+      expect(h.auth.issueSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['USER', 'ADMIN'] as const)(
+    'allows the guarded administrator to create a %s account with eight characters',
+    async (role) => {
+      const h = harness();
+      await h.service.createAccount({ username: 'Sara', phone, password }, role);
+      expect(bcrypt.hash).toHaveBeenCalledWith(password, 12);
+      expect(h.prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            phone,
+            role,
+            passwordCredential: {
+              create: { username: 'sara', passwordHash: 'stored-password-hash' },
+            },
+          }),
+        }),
+      );
+    },
+  );
 });

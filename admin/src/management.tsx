@@ -142,6 +142,7 @@ const number = new Intl.NumberFormat("fa-IR");
 const date = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
   dateStyle: "medium",
   timeStyle: "short",
+  timeZone: "Asia/Tehran",
 });
 export const formatNumber = (value: number | null | undefined) =>
   number.format(value ?? 0);

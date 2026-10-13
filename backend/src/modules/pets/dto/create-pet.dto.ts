@@ -28,7 +28,7 @@ export class CreatePetDto {
 
   @ApiPropertyOptional({ example: '2023-01-15' })
   @IsOptional()
-  @IsDateString()
+  @IsDateString({ strict: true })
   birthDate?: string;
 
   @ApiPropertyOptional({ enum: ['MALE', 'FEMALE'] })

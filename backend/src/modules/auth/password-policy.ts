@@ -22,7 +22,7 @@ export function canonicalUsername(value: string): string {
 export function validPassword(value: unknown): value is string {
   return (
     typeof value === 'string' &&
-    [...value].length >= 12 &&
+    [...value].length >= 8 &&
     Buffer.byteLength(value, 'utf8') <= 72 &&
     !value.includes('\0')
   );
@@ -32,7 +32,7 @@ export function assertPassword(value: string): void {
   if (!validPassword(value)) {
     throw new AppException(
       'VALIDATION_ERROR',
-      'رمز عبور باید حداقل ۱۲ کاراکتر و حداکثر ۷۲ بایت باشد',
+      'رمز عبور باید حداقل ۸ کاراکتر و حداکثر ۷۲ بایت باشد',
       400,
     );
   }

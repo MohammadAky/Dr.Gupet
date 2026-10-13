@@ -36,6 +36,7 @@ function ActionRow({ href, label, count, note }: { href: string; label: string; 
   </a>;
 }
 const dateFormat = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+  timeZone: "Asia/Tehran",
   month: "short",
   day: "numeric",
 });

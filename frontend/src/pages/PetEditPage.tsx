@@ -12,7 +12,8 @@ import { Field } from '../components/Field';
 import { ImagePicker } from '../components/ImagePicker';
 import { ErrorState, LoadingState } from '../components/states';
 import { toEnDigits } from '../lib/format';
-import { formatJalali, todayIso } from '../lib/jalali';
+import { todayIso } from '../lib/jalali';
+import { JalaliDateInput } from '../components/JalaliDateInput';
 import { petSchema, validateUploadFile } from '../lib/schemas';
 import { errorText } from '../lib/labels';
 import { API_BASE_URL } from '../lib/env';
@@ -412,22 +413,17 @@ function PetEditSession() {
         </Field>
 
         <Field
-          label="تاریخ تولد (میلادی)"
+          label="تاریخ تولد (شمسی)"
           htmlFor="birthDate"
           error={errors.birthDate}
-          hint={
-            form.birthDate
-              ? `برابر شمسی: ${formatJalali(form.birthDate)}`
-              : 'تاریخ را در تقویم میلادی انتخاب کنید؛ در پروفایل به شمسی نمایش داده می‌شود.'
-          }
+          hint="تاریخ را از تقویم شمسی انتخاب کنید؛ تاریخ آینده مجاز نیست."
         >
-          <input
+          <JalaliDateInput
             id="birthDate"
             disabled={save.isPending}
-            type="date"
             max={todayIso()}
             value={form.birthDate}
-            onChange={(event) => set('birthDate', event.target.value)}
+            onChange={(value) => set('birthDate', value)}
           />
         </Field>
 

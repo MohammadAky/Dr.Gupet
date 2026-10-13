@@ -64,12 +64,12 @@ describe('Password API validation and identity boundaries', () => {
     },
   );
 
-  it('accepts exactly 72 UTF-8 bytes and at least 12 Unicode characters', async () => {
+  it('accepts exactly 72 UTF-8 bytes and at least eight Unicode characters', async () => {
     await expect(
       validate(PasswordRegisterDto, { ...registration, password: 'ژ'.repeat(36) }),
     ).resolves.toBeDefined();
     await expect(
-      validate(PasswordRegisterDto, { ...registration, password: '🙂'.repeat(12) }),
+      validate(PasswordRegisterDto, { ...registration, password: '🙂'.repeat(8) }),
     ).resolves.toBeDefined();
   });
 
@@ -134,5 +134,52 @@ describe('Password API validation and identity boundaries', () => {
         userId: 9,
       }),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('Eight-character policy across every password write DTO', () => {
+  const cases = [
+    {
+      flow: 'customer registration',
+      dto: PasswordRegisterDto,
+      body: registration,
+      key: 'password',
+    },
+    {
+      flow: 'administrator account creation',
+      dto: AdminPasswordRegisterDto,
+      body: { username: 'admin2', phone: '09121234567', role: 'ADMIN' },
+      key: 'password',
+    },
+    {
+      flow: 'administrator credential assignment',
+      dto: PasswordCredentialDto,
+      body: { username: 'sara' },
+      key: 'password',
+    },
+    {
+      flow: 'password change',
+      dto: PasswordChangeDto,
+      body: { currentPassword: registration.password },
+      key: 'newPassword',
+    },
+    {
+      flow: 'password recovery',
+      dto: PasswordResetDto,
+      body: { username: 'sara', phone: registration.phone, code: '123456' },
+      key: 'newPassword',
+    },
+  ];
+
+  it.each(cases)('accepts exactly eight characters for $flow', async ({ dto, body, key }) => {
+    await expect(validate(dto, { ...body, [key]: 'safe1234' })).resolves.toMatchObject({
+      [key]: 'safe1234',
+    });
+  });
+
+  it.each(cases)('rejects seven characters for $flow', async ({ dto, body, key }) => {
+    await expect(validate(dto, { ...body, [key]: 'safe123' })).rejects.toMatchObject({
+      status: 400,
+    });
   });
 });

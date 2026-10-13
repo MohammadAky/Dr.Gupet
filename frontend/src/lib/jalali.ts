@@ -3,6 +3,8 @@
  * (README §6.1) — conversion happens here, in one place.
  */
 
+import { todayTehran } from '../components/calendar';
+
 export type JalaliKind = 'date' | 'datetime';
 
 const PERSIAN_LOCALE = 'fa-IR-u-ca-persian';
@@ -11,6 +13,7 @@ export function formatJalali(iso: string | number | Date, kind: JalaliKind = 'da
   const date = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat(PERSIAN_LOCALE, {
+    timeZone: 'Asia/Tehran',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -37,5 +40,5 @@ export function formatRelativeJalali(iso: string | number | Date, now: Date = ne
 
 /** Today in ISO (yyyy-mm-dd) — used to forbid future birth dates. */
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayTehran();
 }

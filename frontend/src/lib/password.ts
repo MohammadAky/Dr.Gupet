@@ -1,4 +1,4 @@
-export const passwordHint = 'حداقل ۱۲ نویسه؛ حداکثر ۷۲ بایت (برای حروف فارسی کوتاه‌تر).';
+export const passwordHint = 'حداقل ۸ نویسه؛ حداکثر ۷۲ بایت (برای حروف فارسی کوتاه‌تر).';
 export const usernameHint = '۳ تا ۳۲ حرف انگلیسی، عدد، نقطه یا زیرخط.';
 
 export function normalizeUsername(value: string): string {
@@ -10,7 +10,7 @@ export function usernameError(value: string): string | undefined {
 }
 
 export function passwordError(value: string): string | undefined {
-  return Array.from(value).length >= 12 && new TextEncoder().encode(value).length <= 72
+  return Array.from(value).length >= 8 && new TextEncoder().encode(value).length <= 72
     ? undefined
     : passwordHint;
 }
