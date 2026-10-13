@@ -43,6 +43,21 @@ it("normalizes Persian and Arabic coupon numbers before sending a numeric API va
   await waitFor(() => expect(request).toHaveBeenCalledWith("/admin/coupons", expect.objectContaining({ method: "POST", body: expect.objectContaining({ value: 20, minOrderAmount: 100 }) })));
 });
 
+it("groups fixed coupon amounts while sending unchanged integer Toman values", async () => {
+  request.mockImplementation((path: string, options?: { method?: string }) => options?.method === "POST" ? Promise.resolve(coupon) : path.includes("?") ? Promise.resolve({ data: [], meta: { page: 1, totalPages: 1 } }) : Promise.resolve(coupon));
+  render(<Promotions />);
+  fireEvent.click(screen.getByRole("button", { name: "+ کد جدید" }));
+  const code = within(screen.getByRole("region", { name: "ساخت کد تخفیف" })).getByLabelText("کد");
+  fireEvent.change(code, { target: { value: "FIXED" } });
+  fireEvent.change(screen.getByLabelText("نوع"), { target: { value: "FIXED" } });
+  fireEvent.change(screen.getByLabelText("مقدار (تومان)"), { target: { value: "123000" } });
+  fireEvent.change(screen.getByLabelText("حداقل سفارش (تومان)"), { target: { value: "۲۰۰٬۰۰۰" } });
+  fireEvent.change(screen.getByLabelText("سقف تخفیف (تومان)"), { target: { value: "100000" } });
+  expect((screen.getByLabelText("مقدار (تومان)") as HTMLInputElement).value).toBe("۱۲۳٬۰۰۰");
+  fireEvent.submit(code.closest("form")!);
+  await waitFor(() => expect(request).toHaveBeenCalledWith("/admin/coupons", expect.objectContaining({ method: "POST", body: expect.objectContaining({ type: "FIXED", value: 123000, minOrderAmount: 200000, maxDiscount: 100000 }) })));
+});
+
 it("does not reopen a deliberately closed coupon editor when its pending save completes", async () => {
   let complete: ((value: unknown) => void) | undefined;
   request.mockImplementation((path: string, options?: { method?: string }) => options?.method === "POST" ? new Promise((resolve) => { complete = resolve; }) : path.includes("?") ? Promise.resolve({ data: [], meta: { page: 1, totalPages: 1 } }) : Promise.resolve(coupon));

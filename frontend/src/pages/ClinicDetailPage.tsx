@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { SafeImage } from '../components/SafeImage';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';

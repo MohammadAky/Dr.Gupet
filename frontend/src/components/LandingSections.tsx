@@ -164,6 +164,7 @@ function MedicineCard({ medicine }: { medicine: Medicine }) {
         <SafeImage
           className="landing-medicine__image"
           src={image}
+          sizes="(max-width: 760px) calc((100vw - 52px) / 2), 320px"
           width={320}
           height={240}
           alt=""

@@ -1,4 +1,5 @@
 import { useState, type ImgHTMLAttributes, type ReactNode } from 'react';
+import { landingImageSet } from '../lib/landing-image';
 
 export interface SafeImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   fallback?: ReactNode;
@@ -26,6 +27,7 @@ function ImageResource({ src, alt = '', fallback, onError, className, width, hei
       </span>
     );
   }
-  return <img {...props} src={src} alt={alt} className={className} width={width} height={height}
+  const responsive = landingImageSet(src, window.location.origin);
+  return <img {...props} srcSet={props.srcSet ?? responsive} sizes={props.sizes ?? (responsive ? '100vw' : undefined)} src={src} alt={alt} className={className} width={width} height={height}
     onError={(event) => { setFailedSource(src); onError?.(event); }} />;
 }

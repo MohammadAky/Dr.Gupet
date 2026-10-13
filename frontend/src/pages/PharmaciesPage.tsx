@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { DirectoryPage } from '../components/DirectoryPage';
 
 export function PharmaciesPage() {

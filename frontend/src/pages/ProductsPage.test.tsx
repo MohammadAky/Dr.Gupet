@@ -52,11 +52,31 @@ describe('catalog URL forms', () => {
       );
     });
     expect((container.querySelector('#q') as HTMLInputElement).value).toBe('dog');
-    expect((container.querySelector('#minPrice') as HTMLInputElement).value).toBe('100');
+    expect((container.querySelector('#minPrice') as HTMLInputElement).value).toBe('۱۰۰');
 
     await act(async () => (container.querySelector('a') as HTMLAnchorElement).click());
 
     expect((container.querySelector('#q') as HTMLInputElement).value).toBe('cat');
-    expect((container.querySelector('#minPrice') as HTMLInputElement).value).toBe('200');
+    expect((container.querySelector('#minPrice') as HTMLInputElement).value).toBe('۲۰۰');
+  });
+
+  it('formats price filters while preserving API Toman values and rejecting exponent syntax', async () => {
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/products']}><ProductsPage /></MemoryRouter></QueryClientProvider>));
+    async function edit(id: string, value: string) {
+      await act(async () => {
+        const input = container.querySelector<HTMLInputElement>(`#${id}`)!;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    }
+    await edit('minPrice', '۱۲۳٬۰۰۰'); await edit('maxPrice', '456000');
+    expect(container.querySelector<HTMLInputElement>('#maxPrice')!.value).toBe('۴۵۶٬۰۰۰');
+    await act(async () => container.querySelector('.price-filter')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await vi.waitFor(() => expect(shopApi.products).toHaveBeenCalledWith(expect.objectContaining({ minPrice: 123000, maxPrice: 456000 })));
+    const calls = vi.mocked(shopApi.products).mock.calls.length;
+    await edit('minPrice', '1e3');
+    await act(async () => container.querySelector('.price-filter')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(container.querySelector('#price-filter-error')).not.toBeNull();
+    expect(vi.mocked(shopApi.products).mock.calls.length).toBe(calls);
   });
 });

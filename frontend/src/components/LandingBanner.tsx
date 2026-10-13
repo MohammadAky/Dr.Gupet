@@ -5,6 +5,7 @@ import { landingSample, safeLandingLink, type LandingContent } from '../features
 import { bannerSpring, bannerStep } from '../features/landing/banner-motion';
 import { toFaDigits } from '../lib/format';
 import { SafeImage } from './SafeImage';
+import { landingImageSet } from '../lib/landing-image';
 import '../styles/landing-banner.css';
 
 const ROTATION_MS = 7000;
@@ -30,6 +31,7 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
   const gesture = useRef<Gesture | null>(null);
   const frame = useRef<number | null>(null);
   const offset = useRef(0);
+  const measuredWidth = useRef(0);
   const velocity = useRef(0);
   const suppressClick = useRef(false);
   const mounted = useRef(true);
@@ -60,7 +62,7 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
     stopSpring();
     if (slides.length < 2) { present(0); setInteracting(false); return; }
     const next = (active + step + slides.length) % slides.length;
-    const width = root.current?.getBoundingClientRect().width ?? 0;
+    const width = measuredWidth.current;
     if (reduced || width <= 0) { setMotion('instant'); finish(next); return; }
     setMotion('slide'); setInteracting(true);
     const target = -step * width;
@@ -108,7 +110,7 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
     event.preventDefault();
     const now = performance.now();
     current.samples = [...current.samples, { x: event.clientX, time: now }].filter(sample => now - sample.time <= 100).slice(-5);
-    const width = root.current?.getBoundingClientRect().width ?? 0;
+    const width = measuredWidth.current;
     present(Math.max(-width, Math.min(width, current.offset + x)));
   }
   function pointerEnd(event: PointerEvent<HTMLElement>, cancelled = false) {
@@ -121,30 +123,39 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
     const samples = [...current.samples, { x: event.clientX, time: now }].filter(sample => now - sample.time <= 100);
     const first = samples[0]!; const last = samples.at(-1)!;
     const speed = last.time > first.time ? ((last.x - first.x) / (last.time - first.time)) * 1000 : 0;
-    const width = root.current?.getBoundingClientRect().width ?? 0;
+    const width = measuredWidth.current;
     settle(cancelled ? 0 : bannerStep(offset.current, width, speed), cancelled ? 0 : speed);
   }
 
   useLayoutEffect(() => {
+    let measureFrame: number | null = null;
+    let disposed = false;
     const measure = () => {
+      measureFrame = null;
       if (!root.current) return;
+      measuredWidth.current = root.current.getBoundingClientRect().width;
       let offset = 0; let element: HTMLElement | null = root.current;
       while (element) { offset += element.offsetTop; element = element.offsetParent as HTMLElement | null; }
-      root.current.style.setProperty('--landing-header-height', `${Math.max(0, offset)}px`);
+      const height = `${Math.max(0, offset)}px`;
+      if (root.current.style.getPropertyValue('--landing-header-height') !== height) root.current.style.setProperty('--landing-header-height', height);
+    };
+    const scheduleMeasure = () => {
+      if (!disposed && measureFrame === null) measureFrame = requestAnimationFrame(measure);
     };
     const resize = () => {
       stopSpring(); present(0); velocity.current = 0;
       const pointer = gesture.current; gesture.current = null;
       if (pointer) releaseCapture(pointer.id);
       root.current?.removeAttribute('data-dragging'); setInteracting(false);
-      measure();
+      scheduleMeasure();
     };
     measure(); window.addEventListener('resize', resize);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure);
     document.querySelectorAll('.announcement, .app-header, .site-header, .header').forEach(el => observer?.observe(el));
-    void document.fonts?.ready.then(measure);
-    return () => { window.removeEventListener('resize', resize); observer?.disconnect(); };
-  }, [present, releaseCapture, stopSpring]);
+    if (root.current) observer?.observe(root.current);
+    void document.fonts?.ready.then(scheduleMeasure);
+    return () => { disposed = true; if (measureFrame !== null) cancelAnimationFrame(measureFrame); window.removeEventListener('resize', resize); observer?.disconnect(); };
+  }, [hasSlides, present, releaseCapture, stopSpring]);
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const update = () => {
@@ -194,8 +205,8 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
       const item = slides[(active + slot + slides.length) % slides.length]!;
       return <div key={slot} className="landing-banner__slide" data-banner-slot={slot} style={{ transform: `translate3d(${slot * 100}%, 0, 0)` }} aria-hidden={slot !== 0 ? true : undefined} inert={slot !== 0}>
         <div className="landing-banner__art" aria-hidden="true"><picture style={{ '--desktop-focus': `${item.desktopFocus.x}% ${item.desktopFocus.y}%`, '--mobile-focus': `${item.mobileFocus.x}% ${item.mobileFocus.y}%` } as CSSProperties}>
-          {item.mobileImage && <source media="(max-width: 760px)" srcSet={item.mobileImage} />}
-          <SafeImage className="landing-banner__image" src={item.image} alt="" width="1600" height="700" decoding="async" draggable={false} loading="eager" fetchPriority={slot === 0 && active === 0 ? 'high' : 'auto'} />
+          {item.mobileImage && <source media="(max-width: 760px)" srcSet={landingImageSet(item.mobileImage) ?? item.mobileImage} sizes="100vw" />}
+          <SafeImage className="landing-banner__image" src={item.image} srcSet={landingImageSet(item.image)} sizes="100vw" alt="" width="1600" height="700" decoding="async" draggable={false} loading="eager" fetchPriority={slot === 0 ? 'high' : 'low'} />
         </picture></div>
         <div className="landing-banner__copy" aria-live={slot === 0 && manual ? 'polite' : 'off'} aria-atomic="true">
           <div className="landing-banner__text" key={item.id}><p className="landing-banner__eyebrow">برای همراه دوست‌داشتنی شما</p>

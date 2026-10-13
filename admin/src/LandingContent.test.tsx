@@ -391,7 +391,7 @@ it("keeps the selected card during reorder, supports Persian sample prices, and 
   expect(
     (screen.getByLabelText("قیمت نمونه (تومان؛ اختیاری)") as HTMLInputElement)
       .value,
-  ).toBe("250000");
+  ).toBe("۲۵۰٬۰۰۰");
   fireEvent.change(screen.getByLabelText("قیمت نمونه (تومان؛ اختیاری)"), {
     target: { value: "-4" },
   });
@@ -399,7 +399,7 @@ it("keeps the selected card during reorder, supports Persian sample prices, and 
   expect(
     (screen.getByLabelText("قیمت نمونه (تومان؛ اختیاری)") as HTMLInputElement)
       .value,
-  ).toBe("250000");
+  ).toBe("۲۵۰٬۰۰۰");
   fireEvent.click(screen.getByRole("button", { name: "حذف مورد" }));
   const dialog = screen.getByRole("dialog", { name: "حذف مورد" });
   fireEvent.click(within(dialog).getByRole("button", { name: "حذف مورد" }));

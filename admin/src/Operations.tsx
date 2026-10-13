@@ -1,3 +1,4 @@
+import { TomanInput } from './TomanInput';
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useAuth } from "./auth";
 import {
@@ -476,7 +477,10 @@ function Settings() {
             </label>
             <label>
               مقدار جدید
-              <input
+              {key !== "ORDER_EXPIRE_MINUTES" ? (
+                <TomanInput name="value" disabled={busy} value={value} onValueChange={setValue} placeholder={current?.value || "عدد صحیح"} />
+              ) : (
+<input
                 inputMode="numeric"
                 name="value"
                 disabled={busy}
@@ -484,6 +488,7 @@ function Settings() {
                 onChange={(event) => setValue(event.target.value)}
                 placeholder={current?.value || "عدد صحیح"}
               />
+              )}
             </label>
             <button type="submit" className="manage-primary" disabled={busy}>
               ذخیره

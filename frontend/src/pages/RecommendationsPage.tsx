@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { useQuery } from '@tanstack/react-query';
 import { useLayoutEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';

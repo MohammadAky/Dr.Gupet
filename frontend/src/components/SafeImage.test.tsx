@@ -24,3 +24,11 @@ it('keeps decorative failures out of the accessibility tree and normalizes attri
   expect(fallback.style.width).toBe('96px');
   expect(fallback.style.height).toBe('76px');
 });
+it('uses known responsive derivatives while preserving an explicit caller image set and display size', async () => {
+  await act(async () => root.render(<SafeImage src="/brand/landing-family-mobile.webp" sizes="160px" alt="" />));
+  expect(container.querySelector('img')?.getAttribute('srcset')).toContain('mobile-480.webp 480w');
+  expect(container.querySelector('img')?.getAttribute('sizes')).toBe('160px');
+  await act(async () => root.render(<SafeImage src="/brand/landing-family-mobile.webp" srcSet="/custom.webp 480w" sizes="240px" alt="" />));
+  expect(container.querySelector('img')?.getAttribute('srcset')).toBe('/custom.webp 480w');
+  expect(container.querySelector('img')?.getAttribute('sizes')).toBe('240px');
+});

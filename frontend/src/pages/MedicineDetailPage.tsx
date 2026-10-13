@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';

@@ -31,6 +31,7 @@ export function ProductCardView({
             src={imageUrl ?? undefined}
             alt={publicRecordName(card)}
             loading="lazy"
+            sizes="(max-width: 760px) calc((100vw - 52px) / 2), (max-width: 1000px) 45vw, 320px"
             referrerPolicy="no-referrer"
           />
         </div>

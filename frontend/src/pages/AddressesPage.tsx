@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';

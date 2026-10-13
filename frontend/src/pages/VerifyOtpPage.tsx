@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { SafeImage } from '../components/SafeImage';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';

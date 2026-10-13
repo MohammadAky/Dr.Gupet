@@ -1,3 +1,4 @@
+import { TomanInput } from './TomanInput';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "./auth";
 import {
@@ -404,33 +405,37 @@ export function Promotions() {
                   </label>
                   <label>
                     مقدار {draft.type === "PERCENT" ? "(درصد)" : "(تومان)"}
-                    <input
+                    {draft.type === "FIXED" ? (
+                      <TomanInput required name="value" value={draft.value} onValueChange={(value) => set("value", value)} />
+                    ) : (
+<input
                       required
                       inputMode="numeric"
                       name="value"
                       value={draft.value}
                       onChange={(event) => set("value", event.target.value)}
                     />
+                    )}
                   </label>
                   <label>
                     حداقل سفارش (تومان)
-                    <input
-                      inputMode="numeric"
+                    <TomanInput
+
                       value={draft.minOrderAmount}
                       name="minOrderAmount"
-                      onChange={(event) =>
-                        set("minOrderAmount", event.target.value)
+                      onValueChange={(value) =>
+                        set("minOrderAmount", value)
                       }
                     />
                   </label>
                   <label>
                     سقف تخفیف (تومان)
-                    <input
-                      inputMode="numeric"
+                    <TomanInput
+
                       value={draft.maxDiscount}
                       name="maxDiscount"
-                      onChange={(event) =>
-                        set("maxDiscount", event.target.value)
+                      onValueChange={(value) =>
+                        set("maxDiscount", value)
                       }
                     />
                   </label>

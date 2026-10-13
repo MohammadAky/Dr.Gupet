@@ -1,3 +1,4 @@
+import { TomanInput } from './TomanInput';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError, type PageResult } from "./api/client";
 import { useAuth } from "./auth";
@@ -548,29 +549,23 @@ function CreateProduct({
               </label>
               <label className="catalog-field">
                 قیمت به تومان <b>*</b>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
+                <TomanInput
                   required
                   value={variant.price}
                   disabled={busy}
-                  onChange={(event) =>
-                    setVariantField("price", event.target.value)
+                  onValueChange={(value) =>
+                    setVariantField("price", value)
                   }
                   placeholder="۱۲۸۰۰۰۰"
                 />
               </label>
               <label className="catalog-field">
                 قیمت مقایسه‌ای
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
+                <TomanInput
                   value={variant.compareAtPrice}
                   disabled={busy}
-                  onChange={(event) =>
-                    setVariantField("compareAtPrice", event.target.value)
+                  onValueChange={(value) =>
+                    setVariantField("compareAtPrice", value)
                   }
                 />
               </label>
@@ -1420,31 +1415,27 @@ function Detail({
               </label>
               <label>
                 قیمت (تومان)
-                <input
-                  type="number"
-                  min="0"
+                <TomanInput
                   required
                   value={variantEdit.price}
                   disabled={busy}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     setVariantEdit({
                       ...variantEdit,
-                      price: event.target.value,
+                      price: value,
                     })
                   }
                 />
               </label>
               <label>
                 قیمت مقایسه‌ای
-                <input
-                  type="number"
-                  min="0"
+                <TomanInput
                   value={variantEdit.compareAtPrice}
                   disabled={busy}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     setVariantEdit({
                       ...variantEdit,
-                      compareAtPrice: event.target.value,
+                      compareAtPrice: value,
                     })
                   }
                 />
@@ -1557,14 +1548,12 @@ function Detail({
             </label>
             <label>
               قیمت (تومان)
-              <input
-                type="number"
-                min="0"
+              <TomanInput
                 required
                 value={variant.price}
                 disabled={busy}
-                onChange={(event) =>
-                  setVariant({ ...variant, price: event.target.value })
+                onValueChange={(value) =>
+                  setVariant({ ...variant, price: value })
                 }
               />
             </label>

@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { useMutation } from '@tanstack/react-query';
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { api, type UpdateProfileInput } from '../api/endpoints';

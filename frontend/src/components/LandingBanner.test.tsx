@@ -450,6 +450,44 @@ describe('cyclic landing banner interaction and motion', () => {
     expect(title()).toBe(landingSample.slides[1]!.title);
   });
 
+  it('prioritizes only the active banner and uses matching responsive mobile crops', async () => {
+    await show();
+    const activeImage = container.querySelector('[data-banner-slot="0"] img')!;
+    expect(activeImage.getAttribute('loading')).toBe('eager');
+    expect(activeImage.getAttribute('fetchpriority')).toBe('high');
+    expect(container.querySelector('[data-banner-slot="0"] source')?.getAttribute('srcset')).toContain('landing-family-mobile-480.webp 480w');
+    for (const image of container.querySelectorAll('[inert] img')) {
+      expect(image.getAttribute('loading')).toBe('eager');
+      expect(image.getAttribute('fetchpriority')).toBe('low');
+    }
+    await click('بنر بعدی');
+    expect(container.querySelector('[data-banner-slot="0"] img')?.getAttribute('fetchpriority')).toBe('high');
+  });
+
+  it('does not read layout on repeated drag movement after the initial frame measurement', async () => {
+    await show();
+    const bounds = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
+    bounds.mockClear();
+    await point('pointerdown', 280, 120);
+    await point('pointermove', 240, 120);
+    await point('pointermove', 210, 120);
+    expect(bounds).not.toHaveBeenCalled();
+  });
+
+  it('measures a newly enabled banner after an initially empty campaign without needing a window resize', async () => {
+    const empty = structuredClone(landingSample);
+    empty.slides.forEach(slide => { slide.enabled = false; });
+    await show(empty);
+    expect(container.querySelector('.landing-banner--empty')).not.toBeNull();
+    await show();
+    await point('pointerdown', 280, 120);
+    await point('pointermove', 100, 120);
+    expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')?.style.transform).toContain('-180px');
+    await point('pointerup', 100, 120);
+    await tick(1000);
+    expect(title()).toBe(landingSample.slides[1]!.title);
+  });
+
   it('measures normal layout despite the route entrance transform and observes actual header resizing', async () => {
     const header = document.createElement('header');
     header.className = 'app-header';
@@ -496,7 +534,7 @@ describe('cyclic landing banner interaction and motion', () => {
       expect(observed).toHaveBeenCalledWith(header);
       expect(banner().style.getPropertyValue('--landing-header-height')).toBe('170px');
       parentOffset = 160;
-      await act(async () => resizeCallback([], {} as ResizeObserver));
+      await act(async () => { resizeCallback([], {} as ResizeObserver); vi.advanceTimersByTime(20); });
       expect(banner().style.getPropertyValue('--landing-header-height')).toBe('220px');
       await act(async () => root.unmount());
       mounted = false;

@@ -9,7 +9,9 @@ import { ProductCardView } from '../components/ProductCardView';
 import { SearchableFilter } from '../components/SearchableFilter';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { parseProductFilters, serializeProductFilters } from '../features/catalog/filters';
-import { toEnDigits } from '../lib/format';
+import { TomanInput } from '../components/TomanInput';
+import { rawTomanInput } from '../lib/toman-input';
+import '../styles/content-pages.css';
 import { publicRecordName } from '../lib/sample-records';
 
 /**
@@ -62,8 +64,8 @@ export function ProductsPage() {
   function submitPrices(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parse = (value: string) => {
-      const digits = toEnDigits(value.trim());
-      if (!digits) return undefined;
+      const digits = rawTomanInput(value.trim());
+      if (!digits || !/^\d+$/.test(digits)) return undefined;
       const normalized = Number(digits);
       return Number.isFinite(normalized) && normalized >= 0 ? normalized : undefined;
     };
@@ -227,24 +229,24 @@ export function ProductsPage() {
 
         <form className="price-filter" ref={priceFormRef} onSubmit={submitPrices}>
           <label htmlFor="minPrice">از قیمت</label>
-          <input
+          <TomanInput
             id="minPrice"
             name="minPrice"
-            inputMode="numeric"
+
             aria-invalid={priceError ? true : undefined}
             aria-describedby={priceError ? 'price-filter-error' : undefined}
-            dir="ltr"
+
             key={`min-${filters.minPrice ?? ''}`}
             defaultValue={filters.minPrice ?? ''}
           />
           <label htmlFor="maxPrice">تا قیمت</label>
-          <input
+          <TomanInput
             id="maxPrice"
             name="maxPrice"
-            inputMode="numeric"
+
             aria-invalid={priceError ? true : undefined}
             aria-describedby={priceError ? 'price-filter-error' : undefined}
-            dir="ltr"
+
             key={`max-${filters.maxPrice ?? ''}`}
             defaultValue={filters.maxPrice ?? ''}
           />

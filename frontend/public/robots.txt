@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /verify
+Disallow: /profile
+Disallow: /addresses
+Disallow: /pets
+Disallow: /recommendations
+Disallow: /favorites
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment
+Disallow: /orders

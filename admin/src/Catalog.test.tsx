@@ -131,9 +131,11 @@ it("retries only the detail read after a saved variant cannot be reloaded", asyn
   await screen.findByRole("heading", { name: "افزودن واریانت" });
   fireEvent.change(screen.getByRole("textbox", { name: "شناسهٔ کالا (SKU)" }), { target: { value: "LOCAL-VARIANT-1" } });
   fireEvent.change(screen.getByRole("spinbutton", { name: "وزن (گرم)" }), { target: { value: "400" } });
-  fireEvent.change(screen.getByRole("spinbutton", { name: "قیمت (تومان)" }), { target: { value: "1000" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "قیمت (تومان)" }), { target: { value: "123000" } });
+  expect((screen.getByRole("textbox", { name: "قیمت (تومان)" }) as HTMLInputElement).value).toBe("۱۲۳٬۰۰۰");
   fireEvent.click(screen.getByRole("button", { name: "افزودن واریانت" }));
   await screen.findByRole("button", { name: "دریافت دوبارهٔ جزئیات" });
+  expect(requestMock).toHaveBeenCalledWith("/admin/products/1/variants", expect.objectContaining({ method: "POST", body: expect.objectContaining({ price: 123000 }) }));
   await waitFor(() => expect((screen.getByRole("button", { name: "دریافت دوبارهٔ جزئیات" }) as HTMLButtonElement).disabled).toBe(false));
   expect(screen.getByText("واریانت افزوده شد.")).toBeTruthy();
   expect((screen.getByRole("button", { name: "افزودن واریانت" }) as HTMLButtonElement).disabled).toBe(true);

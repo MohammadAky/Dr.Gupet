@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { SafeImage } from '../components/SafeImage';
 import { Link } from 'react-router-dom';
 

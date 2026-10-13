@@ -34,7 +34,7 @@ it("protects unsaved settings from key and keyboard tab changes, then clears the
   fireEvent.change(screen.getByLabelText("کلید"), { target: { value: "ORDER_EXPIRE_MINUTES" } });
   fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));
   await act(async () => {});
-  expect((input as HTMLInputElement).value).toBe("۳۰۰۰۰");
+  expect((input as HTMLInputElement).value).toBe("۳۰٬۰۰۰");
   expect((screen.getByLabelText("کلید") as HTMLSelectElement).value).toBe("SHIPPING_FLAT_COST");
   fireEvent.keyDown(screen.getByRole("tab", { name: "تنظیمات" }), { key: "Home" });
   fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));

@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';

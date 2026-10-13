@@ -1,3 +1,4 @@
+import { TomanInput } from './TomanInput';
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   landingSample,
@@ -408,11 +409,11 @@ export function LandingSectionsEditor({
             </label>
             <label className="landing-field">
               قیمت نمونه (تومان؛ اختیاری)
-              <input
-                dir="ltr"
-                inputMode="numeric"
+              <TomanInput
+
+
                 value={item.price ?? ""}
-                onChange={(event) => price(event.target.value)}
+                onValueChange={price}
               />
             </label>
             <label className="landing-field">

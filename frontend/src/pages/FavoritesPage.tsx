@@ -1,3 +1,4 @@
+import '../styles/content-pages.css';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useLayoutEffect, useRef, useState } from 'react';
