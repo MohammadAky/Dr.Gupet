@@ -1,4 +1,4 @@
-/* Present while the document/module is genuinely pending; no minimum display time. */
+/* Initial document indicator; landing has an owner-requested 1200ms minimum. */
 .landing-bootstrap {
   min-height: 100svh;
   display: flex;
