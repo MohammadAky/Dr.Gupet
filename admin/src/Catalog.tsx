@@ -2,6 +2,7 @@ import { TomanInput } from './TomanInput';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError, type PageResult } from "./api/client";
 import { useAuth } from "./auth";
+import { ProductCsvImport } from "./ProductCsvImport";
 import { parseAdminLocation } from "./navigation";
 import { validateRequiredFields } from "./management";
 import {
@@ -39,7 +40,7 @@ const neuterSuitabilityLabels: Record<string, string> = {
   ANY: "بدون محدودیت", NEUTERED_ONLY: "مخصوص عقیم‌شده",
 };
 
-type Section = "list" | "create" | "detail" | "references";
+type Section = "list" | "create" | "detail" | "references" | "import";
 type RefKind = "brand" | "category" | "petType";
 type References = CatalogReferences;
 
@@ -1939,6 +1940,8 @@ export function Catalog() {
       </>
     );
 
+  if (section === "import")
+    return <ProductCsvImport refs={refs} onBack={() => setSection("list")} onImported={() => setRefresh(value => value + 1)} />;
   if (section === "create")
     return (
       <CreateProduct
@@ -1977,6 +1980,9 @@ export function Catalog() {
         text="محصولات منتشرشده و پیش‌نویس‌ها را یک‌جا ببینید و محصول تازه ثبت کنید."
         actions={
           <>
+            <button type="button" className="button button--ghost" disabled={refsLoading || !!refsError} onClick={() => setSection("import")}>
+              ورود از CSV
+            </button>
             <button
               type="button"
               className="button button--ghost"

@@ -26,6 +26,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { ImportProductsDto } from './dto/import-products.dto';
+import { ProductsImportService } from './products-import.service';
 
 @ApiTags('Admin - Products')
 @Controller('admin/products')
@@ -36,6 +38,7 @@ export class AdminProductsController {
   constructor(
     private adminProductsService: AdminProductsService,
     private auditService: AuditService,
+    private productsImport: ProductsImportService,
   ) {}
 
   @Get()
@@ -57,6 +60,23 @@ export class AdminProductsController {
       categoryId: categoryId ? Number(categoryId) : undefined,
       petTypeId: petTypeId ? Number(petTypeId) : undefined,
     });
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: 'Atomically import up to 100 products (admin only)' })
+  async importBatch(
+    @Body() dto: ImportProductsDto,
+    @Req() req: { user: { sub: number }; ip: string },
+  ) {
+    const result = await this.productsImport.importBatch(dto);
+    await this.auditService.record({
+      adminId: req.user.sub,
+      action: 'CREATE',
+      entity: 'Product',
+      summary: `batch import: ${result.imported} products`,
+      ip: req.ip,
+    });
+    return result;
   }
 
   @Get(':id')

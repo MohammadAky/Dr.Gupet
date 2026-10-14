@@ -409,3 +409,39 @@ it("restores a canceled managed history traversal instead of overwriting the pre
   await waitFor(() => expect(window.location.hash).toBe("#overview"));
   await screen.findByRole("heading", { name: "نمای کلی" });
 });
+
+it("refreshes the same dashboard endpoints through a labeled icon without changing the active route", async () => {
+  mobileViewport(false); const requests = adminResponses(); await loginAdmin();
+  const refresh = screen.getByRole("button", { name: "به‌روزرسانی نمای کلی" });
+  expect(refresh.textContent).toBe("");
+  expect(refresh.getAttribute("title")).toBe("به‌روزرسانی نمای کلی");
+  expect(refresh.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  const hash = window.location.hash;
+  fireEvent.click(refresh);
+  await screen.findByRole("button", { name: "به‌روزرسانی نمای کلی" });
+  await waitFor(() => {
+    expect(requests.mock.calls.filter(([url]) => url.includes("/admin/dashboard"))).toHaveLength(2);
+    expect(requests.mock.calls.filter(([url]) => url.includes("/admin/reports/sales"))).toHaveLength(2);
+    expect(requests.mock.calls.filter(([url]) => url.includes("/admin/reports/users"))).toHaveLength(2);
+  });
+  expect(window.location.hash).toBe(hash);
+});
+
+it("keeps an unsaved workspace mounted while sorting, then retains the existing guarded navigation", async () => {
+  mobileViewport(false); adminResponses(); vi.stubGlobal("scrollTo", vi.fn()); await loginAdmin();
+  const main = document.getElementById("admin-content")!;
+  const draft = document.createElement("form"); draft.dataset.dirty = "true"; main.append(draft);
+  const hash = window.location.hash;
+  fireEvent.click(screen.getByRole("button", { name: "تنظیم ترتیب" }));
+  const grip = screen.getByRole("button", { name: "جابه‌جایی سفارش‌ها" });
+  fireEvent.keyDown(grip, { key: " " }); fireEvent.keyDown(grip, { key: "Home" }); fireEvent.keyDown(grip, { key: "Enter" });
+  expect(document.getElementById("admin-content")).toBe(main);
+  expect(draft.isConnected).toBe(true); expect(draft.dataset.dirty).toBe("true");
+  expect(window.location.hash).toBe(hash);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "پایان تنظیم ترتیب" }));
+  fireEvent.click(screen.getByRole("button", { name: "سفارش‌ها" }));
+  await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت" }));
+  expect(window.location.hash).toBe(hash); expect(draft.isConnected).toBe(true);
+});

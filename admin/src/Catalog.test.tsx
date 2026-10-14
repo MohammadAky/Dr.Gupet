@@ -30,6 +30,7 @@ it("keeps product and reference editors unavailable until their reference data i
   const references = screen.getByRole("button", { name: "داده‌های مرجع" }) as HTMLButtonElement;
   expect(create.disabled).toBe(true);
   expect(references.disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "ورود از CSV" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("در حال دریافت داده‌های مرجع…")).toBeTruthy();
   await waitFor(() => expect(resolveBrands).toBeTypeOf("function"));
   await act(async () => { resolveBrands?.([]); });
@@ -37,6 +38,19 @@ it("keeps product and reference editors unavailable until their reference data i
   expect(references.disabled).toBe(false);
   fireEvent.click(create);
   expect(screen.getByRole("heading", { name: "ثبت محصول" })).toBeTruthy();
+});
+
+it("opens the separate CSV review screen after references are ready without writing products", async () => {
+  requestMock.mockImplementation((path: string) => path.startsWith("/admin/products?") ? Promise.resolve(page()) : Promise.resolve([]));
+  render(<Catalog />);
+  const button = screen.getByRole("button", { name: "ورود از CSV" });
+  await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(button);
+  expect(screen.getByRole("heading", { name: "ورود محصولات از CSV" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "دریافت قالب CSV" })).toBeTruthy();
+  expect(requestMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت به محصولات" }));
+  expect(screen.getByRole("heading", { name: "محصولات" })).toBeTruthy();
 });
 
 it("shows a recoverable reference error instead of opening an incomplete product form", async () => {

@@ -4,6 +4,7 @@ import { ProductVariantsService } from './product-variants.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { slugify } from '../../common/utils/slugify.util';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
+import { Prisma } from '@prisma/client';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -17,6 +18,15 @@ export class AdminProductsService {
     private prisma: PrismaService,
     private productVariantsService: ProductVariantsService,
   ) {}
+
+  private async lockProduct(tx: Prisma.TransactionClient, id: number) {
+    // Both publication and variant edits use this parent lock so their checks
+    // cannot observe different states and then commit an invalid combination.
+    const products = await tx.$queryRaw<Array<{ id: number; isActive: boolean }>>`
+      SELECT id, isActive FROM Product WHERE id = ${id} FOR UPDATE`;
+    if (!products[0]) throw new NotFoundException('محصول یافت نشد');
+    return products[0];
+  }
 
   private async assertReferences(data: {
     brandId?: number;
@@ -169,20 +179,35 @@ export class AdminProductsService {
     }
     await this.assertReferences(dto);
 
-    return this.prisma.product.update({
-      where: { id },
-      data: {
-        name: dto.name != null ? normalizeFa(dto.name) : undefined,
-        brandId: dto.brandId,
-        categoryId: dto.categoryId,
-        petTypeId: dto.petTypeId,
-        lifeStage: dto.lifeStage,
-        sizeClass: dto.sizeClass,
-        neuterSuitability: dto.neuterSuitability,
-        ingredientsText: dto.ingredientsText,
-        description: dto.description,
-        isActive: dto.isActive,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockProduct(tx, id);
+      if (dto.isActive === true) {
+        const unweighed = await tx.productVariant.count({
+          where: { productId: id, isActive: true, weightGram: { lte: 0 } },
+        });
+        if (unweighed > 0) {
+          throw new AppException(
+            'CONFLICT',
+            'پیش از انتشار محصول، وزن گزینه‌های فعال را بزرگ‌تر از صفر ثبت کنید',
+            409,
+          );
+        }
+      }
+      return tx.product.update({
+        where: { id },
+        data: {
+          name: dto.name != null ? normalizeFa(dto.name) : undefined,
+          brandId: dto.brandId,
+          categoryId: dto.categoryId,
+          petTypeId: dto.petTypeId,
+          lifeStage: dto.lifeStage,
+          sizeClass: dto.sizeClass,
+          neuterSuitability: dto.neuterSuitability,
+          ingredientsText: dto.ingredientsText,
+          description: dto.description,
+          isActive: dto.isActive,
+        },
+      });
     });
   }
 
@@ -254,27 +279,47 @@ export class AdminProductsService {
       throw new NotFoundException('واریانت یافت نشد');
     }
 
-    if (dto.sku && dto.sku !== variant.sku) {
-      const skuExists = await this.prisma.productVariant.findUnique({ where: { sku: dto.sku } });
-      if (skuExists) {
-        throw new AppException('CONFLICT', 'SKU تکراری است', 409);
+    return this.prisma.$transaction(async (tx) => {
+      const product = await this.lockProduct(tx, variant.productId);
+      const current = await tx.productVariant.findUnique({ where: { id: variantId } });
+      if (!current || current.productId !== product.id) {
+        throw new NotFoundException('واریانت یافت نشد');
       }
-    }
-
-    const updated = await this.prisma.productVariant.update({
-      where: { id: variantId },
-      data: {
-        sku: dto.sku,
-        weightGram: dto.weightGram,
-        price: dto.price,
-        compareAtPrice: dto.compareAtPrice,
-        stock: dto.stock,
-        isActive: dto.isActive,
-      },
+      const effectiveActive = dto.isActive ?? current.isActive;
+      const effectiveWeight = dto.weightGram ?? current.weightGram;
+      if (product.isActive && effectiveActive && effectiveWeight <= 0) {
+        throw new AppException(
+          'CONFLICT',
+          'گزینهٔ فعال محصول منتشرشده باید وزن بزرگ‌تر از صفر داشته باشد',
+          409,
+        );
+      }
+      if (dto.sku && dto.sku !== current.sku) {
+        const skuExists = await tx.productVariant.findUnique({ where: { sku: dto.sku } });
+        if (skuExists) throw new AppException('CONFLICT', 'SKU تکراری است', 409);
+      }
+      const updated = await tx.productVariant.update({
+        where: { id: variantId },
+        data: {
+          sku: dto.sku,
+          weightGram: dto.weightGram,
+          price: dto.price,
+          compareAtPrice: dto.compareAtPrice,
+          stock: dto.stock,
+          isActive: dto.isActive,
+        },
+      });
+      const cheapest = await tx.productVariant.findFirst({
+        where: { productId: product.id, isActive: true },
+        orderBy: { price: 'asc' },
+        select: { price: true },
+      });
+      await tx.product.update({
+        where: { id: product.id },
+        data: { minPrice: cheapest?.price ?? 0 },
+      });
+      return updated;
     });
-
-    await this.productVariantsService.recalculateMinPrice(variant.productId);
-    return updated;
   }
 
   async removeVariant(variantId: number) {

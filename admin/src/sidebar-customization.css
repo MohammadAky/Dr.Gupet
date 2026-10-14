@@ -1,0 +1,45 @@
+.sidebar-order-tools { display: grid; gap: 10px; }
+.sidebar-order-toggle,
+.sidebar-order-reset {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid rgb(216 234 211 / 22%);
+  border-radius: 12px;
+  background: transparent;
+  color: #dcebd5;
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.sidebar-order-toggle:hover,
+.sidebar-order-reset:not(:disabled):hover { background: rgb(255 255 255 / 8%); }
+.sidebar-order-reset:disabled { opacity: .45; cursor: default; }
+.sidebar-order-tools p,
+.sidebar-sort-help { margin: 0; color: #c5d9c3; font-size: .73rem; line-height: 1.9; }
+.sidebar-order-tools .sidebar-order-warning { color: #f2d494; }
+.sidebar-order-steps { display: flex; align-items: center; gap: 6px; }
+.sidebar-order-steps button { min-height: 44px; min-width: 44px; padding: 8px; border: 1px solid rgb(216 234 211 / 22%); border-radius: 10px; background: transparent; color: #dcebd5; font: inherit; cursor: pointer; }
+.sidebar-order-steps button:disabled { opacity: .45; cursor: default; }
+.sidebar-sort-list { display: grid; gap: 4px; }
+.sidebar-sort-row { position: relative; display: flex; align-items: stretch; gap: 2px; min-width: 0; }
+.sidebar-sort-row .sidebar-link { min-width: 0; }
+.sidebar-sort-handle {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #b7ceb0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.sidebar-sort-handle:hover,
+.sidebar-sort-handle[aria-pressed="true"] { color: #e9f1e2; background: rgb(255 255 255 / 10%); }
+.sidebar-sort-row[data-floating="true"] { z-index: 2; background: #203d26; border-radius: 12px; box-shadow: 0 8px 18px rgb(0 0 0 / 18%); }
+.sidebar-sort-row[data-floating="true"] .sidebar-sort-handle { cursor: grabbing; }
+.sidebar-sort-announcement { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.page-heading > .dashboard-refresh.button { width: 44px; min-width: 44px; height: 44px; padding: 10px; flex: none; }

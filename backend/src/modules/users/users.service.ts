@@ -290,13 +290,20 @@ export class UsersService {
    * Soft-delete user (admin)
    */
   async softDeleteByAdmin(id: number, actorId?: number) {
-    await this.protectAdminAccess(id, actorId, true, (tx) =>
-      tx.user.update({
+    await this.protectAdminAccess(id, actorId, true, async (tx) => {
+      const users = await tx.$queryRaw<Array<{ status: string; deletedAt: Date | null }>>`
+        SELECT status, deletedAt FROM User WHERE id = ${id} FOR UPDATE`;
+      const user = users[0];
+      if (!user) throw new NotFoundException('کاربر یافت نشد');
+      if (user.deletedAt || user.status !== 'BLOCKED') {
+        throw new AppException('CONFLICT', 'فقط کاربر مسدود و حذف‌نشده قابل حذف است', 409);
+      }
+      await tx.user.update({
         where: { id },
         data: { deletedAt: new Date(), status: 'BLOCKED' },
         select: { id: true },
-      }),
-    );
+      });
+    });
 
     return { deleted: true };
   }

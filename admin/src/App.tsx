@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { AuthProvider, useAuth } from "./auth";
 import { ApiError } from "./api/client";
 import { Catalog } from "./Catalog";
@@ -14,7 +14,9 @@ import { ThemeToggle } from "./ThemeToggle";
 import { PasswordInput } from "./PasswordInput";
 import { normalizeUsername } from "./password";
 import { confirmAction, hasUnsavedDrafts, useDraftProtection } from "./management";
-import { parseAdminLocation, type AdminSection } from "./navigation";
+import { parseAdminLocation } from "./navigation";
+import { AdminSidebar } from "./AdminSidebar";
+import { sidebarGroups as navigation } from "./sidebar-order";
 import {
   periodLabels,
   periodQuery,
@@ -300,67 +302,6 @@ function Login() {
   );
 }
 
-const navigation: Array<{
-  title: string;
-  items: Array<{ id: AdminSection; label: string; index: string }>;
-}> = [
-  { title: "مرکز فرمان", items: [
-    { id: "overview", label: "نمای کلی", index: "۰۱" },
-    { id: "products", label: "محصولات", index: "۰۲" },
-  ] },
-  { title: "مدیریت فروشگاه", items: [
-    { id: "orders", label: "سفارش‌ها", index: "۰۳" },
-    { id: "people", label: "کاربران", index: "۰۴" },
-    { id: "promotions", label: "کدهای تخفیف", index: "۰۵" },
-    { id: "care", label: "دارو و مراکز", index: "۰۶" },
-  ] },
-  { title: "پایش و تنظیمات", items: [
-    { id: "payments", label: "پرداخت‌ها", index: "۰۷" },
-    { id: "reports", label: "گزارش‌ها", index: "۰۸" },
-    { id: "audit", label: "لاگ تغییرات", index: "۰۹" },
-    { id: "settings", label: "تنظیمات", index: "۱۰" },
-    { id: "landing", label: "محتوای صفحهٔ اصلی", index: "۱۱" },
-  ] },
-];
-
-function Sidebar({ active, onSelect, open, onClose, mobile, sidebarRef, closeRef }: {
-  active: AdminSection;
-  onSelect: (value: AdminSection) => void;
-  open: boolean;
-  onClose: () => void;
-  mobile: boolean;
-  sidebarRef: RefObject<HTMLElement | null>;
-  closeRef: RefObject<HTMLButtonElement | null>;
-}) {
-  return (
-    <aside ref={sidebarRef} className={"sidebar" + (open ? " sidebar--open" : "")}
-      id="admin-navigation" inert={mobile && !open}
-      role={mobile && open ? "dialog" : undefined}
-      aria-modal={mobile && open ? true : undefined}
-      aria-label={mobile && open ? "فهرست مدیریت" : undefined}
-      tabIndex={mobile && open ? -1 : undefined}>
-      <div className="sidebar-brand-row">
-      <Brand compact />
-        <button ref={closeRef} type="button" className="sidebar-close" onClick={onClose}
-          aria-label="بستن فهرست">×</button>
-      </div>
-      <nav aria-label="بخش‌های مدیریت">
-        {navigation.map((group) => <div className="sidebar-group" key={group.title}>
-          <span className="sidebar-label">{group.title}</span>
-          {group.items.map((item) => <button type="button" key={item.id}
-            className={"sidebar-link" + (active === item.id ? " sidebar-link--active" : "")}
-            aria-current={active === item.id ? "page" : undefined}
-            onClick={() => onSelect(item.id)}>
-            <span className="sidebar-link__index" aria-hidden="true">{item.index}</span>
-            <span>{item.label}</span>
-          </button>)}
-        </div>)}
-      </nav>
-      <p className="sidebar-note">دکتر گوپت<br /><span>فضای کار مدیریت فروشگاه</span></p>
-    </aside>
-  );
-}
-
 function Metric({
   label,
   value,
@@ -478,7 +419,9 @@ function DashboardContent({
             </button>
           ))}
         </div>
-        <button type="button" className="button" onClick={onRefresh}>به‌روزرسانی نمای کلی</button>
+        <button type="button" className="button dashboard-refresh" onClick={onRefresh} aria-label="به‌روزرسانی نمای کلی" title="به‌روزرسانی نمای کلی">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 17.9 17" /></svg>
+        </button>
       </div>
       <section className="metrics" aria-label="شاخص‌های فروشگاه">
         <Metric
@@ -880,7 +823,7 @@ function Workspace() {
     }}>رفتن به محتوای اصلی</a>
     {drawerOpen && <button type="button" className="sidebar-scrim" aria-hidden="true" tabIndex={-1}
       onClick={() => setNavOpen(false)} />}
-    <div className="sidebar-viewport"><Sidebar active={section} open={drawerOpen} mobile={mobile} sidebarRef={sidebarRef} closeRef={closeRef}
+    <div className="sidebar-viewport"><AdminSidebar accountId={identity?.id ?? null} brand={<Brand compact />} active={section} open={drawerOpen} mobile={mobile} sidebarRef={sidebarRef} closeRef={closeRef}
       onClose={() => setNavOpen(false)}
       onSelect={(value) => { if (value === section) setNavOpen(false); else void navigate(`#${value}`, true); }} /></div>
     <div className="main-shell" inert={drawerOpen}>

@@ -48,4 +48,28 @@ describe('Server-side administrator access protection', () => {
     expect(h.tx.$queryRaw).toHaveBeenCalledTimes(1);
     expect(h.tx.user.update).toHaveBeenCalledTimes(1);
   });
+
+  it('soft-deletes a blocked user without deleting related records or credentials', async () => {
+    const h = harness();
+    h.tx.$queryRaw
+      .mockResolvedValueOnce([{ id: 1 }])
+      .mockResolvedValueOnce([{ status: 'BLOCKED', deletedAt: null }]);
+    expect(await h.service.softDeleteByAdmin(2, 1)).toEqual({ deleted: true });
+    expect(h.tx.user.update).toHaveBeenCalledWith({
+      where: { id: 2 },
+      data: { deletedAt: expect.any(Date), status: 'BLOCKED' },
+      select: { id: true },
+    });
+    expect(h.tx.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    { status: 'ACTIVE', deletedAt: null },
+    { status: 'BLOCKED', deletedAt: new Date() },
+  ])('rejects nonblocked or already deleted users %j under the transaction lock', async (user) => {
+    const h = harness();
+    h.tx.$queryRaw.mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce([user]);
+    await expect(h.service.softDeleteByAdmin(2, 1)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(h.tx.user.update).not.toHaveBeenCalled();
+  });
 });

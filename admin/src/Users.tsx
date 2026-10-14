@@ -461,6 +461,42 @@ export function Users() {
               <h2>
                 {fullName(user)} · <span dir="ltr">{user.phone ?? user.username ?? `#${user.id}`}</span>
               </h2>
+              <section className="manage-card" aria-label="دسترسی و حذف حساب">
+                <div className="manage-section-heading">
+                  <div><h2>دسترسی و حذف حساب</h2><p>وضعیت حساب: {user.deletedAt ? "بایگانی‌شده" : user.status === "BLOCKED" ? "تعلیق‌شده" : "فعال"}</p></div>
+                  <div className="manage-actions">
+                    {user.deletedAt ? <button
+                      type="button" className="manage-primary" disabled={busy || detail.loading}
+                      onClick={() => void mutate(
+                        "PATCH", `/admin/users/${user.id}/restore`, undefined,
+                        "حساب بازیابی شد.", "این حساب بازیابی و دوباره فعال شود؟",
+                      )}
+                    >بازیابی حساب</button> : <>
+                      {user.status === "ACTIVE" && <button
+                        type="button" className="manage-danger" disabled={busy || detail.loading || identity?.id === user.id}
+                        onClick={() => void mutate(
+                          "PATCH", `/admin/users/${user.id}`, { status: "BLOCKED" },
+                          "حساب تعلیق شد. ورود تا فعال‌سازی مجدد ممکن نیست.",
+                          "دسترسی این حساب تعلیق شود؟ تغییرهای ذخیره‌نشدهٔ این پرونده کنار گذاشته می‌شوند. سفارش‌ها و تاریخچه حفظ می‌شوند.",
+                        )}
+                      >تعلیق حساب</button>}
+                      <button
+                        type="button" className="manage-danger"
+                        disabled={busy || detail.loading || user.status !== "BLOCKED" || identity?.id === user.id}
+                        onClick={() => void mutate(
+                          "DELETE", `/admin/users/${user.id}`, undefined,
+                          "حساب حذف و بایگانی شد. سفارش‌ها و تاریخچه حفظ شده‌اند و حساب قابل بازیابی است.",
+                          "این حساب تعلیق‌شده حذف و بایگانی شود؟ سفارش‌ها و تاریخچه حفظ می‌شوند؛ حساب از همین صفحه قابل بازیابی است. تغییرهای ذخیره‌نشده کنار گذاشته می‌شوند.",
+                        )}
+                      >حذف حساب</button>
+                    </>}
+                  </div>
+                </div>
+                {identity?.id === user.id ? <p className="manage-notice manage-notice--info">تعلیق، حذف یا کاهش دسترسی حساب مدیر فعلی از این صفحه ممکن نیست.</p>
+                  : !user.deletedAt && <p className="manage-notice manage-notice--info">{user.status === "BLOCKED" ? "این حساب تعلیق‌شده است؛ حذف آن اختیاری است و حساب را بایگانی می‌کند. سفارش‌ها و تاریخچه حفظ می‌شوند." : "برای حذف حساب، ابتدا دسترسی آن را تعلیق کنید. حذف، حساب را بایگانی می‌کند و سفارش‌ها و تاریخچه را نگه می‌دارد."}</p>}
+                <Notice message={error} />
+                <Notice message={message} kind="success" />
+              </section>
               <dl className="manage-facts">
                 <div><dt>نام کاربری</dt><dd dir="ltr">{user.username ?? "—"}</dd></div>
                 <div>
@@ -518,8 +554,6 @@ export function Users() {
                 ))}
               </ul>
               {user.orders.length === 0 && <p>سفارشی ثبت نشده است.</p>}
-              <Notice message={error} />
-              <Notice message={message} kind="success" />
               {!user.deletedAt && (
                 <div className="manage-card">
                   <h2>ویرایش دسترسی و نام</h2>
@@ -595,48 +629,7 @@ export function Users() {
                     >
                       ذخیرهٔ تغییرات
                     </button>
-                    <button
-                      type="button"
-                      className="manage-danger"
-                      disabled={busy || identity?.id === user.id}
-                      onClick={() =>
-                        void mutate(
-                          "DELETE",
-                          `/admin/users/${user.id}`,
-                          undefined,
-                          "کاربر به‌صورت موقت حذف شد.",
-                          "این کاربر موقتاً حذف و مسدود شود؟",
-                        )
-                      }
-                    >
-                      حذف موقت
-                    </button>
                   </div>
-                  {identity?.id === user.id && (
-                    <p className="manage-notice manage-notice--info">
-                      نقش و وضعیت حساب مدیر فعلی از این صفحه قابل کاهش نیست.
-                    </p>
-                  )}
-                </div>
-              )}
-              {user.deletedAt && (
-                <div className="manage-actions">
-                  <button
-                    type="button"
-                    className="manage-primary"
-                    disabled={busy}
-                    onClick={() =>
-                      void mutate(
-                        "PATCH",
-                        `/admin/users/${user.id}/restore`,
-                        undefined,
-                        "حساب کاربر بازیابی شد.",
-                        "حساب کاربر دوباره فعال شود؟",
-                      )
-                    }
-                  >
-                    بازیابی حساب
-                  </button>
                 </div>
               )}
             </>

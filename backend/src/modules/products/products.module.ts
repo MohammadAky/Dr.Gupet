@@ -5,6 +5,7 @@ import { ProductsService } from './products.service';
 import { AdminProductsService } from './admin-products.service';
 import { ProductVariantsService } from './product-variants.service';
 import { ProductsRecommendationService } from './products-recommendation.service';
+import { ProductsImportService } from './products-import.service';
 
 @Module({
   controllers: [ProductsController, AdminProductsController],
@@ -13,6 +14,7 @@ import { ProductsRecommendationService } from './products-recommendation.service
     AdminProductsService,
     ProductVariantsService,
     ProductsRecommendationService,
+    ProductsImportService,
   ],
   exports: [ProductsService, ProductVariantsService, ProductsRecommendationService],
 })
