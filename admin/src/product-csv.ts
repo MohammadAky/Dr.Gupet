@@ -2,6 +2,12 @@ export const PRODUCT_CSV_COLUMNS = [
   "name", "price", "stock", "weightGram", "compareAtPrice", "sku", "slug",
   "ingredientsText", "description", "isActive",
 ] as const;
+export const PRODUCT_CSV_REFERENCE_COLUMNS = ["brandId", "categoryId", "petTypeId", "brandName", "categoryName", "petType"] as const;
+export const PRODUCT_CSV_TEMPLATE_COLUMNS = [...PRODUCT_CSV_COLUMNS.slice(0, -1), "brand", "category", "petType", "نمایش"];
+const headerAliases: Record<string, string> = {
+  "نمایش": "isActive", brand: "brandName", category: "categoryName",
+  "برند": "brandName", "دسته‌بندی": "categoryName", "دسته بندی": "categoryName", "نوع حیوان": "petType",
+};
 export const PRODUCT_CSV_MAX_ROWS = 100;
 export const PRODUCT_CSV_MAX_BYTES = 1024 * 1024;
 export const PRODUCT_IMPORT_MAX_BYTES = 90 * 1024;
@@ -18,6 +24,11 @@ export interface ProductImportRow {
   ingredientsText?: string;
   description?: string;
   isActive: boolean;
+  brandId?: number;
+  categoryId?: number;
+  petTypeId?: number;
+  brandName?: string;
+  categoryName?: string;
 }
 export interface CsvReviewRow {
   number: number;
@@ -25,6 +36,7 @@ export interface CsvReviewRow {
   price: string;
   data?: ProductImportRow;
   errors: string[];
+  values?: Record<string, string>;
 }
 export interface ProductCsvReview {
   rows: CsvReviewRow[];
@@ -85,18 +97,18 @@ export function importSlug(input: string): string {
     .replace(/[\s_]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 
-export function reviewProductCsv(source: string): ProductCsvReview {
+export function reviewProductCsv(source: string, edits: Record<number, Record<string, string>> = {}): ProductCsvReview {
   if (new TextEncoder().encode(source).byteLength > PRODUCT_CSV_MAX_BYTES)
     return { rows: [], errors: ["حجم فایل باید حداکثر یک مگابایت باشد."] };
   let parsed: string[][];
   try { parsed = records(source.replace(/^\uFEFF/, "")); }
   catch (error) { return { rows: [], errors: [error instanceof Error ? error.message : "ساختار CSV معتبر نیست."] }; }
   if (!parsed.length) return { rows: [], errors: ["فایل CSV خالی است."] };
-  const headers = parsed[0]!.map(value => value.trim());
+  const headers = parsed[0]!.map(value => headerAliases[value.trim()] ?? value.trim());
   const errors: string[] = [];
   if (new Set(headers).size !== headers.length) errors.push("نام ستون‌های فایل نباید تکراری باشد.");
   if (!headers.includes("name") || !headers.includes("price")) errors.push("ستون‌های name و price الزامی هستند.");
-  if (headers.some(header => !(PRODUCT_CSV_COLUMNS as readonly string[]).includes(header))) errors.push("نام ستون‌ها با قالب سازگار نیست؛ قالب CSV را دریافت کنید.");
+  if (headers.some(header => ![...PRODUCT_CSV_COLUMNS, ...PRODUCT_CSV_REFERENCE_COLUMNS].includes(header as typeof PRODUCT_CSV_COLUMNS[number]))) errors.push("نام ستون‌ها با قالب سازگار نیست؛ قالب CSV را دریافت کنید.");
   const dataRecords = parsed.slice(1).filter(row => row.some(cell => cell.trim()));
   if (!dataRecords.length) errors.push("فایل فقط سربرگ دارد؛ دست‌کم یک محصول وارد کنید.");
   if (dataRecords.length > PRODUCT_CSV_MAX_ROWS) errors.push("در هر فایل حداکثر ۱۰۰ محصول وارد کنید.");
@@ -108,7 +120,8 @@ export function reviewProductCsv(source: string): ProductCsvReview {
     const entry: CsvReviewRow = { number: index + 2, name: "", price: "", errors: [] };
     rows.push(entry);
     if (cells.length !== headers.length) { entry.errors.push("تعداد خانه‌ها با سربرگ برابر نیست."); return; }
-    const values = Object.fromEntries(headers.map((header, column) => [header, cells[column]!.trim()]));
+    const values = { ...Object.fromEntries(headers.map((header, column) => [header, cells[column]!.trim()])), ...edits[index + 2] };
+    entry.values = values;
     const name = values.name ?? "", price = values.price ?? "";
     entry.name = name; entry.price = price;
     const normalizedName = name.replace(/ي/g, "ی").replace(/ك/g, "ک").replace(/\u200c|\u200d|\u200e|\u200f|\u0640/g, "").trim();
@@ -126,10 +139,25 @@ export function reviewProductCsv(source: string): ProductCsvReview {
       else numeric[key] = value;
     }
     const active = values.isActive ?? "";
-    const activeValue = active.replace(/[۰٠]/g, "0").replace(/[۱١]/g, "1");
-    if (!["", "0", "1"].includes(activeValue)) entry.errors.push("isActive فقط ۰ (پیش‌نویس) یا ۱ (فعال) باشد.");
-    const isActive = activeValue === "1";
+    const activeValue = active.replace(/[۰٠]/g, "0").replace(/[۱١]/g, "1").toLowerCase();
+    if (!["", "0", "1", "t", "f", "true", "false"].includes(activeValue)) entry.errors.push("نمایش (isActive) باید T (منتشرشده) یا F (منتشرنشده) باشد.");
+    const isActive = ["1", "t", "true"].includes(activeValue);
     if (isActive && numeric.weightGram === 0) entry.errors.push("محصول فعال باید وزن بیشتر از صفر داشته باشد.");
+    const references: Pick<ProductImportRow, "brandId" | "categoryId" | "petTypeId" | "brandName" | "categoryName"> = {};
+    for (const key of ["brandId", "categoryId", "petTypeId"] as const) {
+      if (!values[key]) continue;
+      const id = csvInteger(values[key], true);
+      if (id === null || id < 1) entry.errors.push(`${key} باید شناسهٔ صحیح و مثبت باشد.`);
+      else references[key] = id;
+    }
+    for (const key of ["brandName", "categoryName"] as const) {
+      const text = values[key]?.trim();
+      if (!text) continue;
+      if (text.length > 191) entry.errors.push(`${key} باید حداکثر ۱۹۱ نویسه باشد.`);
+      else references[key] = text;
+    }
+    if (references.brandId && references.brandName) entry.errors.push("برای برند، فقط نام یا شناسه را وارد کنید.");
+    if (references.categoryId && references.categoryName) entry.errors.push("برای دسته‌بندی، فقط نام یا شناسه را وارد کنید.");
     const slug = importSlug(values.slug || name);
     if (!slug) entry.errors.push("نام یا slug برای ساخت نشانی محصول معتبر نیست.");
     const checkDuplicate = (key: string, seen: Map<string, CsvReviewRow>, label: string) => {
@@ -144,7 +172,7 @@ export function reviewProductCsv(source: string): ProductCsvReview {
     checkDuplicate(slug, slugs, "نشانی محصول");
     checkDuplicate((values.sku ?? "").toLowerCase(), skus, "SKU");
     if (!entry.errors.length) entry.data = {
-      name, ...numeric, isActive,
+      name, ...numeric, isActive, ...references,
       ...(values.sku ? { sku: values.sku } : {}),
       ...(values.slug ? { slug: values.slug } : {}),
       ...(values.ingredientsText ? { ingredientsText: values.ingredientsText } : {}),

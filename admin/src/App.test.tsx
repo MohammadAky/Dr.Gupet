@@ -50,7 +50,7 @@ it("requires OTP and refuses a non-admin identity", async () => {
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("دسترسی ندارد"));
   expect(screen.getByRole("heading", { name: "ورود مدیر" })).toBeTruthy();
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-    "/api/v1/auth/otp/request", "/api/v1/auth/otp/verify", "/api/v1/admin/me",
+    "/api/v1/auth/admin/otp/request", "/api/v1/auth/admin/otp/verify", "/api/v1/admin/me",
   ]);
   expect(fetchMock.mock.calls.every(([, init]) => init.credentials === "omit")).toBe(true);
   expect(document.cookie).toBe("");
@@ -82,6 +82,17 @@ async function requestAdminCode() {
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "دریافت کد" })); });
 }
 
+it("keeps a rejected administrator phone on the request step without starting verification", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce(response({}, 403));
+  vi.stubGlobal("fetch", fetchMock);
+  await requestAdminCode();
+  expect(screen.getByRole("alert").textContent).toContain("دسترسی مجاز نیست");
+  expect(screen.queryByLabelText("کد تأیید")).toBeNull();
+  expect((screen.getByRole("button", { name: "دریافت کد" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0]![0]).toBe("/api/v1/auth/admin/otp/request");
+});
+
 it("resends to the normalized admin phone after the server cooldown and resets the code", async () => {
   vi.useFakeTimers();
   const fetchMock = vi.fn()
@@ -96,7 +107,7 @@ it("resends to the normalized admin phone after the server cooldown and resets t
   act(() => { vi.advanceTimersByTime(4000); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "ارسال مجدد کد" })); });
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(fetchMock.mock.calls[1]![0]).toBe("/api/v1/auth/otp/request");
+  expect(fetchMock.mock.calls[1]![0]).toBe("/api/v1/auth/admin/otp/request");
   expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toEqual({ phone: "09120000000" });
   expect(fetchMock.mock.calls[1]![1].credentials).toBe("omit");
   expect(fetchMock.mock.calls[1]![1].headers.Authorization).toBeUndefined();
@@ -180,7 +191,7 @@ it("does not send duplicate initial requests or resend during OTP verification",
   fireEvent.submit(form);
   fireEvent.click(screen.getByRole("button", { name: "ارسال مجدد کد" }));
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(fetchMock.mock.calls[1]![0]).toBe("/api/v1/auth/otp/verify");
+  expect(fetchMock.mock.calls[1]![0]).toBe("/api/v1/auth/admin/otp/verify");
   await act(async () => { finishVerify(response(null, 401)); });
   expect(screen.getByRole("alert")).toBeTruthy();
   expect((screen.getByRole("button", { name: "ارسال مجدد کد" }) as HTMLButtonElement).disabled).toBe(false);
@@ -217,8 +228,8 @@ function adminResponses() {
   ] };
   const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
     void _init;
-    if (url.endsWith("/auth/otp/request")) return Promise.resolve(response({ expiresIn: 120 }));
-    if (url.endsWith("/auth/otp/verify")) return Promise.resolve(response({ accessToken: "a", refreshToken: "r" }));
+    if (url.endsWith("/auth/admin/otp/request")) return Promise.resolve(response({ expiresIn: 120 }));
+    if (url.endsWith("/auth/admin/otp/verify")) return Promise.resolve(response({ accessToken: "a", refreshToken: "r" }));
     if (url.endsWith("/admin/me")) return Promise.resolve(response({ id: 1, role: "ADMIN", firstName: "مدیر" }));
     if (url.includes("/admin/dashboard")) return Promise.resolve(response(dashboard));
     if (url.includes("/admin/reports/sales")) return Promise.resolve(response(sales));

@@ -189,9 +189,7 @@ describe('persisted landing records and shared consent-based nearby centers', ()
     expect(locate).not.toHaveBeenCalled();
     expect(shopApi.nearbyClinics).not.toHaveBeenCalled();
     expect(shopApi.nearbyPharmacies).not.toHaveBeenCalled();
-    expect(container.textContent).toContain(
-      'موقعیت شما برای محاسبهٔ فاصله به سرور ما ارسال می‌شود',
-    );
+    expect(container.textContent).toContain('نزدیک‌ترین کلینیک خود را پیدا کنید');
   });
 
   it('requests global backend nearby results for both kinds after permission and uses a center outside the initial page', async () => {

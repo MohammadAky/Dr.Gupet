@@ -15,5 +15,5 @@ export function bannerStep(distance: number, width: number, velocity: number): -
   if (Math.abs(projected) < Math.max(40, width * 0.16) &&
     !(Math.abs(distance) >= 12 && Math.abs(velocity) >= 500)) return 0;
   const direction = Math.abs(velocity) >= 500 ? velocity : projected;
-  return direction < 0 ? 1 : -1;
+  return direction > 0 ? 1 : -1;
 }

@@ -139,6 +139,15 @@ async function flush() {
   });
 }
 async function fill(id: string, value: string) {
+  const trigger = container.querySelector<HTMLButtonElement>(`button#${id}[role="combobox"]`);
+  if (trigger) {
+    await vi.waitFor(() => expect(trigger.disabled).toBe(false));
+    await act(async () => trigger.click());
+    const option = Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]')).find(item => item.dataset.value === value);
+    expect(option).toBeTruthy();
+    await act(async () => option!.click());
+    return;
+  }
   await act(async () => {
     const input = container.querySelector<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -289,7 +298,7 @@ it('clears optional pet fields and a saved birthday using explicit nulls', async
   await act(async () => container.querySelector<HTMLButtonElement>('#birthDate')!.click());
   const clearDate = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'پاک کردن تاریخ')!;
   await act(async () => clearDate.click());
-  expect(container.querySelector('#birthDate')!.textContent).toContain('انتخاب تاریخ شمسی');
+  expect(container.querySelector('#birthDate')!.textContent).toContain('انتخاب تاریخ');
   await submit();
   expect(api.updatePet).toHaveBeenCalledWith(
     5,

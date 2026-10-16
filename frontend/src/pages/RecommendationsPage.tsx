@@ -1,3 +1,4 @@
+import { GlassSelect } from '../components/GlassSelect';
 import '../styles/content-pages.css';
 import { useQuery } from '@tanstack/react-query';
 import { useLayoutEffect, useRef } from 'react';
@@ -14,7 +15,7 @@ import type { RecommendationItem } from '../api/types';
 
 export function recommendationEvidence(card: Pick<RecommendationItem, 'matchedTags'>): string {
   const tags = [...new Set(card.matchedTags.map((tag) => tag.trim()).filter(Boolean))];
-  return tags.length ? `تطابق رژیمی ثبت‌شده: ${tags.join('، ')}` : 'تطابق رژیمی مشخصی برای این محصول گزارش نشده است.';
+  return tags.length ? `تطابق رژیمی: ${tags.join('، ')}` : 'تطابق رژیمی گزارش نشده است.';
 }
 
 export function parseRecommendationPage(params: URLSearchParams): number {
@@ -85,7 +86,6 @@ function RecommendationsSession() {
         <header className="account-heading">
           <div>
             <h1>پیشنهادها</h1>
-            <p>پیشنهادهای شخصی، با شناخت بهتر همراه شما شروع می‌شوند.</p>
           </div>
         </header>
         <EmptyState
@@ -102,13 +102,12 @@ function RecommendationsSession() {
       <header className="account-heading">
         <div>
           <h1>پیشنهادها برای {petList.find((pet) => pet.id === petId)?.name}</h1>
-          <p>انتخاب‌هایی متناسب با اطلاعات ثبت‌شدهٔ همراهتان.</p>
         </div>
       </header>
 
       <div className="account-pet-selector">
         <label htmlFor="petSelect">حیوان</label>
-        <select
+        <GlassSelect
           id="petSelect"
           value={petId}
           onChange={(event) => selectPet(Number(event.target.value))}
@@ -118,12 +117,11 @@ function RecommendationsSession() {
               {pet.name}
             </option>
           ))}
-        </select>
+        </GlassSelect>
       </div>
 
       <p className="account-guidance">
-        پیشنهادها از اطلاعات ثبت‌شدهٔ حیوان و محصول به دست می‌آیند. تطابق رژیمی هر محصول
-        جداگانه نمایش داده می‌شود؛ این نتیجه تضمین سازگاری یا جایگزین مشاورهٔ دامپزشک نیست.
+        پیشنهادها تضمین سازگاری یا جایگزین مشاورهٔ دامپزشک نیستند.
       </p>
 
       {recommendations.isLoading && <LoadingState layout="cards" />}

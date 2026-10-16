@@ -70,12 +70,44 @@ describe('Product import HTTP validation and ADMIN role (controlled identity)', 
     expect(importer.importBatch).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();
   });
+  it('accepts optional fallbacks and nested per-row references with normalized Persian names', async () => {
+    const response = await post({
+      rows: [
+        {
+          name: 'خوراک سگ',
+          price: 10,
+          petTypeId: 3,
+          brandName: ' برند كيان ',
+          categoryName: ' خوراك‌سگ ',
+        },
+        { name: 'خوراک گربه', price: 20, petTypeId: 4, brandId: 5, categoryId: 6 },
+      ],
+    });
+    expect(response.status).toBe(201);
+    expect(importer.importBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rows: [
+          expect.objectContaining({
+            petTypeId: 3,
+            brandName: 'برند کیان',
+            categoryName: 'خوراکسگ',
+          }),
+          expect.objectContaining({ petTypeId: 4, brandId: 5, categoryId: 6 }),
+        ],
+      }),
+    );
+  });
   it.each([
     { ...valid, brandId: 0 },
     { ...valid, rows: [{ name: 'خوراک', price: '1e3' }] },
     { ...valid, rows: [{ name: 'خوراک', price: 2147483648 }] },
     { ...valid, rows: [{ name: 'خوراک', price: 1, weightGram: -1 }] },
     { ...valid, rows: [{ name: 'خوراک', price: 1, extra: 'unknown' }] },
+    { ...valid, rows: [{ name: 'خوراک', price: 1, brandId: 0 }] },
+    { ...valid, rows: [{ name: 'خوراک', price: 1, petTypeId: '3' }] },
+    { ...valid, rows: [{ name: 'خوراک', price: 1, brandName: ' ـ‌ ' }] },
+    { ...valid, rows: [{ name: 'خوراک', price: 1, categoryName: null }] },
+    { ...valid, rows: [{ name: 'خوراک', price: 1, categoryName: 'م'.repeat(192) }] },
   ])('rejects malformed body %# with real nested DTO validation', async (body) => {
     expect((await post(body)).status).toBe(400);
     expect(importer.importBatch).not.toHaveBeenCalled();

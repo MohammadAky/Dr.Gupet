@@ -1,0 +1,11 @@
+.product-card .product-card__media { position: relative; overflow: hidden; }
+.product-card .product-card__media .product-card__alternate {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; pointer-events: none; transition: opacity 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .product-card .product-card__media[data-alternate-ready='true']:hover .product-card__alternate { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-card .product-card__media .product-card__alternate { transition: none; }
+}

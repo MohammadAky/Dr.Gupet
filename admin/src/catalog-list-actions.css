@@ -1,0 +1,9 @@
+.catalog-list .catalog-table.catalog-table--quick-actions :is(th, td):last-child { width: 200px; }
+.catalog-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.catalog-row-actions .catalog-link { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; }
+.catalog-row-actions .catalog-delete-action { color: #a62626; }
+.catalog-delete-action svg { flex: 0 0 auto; }
+[data-theme="dark"] .catalog-row-actions .catalog-delete-action { color: #ffb4a9; }
+@media (max-width: 600px) {
+  .catalog-list .catalog-table.catalog-table--quick-actions :is(th, td):last-child { width: 96px; }
+}

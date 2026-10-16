@@ -1,5 +1,4 @@
 import '../styles/content-pages.css';
-import { SafeImage } from '../components/SafeImage';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,11 +10,11 @@ import { sanitizeInternalRedirect } from '../lib/security';
 import { storeOtpCooldown, storeOtpPhone } from '../auth/otp-flow';
 import { useAuth } from '../auth/auth-provider';
 import { PasswordInput } from '../components/PasswordInput';
+import { PasswordStrength } from '../components/PasswordStrength';
 import { focusFirstInvalid } from '../lib/form-validation';
 import {
   normalizeUsername,
   passwordError,
-  passwordHint,
   usernameError,
   usernameHint,
 } from '../lib/password';
@@ -30,28 +29,6 @@ export function LoginPage() {
   const [notice, setNotice] = useState('');
   return (
     <section className="auth-shell">
-      <aside className="auth-story">
-        <Link to="/" className="auth-story__brand">
-          <SafeImage src="/brand/logo.webp" width={48} height={48} alt="دکتر گوپت" />
-          <span>دکتر گوپت</span>
-        </Link>
-        <div className="auth-story__copy">
-          <h2>
-            مراقبت بهتر،
-            <br />
-            از شناخت بیشتر.
-          </h2>
-          <p>حساب شما، خانهٔ اطلاعات و انتخاب‌های شما و همراه کوچکتان است.</p>
-        </div>
-        <SafeImage
-          className="auth-story__image"
-          src="/brand/companion-cat-960.webp"
-          width={960}
-          height={720}
-          alt=""
-          decoding="async"
-        />
-      </aside>
       <div className="auth-page">
         <h1>
           {mode === 'register'
@@ -60,13 +37,6 @@ export function LoginPage() {
               ? 'بازیابی رمز عبور'
               : 'ورود به حساب'}
         </h1>
-        <p>
-          {mode === 'register'
-            ? 'نام کاربری و رمز عبور را با تأیید شمارهٔ موبایل به حساب خود اضافه کنید.'
-            : mode === 'forgot'
-              ? 'نام کاربری و شمارهٔ موبایل همان حساب را وارد کنید.'
-              : 'روش ورود به حساب خود را انتخاب کنید.'}
-        </p>
         <div className="auth-methods" role="group" aria-label="روش ورود">
           <button
             type="button"
@@ -386,7 +356,6 @@ function PasswordLogin({
           label={forgot ? 'رمز عبور جدید' : 'رمز عبور'}
           htmlFor="password"
           error={errors.password}
-          hint={register || forgot ? passwordHint : undefined}
         >
           <PasswordInput
             id="password"
@@ -395,7 +364,9 @@ function PasswordLogin({
             onChange={(value) => update('password', value)}
             disabled={busy}
             autoComplete={register || forgot ? 'new-password' : 'current-password'}
+            aria-describedby={register || forgot ? 'password-guidance' : undefined}
           />
+          {(register || forgot) && <div id="password-guidance"><PasswordStrength value={password} /></div>}
         </Field>
       )}
       {(register || (forgot && codeStep)) && (
@@ -529,8 +500,6 @@ function OtpLogin({ onBusy }: { onBusy(value: boolean): void }) {
 
   return (
     <div>
-      <p>کد یک‌بارمصرف به شمارهٔ شما پیامک می‌شود (نیازی به رمز عبور نیست).</p>
-
       <form onSubmit={handleSubmit} noValidate aria-busy={requestOtp.isPending}>
         <Field label="شماره موبایل" htmlFor="phone" error={fieldError}>
           <input

@@ -6,6 +6,7 @@
   --forest: #122f12;
   --forest-soft: #214324;
   --gold: #d49f28;
+  --gold-soft: color-mix(in srgb, var(--gold) 16%, var(--paper));
   --focus-ring: #122f12;
   --paper: #fff;
   --muted: #667164;
@@ -37,6 +38,9 @@ input {
 }
 button {
   cursor: pointer;
+}
+a {
+  text-decoration: none;
 }
 button:disabled {
   cursor: wait;
@@ -212,7 +216,7 @@ button:disabled {
 }
 .auth-methods button[aria-pressed="true"] {
   border-color: var(--forest);
-  box-shadow: inset 0 -2px 0 var(--gold);
+  background: var(--gold-soft);
 }
 .password-input {
   position: relative;
@@ -1187,7 +1191,7 @@ body { line-height: 1.7; }
   margin-bottom: 20px;
   font-size: 13px;
 }
-.catalog-notice button { border: 0; background: transparent; color: inherit; font-weight: 700; text-decoration: underline; }
+.catalog-notice button { border: 0; background: transparent; color: inherit; font-weight: 700; text-decoration: none; }
 .catalog-notice--warning { background: #fff3dc; border-color: #e2c47a; color: #674b18; }
 .catalog-notice--success { background: #e7f4e9; border-color: #9acc9f; color: #265b31; }
 .catalog-panel {

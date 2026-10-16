@@ -12,7 +12,15 @@ function deferred() {
 
 /** In-memory transactional parent lock; real SQL concurrency is verified separately. */
 function harness() {
-  const product = { id: 1, isActive: false, minPrice: 100, name: 'خوراک' };
+  const product = {
+    id: 1,
+    isActive: false,
+    minPrice: 100,
+    name: 'خوراک',
+    brandId: 3,
+    categoryId: 4,
+    petTypeId: 5,
+  };
   const variant = {
     id: 2,
     productId: 1,
@@ -60,8 +68,13 @@ function harness() {
             unlock = done;
           });
           await prior;
-          return [{ id: product.id, isActive: product.isActive }];
+          return [{ ...product }];
         },
+        brand: { findUnique: jest.fn(async () => ({ isActive: true })) },
+        productCategory: {
+          findUnique: jest.fn(async () => ({ isActive: true, petTypeId: product.petTypeId })),
+        },
+        petType: { findUnique: jest.fn(async () => ({ isActive: true })) },
         product: { update: productUpdate },
         productVariant: {
           count,

@@ -159,6 +159,8 @@ export interface ProductCard {
   brand: { id: number; name: string };
   image: string | null;
   minPrice: number;
+  /** Gallery position 1 selected by the administrator; old API versions may omit it. */
+  hoverImage?: string | null;
   /** Present on GET /products; favorites/recommendations may omit it. */
   compareAtPrice?: number | null;
   inStock: boolean;

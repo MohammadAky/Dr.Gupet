@@ -1,3 +1,4 @@
+import { GlassSelect } from './GlassSelect';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { addDays, calendarLabel, digits, MONTHS, monthLength, shiftMonth, tehranFields, tehranInstant, todayTehran, toIsoDay, toPersianDay, WEEKDAYS } from './calendar';
 import './jalali-calendar.css';
@@ -75,21 +76,21 @@ export function JalaliDateInput({ id, name, value, onChange, disabled, max, with
       <span>{calendarLabel(value, withTime)}</span>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>
     </button>
-    {open && <div id={`${id}-calendar`} ref={region} className="jalali-date__calendar" role="region" aria-label="تقویم شمسی" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
+    {open && <div id={`${id}-calendar`} ref={region} className="jalali-date__calendar" role="region" aria-label="تقویم" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
       <div className="jalali-date__navigation">
         <button type="button" aria-label="ماه قبل" disabled={disabled || (view.year === 1200 && view.month === 1)} onClick={() => month(-1)}>‹</button>
-        <select aria-label="ماه شمسی" disabled={disabled} value={view.month} data-draft-selector onChange={event => {
+        <GlassSelect aria-label="ماه" disabled={disabled} value={view.month} data-draft-selector onChange={event => {
           const next = { ...view, month: Number(event.target.value), day: 1 }; setView(next); setFocusDay(toIsoDay(next));
-        }}>{MONTHS.map((name, index) => <option key={name} value={index + 1} disabled={!!(max && toIsoDay({ year: view.year, month: index + 1, day: 1 }) > max)}>{name}</option>)}</select>
-        <select aria-label="سال شمسی" data-draft-selector value={view.year} disabled={disabled} onChange={event => {
+        }}>{MONTHS.map((name, index) => <option key={name} value={index + 1} disabled={!!(max && toIsoDay({ year: view.year, month: index + 1, day: 1 }) > max)}>{name}</option>)}</GlassSelect>
+        <GlassSelect aria-label="سال" data-draft-selector value={view.year} disabled={disabled} onChange={event => {
           let next = { ...view, year: Number(event.target.value), day: 1 };
           if (max && toIsoDay(next) > max) next = { ...toPersianDay(max), day: 1 };
           setView(next); setFocusDay(toIsoDay(next));
-        }}>{Array.from({ length: 401 }, (_, index) => 1200 + index).map(year => <option key={year} value={year} disabled={maxPersianYear !== null && year > maxPersianYear}>{digits(year)}</option>)}</select>
+        }}>{Array.from({ length: 401 }, (_, index) => 1200 + index).map(year => <option key={year} value={year} disabled={maxPersianYear !== null && year > maxPersianYear}>{digits(year)}</option>)}</GlassSelect>
         <button type="button" aria-label="ماه بعد" disabled={disabled || (view.year === 1600 && view.month === 12) || !!(max && view.year < 1600 && toIsoDay({ ...shiftMonth(view, 1), day: 1 }) > max)} onClick={() => month(1)}>›</button>
       </div>
       <p className="jalali-date__month" aria-live="polite">{MONTHS[view.month - 1]} {digits(view.year)}</p>
-      <div className="jalali-date__grid" role="group" aria-label="روزهای ماه شمسی">
+      <div className="jalali-date__grid" role="group" aria-label="روزهای ماه">
         {WEEKDAYS.map((day, index) => <span key={index} className="jalali-date__weekday" aria-hidden="true">{day}</span>)}
         {Array.from({ length: offset }, (_, index) => <span key={`blank-${index}`} />)}
         {Array.from({ length }, (_, index) => {
@@ -98,8 +99,8 @@ export function JalaliDateInput({ id, name, value, onChange, disabled, max, with
         })}
       </div>
       {withTime && <div className="jalali-date__time">
-        <label>ساعت تهران<select aria-label="ساعت تهران" disabled={disabled} value={time.hour} onChange={event => setTime('hour', Number(event.target.value))}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{digits(hour).padStart(2, '۰')}</option>)}</select></label>
-        <label>دقیقه<select aria-label="دقیقه" disabled={disabled} value={time.minute} onChange={event => setTime('minute', Number(event.target.value))}>{Array.from({ length: 60 }, (_, minute) => <option key={minute} value={minute}>{digits(minute).padStart(2, '۰')}</option>)}</select></label>
+        <label htmlFor={`${id}-hour`}>ساعت تهران<GlassSelect id={`${id}-hour`} aria-label="ساعت تهران" disabled={disabled} value={time.hour} onChange={event => setTime('hour', Number(event.target.value))}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{digits(hour).padStart(2, '۰')}</option>)}</GlassSelect></label>
+        <label htmlFor={`${id}-minute`}>دقیقه<GlassSelect id={`${id}-minute`} aria-label="دقیقه" disabled={disabled} value={time.minute} onChange={event => setTime('minute', Number(event.target.value))}>{Array.from({ length: 60 }, (_, minute) => <option key={minute} value={minute}>{digits(minute).padStart(2, '۰')}</option>)}</GlassSelect></label>
       </div>}
       {message && <p role="alert">{message}</p>}
       <div className="jalali-date__actions"><button type="button" disabled={disabled || !value} onClick={() => { change(''); close(); }}>پاک کردن تاریخ</button><button type="button" data-draft-keep onClick={close}>بستن تقویم</button></div>

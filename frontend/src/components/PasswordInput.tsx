@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import './password-input.css';
 
 export function PasswordInput({
   id,
@@ -7,6 +8,7 @@ export function PasswordInput({
   disabled,
   required = false,
   autoComplete = 'current-password',
+  requireInteraction = false,
   'aria-describedby': describedBy,
   'aria-invalid': invalid,
 }: {
@@ -15,25 +17,39 @@ export function PasswordInput({
   onChange(value: string): void;
   disabled?: boolean;
   required?: boolean;
-  autoComplete?: 'current-password' | 'new-password';
+  autoComplete?: 'current-password' | 'new-password' | 'off';
+  requireInteraction?: boolean;
   'aria-describedby'?: string;
   'aria-invalid'?: boolean | 'true' | 'false';
 }) {
   const [visible, setVisible] = useState(false);
+  const [editable, setEditable] = useState(!requireInteraction);
+  const interacted = useRef(!requireInteraction);
+  function activate() { interacted.current = true; setEditable(true); }
   return (
-    <div className="password-input">
+    <div className="password-input password-input--overlay">
       <input
         id={id}
         name={id}
         type={visible ? 'text' : 'password'}
         dir="ltr"
         autoComplete={autoComplete}
+        readOnly={!editable}
+        autoCapitalize="none"
+        spellCheck={false}
         aria-describedby={describedBy}
         aria-invalid={invalid}
         value={value}
         disabled={disabled}
         required={required}
-        onChange={(event) => onChange(event.target.value)}
+        onPointerDown={activate}
+        onKeyDown={(event) => {
+          if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') activate();
+        }}
+        onBlur={() => {
+          if (requireInteraction && !value) { interacted.current = false; setEditable(false); }
+        }}
+        onChange={(event) => { if (interacted.current) onChange(event.target.value); }}
       />
       <button
         type="button"

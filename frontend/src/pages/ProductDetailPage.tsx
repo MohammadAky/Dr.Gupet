@@ -1,4 +1,5 @@
 import '../styles/content-pages.css';
+import '../styles/product-detail-experience.css';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -14,6 +15,10 @@ import { API_BASE_URL } from '../lib/env';
 import { SafeImage } from '../components/SafeImage';
 import { Dialog } from '../components/ui/interactive';
 import { isSampleProduct, publicRecordName } from '../lib/sample-records';
+import { ProductGallery } from '../components/ProductGallery';
+import { QuantityField } from '../components/QuantityField';
+import { signalCartAdded } from '../features/cart/cart-feedback';
+import { RelatedProducts } from '../components/RelatedProducts';
 
 /** Product detail: variant selection, add-to-cart and favorite toggle (F5/F7/F8 behaviour). */
 export function ProductDetailPage() {
@@ -62,6 +67,7 @@ export function ProductDetailPage() {
   const slugRef = useRef(slug);
   const generationRef = useRef(0);
   const addInFlightRef = useRef(false);
+  const addWasKeyboardRef = useRef(true);
   const favoriteInFlightRef = useRef(false);
   const quantity = Number(quantityInput);
   const validQuantity =
@@ -138,6 +144,8 @@ export function ProductDetailPage() {
     const requestIdentity = identityRef.current;
     const requestSlug = slugRef.current;
     const generation = generationRef.current;
+    const feedbackKeyboard = addWasKeyboardRef.current;
+    const feedbackSource = event.currentTarget.closest('.product-detail')?.querySelector<HTMLElement>('.product-detail__gallery') ?? null;
     addInFlightRef.current = true;
     setAddPending(true);
     setMessage(null);
@@ -147,6 +155,7 @@ export function ProductDetailPage() {
         if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
         setMessageKind('success');
         setMessage('به سبد خرید اضافه شد.');
+        signalCartAdded({ userId: requestIdentity, keyboard: feedbackKeyboard, source: feedbackSource });
         void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       })
       .catch((error: unknown) => {
@@ -237,45 +246,8 @@ export function ProductDetailPage() {
         <Link to="/">خانه</Link> / <Link to="/products">محصولات</Link> / {publicRecordName(detail)}
       </nav>
       <div className="product-detail__main">
-        <div className="product-detail__gallery">
-          <div className="product-detail__media">
-            {imageUrl ? (
-              <button
-                className="commerce-gallery-open"
-                type="button"
-                onClick={() => setGalleryOpen(true)}
-                aria-label={`نمایش بزرگ‌تر تصویر ${publicRecordName(detail)}`}
-              >
-                <SafeImage src={imageUrl} alt={publicRecordName(detail)} referrerPolicy="no-referrer" />
-                <span>نمایش بزرگ‌تر</span>
-              </button>
-            ) : (
-              <span className="product-detail__placeholder" aria-hidden="true" />
-            )}
-          </div>
-          {images.length > 1 && (
-            <div className="product-detail__thumbnails" role="group" aria-label="تصاویر محصول">
-              {images.map((image, index) => (
-                <button
-                  key={image.id}
-                  type="button"
-                  aria-label={`تصویر ${index + 1} از ${publicRecordName(detail)}`}
-                  aria-pressed={selectedImage?.id === image.id}
-                  onClick={() => setSelectedImageId(image.id)}
-                >
-                  <SafeImage
-                    src={image.safeUrl!}
-                    alt=""
-                    width="72"
-                    height="72"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductGallery images={images} selectedId={selectedImageId} name={publicRecordName(detail)}
+          onSelect={setSelectedImageId} onOpen={() => setGalleryOpen(true)} />
         <div className="product-detail__info">
           <p className="product-detail__eyebrow">
             {publicRecordName(detail.brand)} / {publicRecordName(detail.category)}
@@ -316,27 +288,11 @@ export function ProductDetailPage() {
               ))}
             </fieldset>
 
-            <label htmlFor="qty">تعداد</label>
-            <input
-              id="qty"
-              type="number"
-              min={1}
-              max={MAX_CART_ITEM_QTY}
-              step={1}
-              dir="ltr"
-              value={quantityInput}
-              aria-invalid={!validQuantity}
-              aria-describedby={!validQuantity ? 'qty-error' : undefined}
-              onChange={(event) => setQuantityInput(event.target.value)}
-            />
-            {!validQuantity && (
-              <p id="qty-error" role="alert">
-                تعداد باید عدد صحیح بین ۱ تا {MAX_CART_ITEM_QTY} باشد.
-              </p>
-            )}
+            <QuantityField id="qty" value={quantityInput} onChange={setQuantityInput} max={MAX_CART_ITEM_QTY} disabled={addPending} />
 
             <button
               type="submit"
+              onClick={event => { addWasKeyboardRef.current = event.detail === 0; }}
               disabled={
                 isSampleProduct(detail) ||
                 identity === null ||
@@ -414,6 +370,7 @@ export function ProductDetailPage() {
           <Link to="/recommendations">محصولات مناسب پت من</Link>
         </p>
       </section>
+      <RelatedProducts product={detail} />
       <Dialog
         open={galleryOpen}
         title={publicRecordName(detail)}

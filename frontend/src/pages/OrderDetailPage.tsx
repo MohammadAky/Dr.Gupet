@@ -175,8 +175,7 @@ function OrderDetailSession({ userId }: { userId: number }) {
         </span>
       </header>
       <p className="account-subtle">
-        {formatJalali(detail.createdAt, 'datetime')} ·{' '}
-        <strong>{ORDER_STATUS_FA[detail.status]}</strong>
+        {formatJalali(detail.createdAt, 'datetime')}
       </p>
 
       {detail.status === 'PENDING_PAYMENT' && (
@@ -242,7 +241,7 @@ function OrderDetailSession({ userId }: { userId: number }) {
       </section>
 
       <section>
-        <h2>نشانی تحویل ثبت‌شده</h2>
+        <h2>نشانی تحویل</h2>
         {snapshot ? (
           <>
             <p>
@@ -262,7 +261,7 @@ function OrderDetailSession({ userId }: { userId: number }) {
       </section>
 
       <section>
-        <h2>خلاصه مبلغ سفارش</h2>
+        <h2>خلاصه سفارش</h2>
         <dl className="account-totals">
           <dt>جمع کالاها</dt>
           <dd dir="ltr">{formatToman(detail.itemsTotal)}</dd>

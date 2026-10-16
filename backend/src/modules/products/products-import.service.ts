@@ -34,6 +34,31 @@ export class ProductsImportService {
       const sku = row.sku?.trim() || `IMPORT-${randomUUID()}`;
       const weightGram = row.weightGram ?? 0;
       const isActive = row.isActive ?? false;
+      if (
+        (row.brandId !== undefined && row.brandName !== undefined) ||
+        (row.categoryId !== undefined && row.categoryName !== undefined)
+      ) {
+        throw new AppException(
+          'VALIDATION_ERROR',
+          `ردیف ${index + 1}: برای هر مرجع فقط شناسه یا نام را تعیین کنید`,
+          400,
+        );
+      }
+      const brandId = row.brandId ?? (row.brandName === undefined ? dto.brandId : undefined);
+      const categoryId =
+        row.categoryId ?? (row.categoryName === undefined ? dto.categoryId : undefined);
+      const petTypeId = row.petTypeId ?? dto.petTypeId;
+      if (
+        petTypeId === undefined ||
+        (brandId === undefined && row.brandName === undefined) ||
+        (categoryId === undefined && row.categoryName === undefined)
+      ) {
+        throw new AppException(
+          'VALIDATION_ERROR',
+          `ردیف ${index + 1}: برند، دسته‌بندی و نوع حیوان را تعیین کنید`,
+          400,
+        );
+      }
       if (name.length < 2 || !slug || (isActive && weightGram === 0)) {
         throw new AppException(
           'VALIDATION_ERROR',
@@ -52,6 +77,11 @@ export class ProductsImportService {
       skus.add(sku);
       return {
         name,
+        brandId,
+        brandName: row.brandName,
+        categoryId,
+        categoryName: row.categoryName,
+        petTypeId,
         slug,
         sku,
         weightGram,
@@ -67,26 +97,18 @@ export class ProductsImportService {
     try {
       return await this.prisma.$transaction(
         async (tx) => {
-          const [brand, category, petType] = await Promise.all([
-            tx.brand.findUnique({ where: { id: dto.brandId }, select: { id: true } }),
-            tx.productCategory.findUnique({
-              where: { id: dto.categoryId },
-              select: { id: true, petTypeId: true },
+          // Name matching needs the canonical text, not database collation or a
+          // slug guess. Keep newly created rows in these transaction-local lists.
+          const [brands, categories, petTypes] = await Promise.all([
+            tx.brand.findMany({ select: { id: true, name: true, slug: true, isActive: true } }),
+            tx.productCategory.findMany({
+              select: { id: true, name: true, slug: true, petTypeId: true, isActive: true },
             }),
-            tx.petType.findUnique({ where: { id: dto.petTypeId }, select: { id: true } }),
+            tx.petType.findMany({
+              where: { id: { in: [...new Set(rows.map((row) => row.petTypeId))] } },
+              select: { id: true, isActive: true },
+            }),
           ]);
-          if (
-            !brand ||
-            !category ||
-            !petType ||
-            (category.petTypeId !== null && category.petTypeId !== dto.petTypeId)
-          ) {
-            throw new AppException(
-              'VALIDATION_ERROR',
-              'برند، دسته‌بندی و نوع حیوان معتبر و سازگار را انتخاب کنید',
-              400,
-            );
-          }
           const [products, variants] = await Promise.all([
             tx.product.findMany({ where: { slug: { in: [...slugs] } }, select: { slug: true } }),
             tx.productVariant.findMany({
@@ -102,14 +124,82 @@ export class ProductsImportService {
             );
           }
           const imported: Array<{ id: number; name: string; slug: string }> = [];
-          for (const row of rows) {
+          for (const [index, row] of rows.entries()) {
+            const invalid = (message: string) =>
+              new AppException('VALIDATION_ERROR', `ردیف ${index + 1}: ${message}`, 400);
+            const petType = petTypes.find((item) => item.id === row.petTypeId);
+            if (!petType || !petType.isActive)
+              throw invalid('نوع حیوان معتبر و فعال را انتخاب کنید');
+            let brand: (typeof brands)[number] | undefined;
+            if (row.brandId !== undefined) {
+              brand = brands.find((item) => item.id === row.brandId);
+            } else {
+              const matches = brands.filter(
+                (item) => normalizeFa(item.name).trim() === row.brandName,
+              );
+              if (matches.length > 1)
+                throw invalid('نام برند چند مرجع دارد؛ شناسهٔ دقیق را انتخاب کنید');
+              brand = matches[0];
+              if (!brand) {
+                const slug = slugify(row.brandName!);
+                if (!slug) throw invalid('نام برند برای ساخت نشانی معتبر نیست');
+                if (brands.some((item) => item.slug === slug))
+                  throw new AppException(
+                    'CONFLICT',
+                    `ردیف ${index + 1}: نشانی برند قبلاً ثبت شده است`,
+                    409,
+                  );
+                brand = await tx.brand.create({
+                  data: { name: row.brandName!, slug, isActive: true },
+                  select: { id: true, name: true, slug: true, isActive: true },
+                });
+                brands.push(brand);
+              }
+            }
+            if (!brand || !brand.isActive) throw invalid('برند معتبر و فعال را انتخاب کنید');
+            let category: (typeof categories)[number] | undefined;
+            if (row.categoryId !== undefined) {
+              category = categories.find((item) => item.id === row.categoryId);
+            } else {
+              const matches = categories.filter(
+                (item) =>
+                  normalizeFa(item.name).trim() === row.categoryName &&
+                  (item.petTypeId === null || item.petTypeId === petType.id),
+              );
+              if (matches.length > 1)
+                throw invalid('نام دسته‌بندی چند مرجع سازگار دارد؛ شناسهٔ دقیق را انتخاب کنید');
+              category = matches[0];
+              if (!category) {
+                const stem = slugify(row.categoryName!);
+                if (!stem) throw invalid('نام دسته‌بندی برای ساخت نشانی معتبر نیست');
+                const suffix = `-pet-${petType.id}`;
+                const slug = [...stem].slice(0, 191 - suffix.length).join('') + suffix;
+                if (categories.some((item) => item.slug === slug))
+                  throw new AppException(
+                    'CONFLICT',
+                    `ردیف ${index + 1}: نشانی دسته‌بندی قبلاً ثبت شده است`,
+                    409,
+                  );
+                category = await tx.productCategory.create({
+                  data: { name: row.categoryName!, slug, petTypeId: petType.id, isActive: true },
+                  select: { id: true, name: true, slug: true, petTypeId: true, isActive: true },
+                });
+                categories.push(category);
+              }
+            }
+            if (
+              !category ||
+              !category.isActive ||
+              (category.petTypeId !== null && category.petTypeId !== petType.id)
+            )
+              throw invalid('دسته‌بندی معتبر، فعال و سازگار با نوع حیوان را انتخاب کنید');
             const product = await tx.product.create({
               data: {
                 name: row.name,
                 slug: row.slug,
-                brandId: dto.brandId,
-                categoryId: dto.categoryId,
-                petTypeId: dto.petTypeId,
+                brandId: brand.id,
+                categoryId: category.id,
+                petTypeId: petType.id,
                 ingredientsText: row.ingredientsText,
                 description: row.description,
                 isActive: row.isActive,

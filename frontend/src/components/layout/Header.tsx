@@ -162,7 +162,7 @@ function SearchSuggestions({
       {pending && <p className="search-suggestions__status" role="status">در حال جست‌وجو…</p>}
       {!pending && !items.length && (
         <p className="search-suggestions__status" role="status">
-          {failed ? 'دریافت نتایج ممکن نشد؛ دوباره تلاش کنید.' : 'در نتایج بررسی‌شده موردی پیدا نشد.'}
+          {failed ? 'دریافت نتایج ممکن نشد؛ دوباره تلاش کنید.' : 'نتیجه‌ای پیدا نشد.'}
         </p>
       )}
       {!pending && failed && items.length > 0 && (

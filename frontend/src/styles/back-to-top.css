@@ -1,0 +1,60 @@
+.back-to-top {
+  position: fixed;
+  /* The existing theme circle is 46px; center this 44px target above it. */
+  left: calc(max(20px, env(safe-area-inset-left)) + 1px);
+  bottom: calc(max(20px, env(safe-area-inset-bottom)) + 46px + 12px);
+  z-index: 25;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--glass-border, var(--line));
+  border-radius: 50%;
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--glass-highlight, transparent), transparent 55%), var(--glass-surface, var(--paper));
+  box-shadow: var(--glass-shadow, var(--shadow-card));
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+  cursor: pointer;
+  transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
+}
+.back-to-top svg { display: block; pointer-events: none; }
+.back-to-top:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) {
+  .back-to-top:hover { border-color: var(--gold); }
+}
+@media (max-width: 760px) {
+  .back-to-top {
+    left: calc(max(14px, env(safe-area-inset-left)) + 1px);
+    bottom: calc(78px + env(safe-area-inset-bottom) + 46px + 12px);
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .back-to-top { background: var(--glass-solid, var(--paper)); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .back-to-top {
+    background: var(--glass-solid, var(--paper));
+    border-color: var(--muted);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top { transition: none; }
+}
+@media (forced-colors: active) {
+  .back-to-top {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .back-to-top:focus-visible { outline-color: Highlight; }
+}

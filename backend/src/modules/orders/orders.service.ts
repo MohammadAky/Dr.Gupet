@@ -96,7 +96,7 @@ export class OrdersService {
     // 6. Calculate shipping (Setting table overrides env values)
     const freeShippingThreshold = await this.settingsService.getNumber(
       'FREE_SHIPPING_THRESHOLD',
-      this.configService.get<number>('app.freeShippingThreshold') || 1500000,
+      this.configService.get<number>('app.freeShippingThreshold') || 6000000,
     );
     const shippingFlatCost = await this.settingsService.getNumber(
       'SHIPPING_FLAT_COST',

@@ -25,6 +25,22 @@ export class AuthController {
   ) {}
 
   @Public()
+  @Post('admin/otp/request')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Request OTP for an existing active administrator' })
+  requestAdminOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestAdminOtp(dto.phone);
+  }
+
+  @Public()
+  @Post('admin/otp/verify')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Verify OTP for an existing active administrator' })
+  verifyAdminOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyAdminOtp(dto.phone, dto.code);
+  }
+
+  @Public()
   @Post('password/register/request-otp')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   requestRegistrationOtp(@Body() dto: RequestOtpDto) {

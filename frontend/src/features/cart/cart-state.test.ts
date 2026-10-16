@@ -36,7 +36,11 @@ describe('server cart financial state', () => {
     for (const invalid of [-1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1]) {
       expect(shippingEstimate(withCost(invalid))).toEqual({ cost: 50_000, source: 'fallback' });
     }
-    expect(shippingEstimate({ ...cart, itemsTotal: 1_500_000 })).toEqual({
+    expect(shippingEstimate({ ...cart, itemsTotal: 5_999_999 })).toEqual({
+      cost: 50_000,
+      source: 'fallback',
+    });
+    expect(shippingEstimate({ ...cart, itemsTotal: 6_000_000 })).toEqual({
       cost: 0,
       source: 'fallback',
     });

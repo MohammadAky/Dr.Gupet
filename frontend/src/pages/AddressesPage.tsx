@@ -95,11 +95,10 @@ function AddressesContent() {
       <header className="account-heading">
         <div>
           <h1>آدرس‌های من</h1>
-          <p>نشانی‌های تحویل را یک‌بار ثبت کنید؛ هر خرید، یک انتخاب ساده.</p>
         </div>
         {!atLimit && items.length > 0 && (
           <Link className="account-primary-link" to="/addresses/new">
-            افزودن آدرس جدید <span aria-hidden="true">+</span>
+            افزودن آدرس <span aria-hidden="true">+</span>
           </Link>
         )}
       </header>

@@ -145,7 +145,11 @@ export class ProductsService {
         where,
         include: {
           brand: { select: { id: true, name: true } },
-          images: { take: 1, select: { url: true } },
+          images: {
+            take: 2,
+            orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+            select: { url: true },
+          },
           variants: {
             where: { isActive: true },
             select: { price: true, compareAtPrice: true, stock: true },
@@ -178,6 +182,7 @@ export class ProductsService {
         slug: product.slug,
         brand: product.brand,
         image: product.images[0]?.url || null,
+        hoverImage: product.images[1]?.url || null,
         minPrice,
         compareAtPrice,
         inStock,
@@ -207,7 +212,10 @@ export class ProductsService {
         brand: { select: { id: true, name: true, slug: true } },
         category: { select: { id: true, name: true, slug: true } },
         petType: { select: { id: true, name: true, slug: true } },
-        images: { orderBy: { sortOrder: 'asc' }, select: { id: true, url: true, sortOrder: true } },
+        images: {
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          select: { id: true, url: true, sortOrder: true },
+        },
         variants: {
           where: { isActive: true },
           select: {

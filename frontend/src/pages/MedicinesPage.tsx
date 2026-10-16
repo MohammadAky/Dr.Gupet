@@ -71,7 +71,7 @@ export function MedicinesPage() {
       <div className="directory-page__heading">
         <span className="eyebrow">راهنمای سلامت</span>
         <h1>اطلاعات داروها</h1>
-        <p>این بخش صرفاً اطلاعاتی است؛ قیمت و موجودی ندارد و پیش از مصرف با دامپزشک مشورت کنید.</p>
+        <p>صرفاً اطلاعاتی؛ پیش از مصرف با دامپزشک مشورت کنید.</p>
       </div>
 
       <form className="filter-panel" onSubmit={submit}>
@@ -82,7 +82,7 @@ export function MedicinesPage() {
             options={medicineOptions}
             onInputChange={setSearch}
             onSelect={setSearch}
-            placeholder="نام دارو را بنویسید یا از فهرست انتخاب کنید"
+            placeholder="جستجوی دارو"
           />
           <SearchableFilter
             label="نوع حیوان"
@@ -135,17 +135,15 @@ export function MedicinesPage() {
           <ul className="medicine-grid">
             {medicines.data.data.map((medicine) => (
               <li className="medicine-card" key={medicine.id}>
-                <span className="medicine-card__kind">
-                  {!isSampleReference(medicine) && medicine.requiresPrescription
-                      ? 'نیازمند نسخه'
-                      : 'اطلاعات دارویی'}
-                </span>
+                {!isSampleReference(medicine) && medicine.requiresPrescription && (
+                  <span className="medicine-card__kind">نیازمند نسخه</span>
+                )}
                 <h2>
                   <Link to={`/medicines/${medicine.id}`}>{publicRecordName(medicine)}</Link>
                 </h2>
                 {!isSampleReference(medicine) && medicine.activeIngredient && <p>مادهٔ مؤثره: {medicine.activeIngredient}</p>}
                 <Link className="directory-card__link" to={`/medicines/${medicine.id}`}>
-                  مطالعهٔ اطلاعات <span aria-hidden="true">←</span>
+                  جزئیات <span aria-hidden="true">←</span>
                 </Link>
               </li>
             ))}

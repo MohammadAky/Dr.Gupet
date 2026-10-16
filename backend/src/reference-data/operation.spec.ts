@@ -1,5 +1,7 @@
 import { applyReferenceData } from './operation';
-import { REFERENCE_SPECIES } from './catalog';
+import { REFERENCE_SPECIES, REFERENCE_TAGS } from './catalog';
+
+const breedCount = REFERENCE_SPECIES.reduce((total, species) => total + species.breeds.length, 0);
 
 function referenceTransaction(
   petTypes: { id: number; name: string; slug: string; isActive: boolean }[],
@@ -39,14 +41,18 @@ function referenceTransaction(
 }
 
 describe('Reference create-only transaction preserves Persian database identities', () => {
-  it('fills 23 breeds and 17 tags for VPS IDs 2/3/4 using exact existing Persian slugs without duplicate species', async () => {
+  it('fills the reference vocabulary for existing IDs 2/3/4 using exact Persian slugs without duplicate species', async () => {
     const original = [
       { id: 2, name: 'سگ', slug: 'سگ', isActive: true },
       { id: 3, name: 'گربه', slug: 'گربه', isActive: true },
       { id: 4, name: 'پرنده', slug: 'پرنده', isActive: true },
     ];
     const state = referenceTransaction(original.map((row) => ({ ...row })));
-    expect(await applyReferenceData(state.tx)).toEqual({ species: 0, breeds: 23, tags: 17 });
+    expect(await applyReferenceData(state.tx)).toEqual({
+      species: 0,
+      breeds: breedCount,
+      tags: REFERENCE_TAGS.length,
+    });
     expect(state.petTypes).toEqual(original);
     expect(state.tx.petType.create).not.toHaveBeenCalled();
     expect(
@@ -58,19 +64,25 @@ describe('Reference create-only transaction preserves Persian database identitie
       ).toEqual([...species.breeds]);
     }
     expect(await applyReferenceData(state.tx)).toEqual({ species: 0, breeds: 0, tags: 0 });
-    expect(state.tx.breed.create).toHaveBeenCalledTimes(23);
-    expect(state.tx.tag.create).toHaveBeenCalledTimes(17);
+    expect(state.tx.breed.create).toHaveBeenCalledTimes(breedCount);
+    expect(state.tx.tag.create).toHaveBeenCalledTimes(REFERENCE_TAGS.length);
   });
 
   it('creates only missing cat/bird references alongside an existing Persian dog identity', async () => {
     const state = referenceTransaction([{ id: 2, name: 'سگ', slug: 'سگ', isActive: true }]);
-    expect(await applyReferenceData(state.tx)).toEqual({ species: 2, breeds: 23, tags: 17 });
+    expect(await applyReferenceData(state.tx)).toEqual({
+      species: 2,
+      breeds: breedCount,
+      tags: REFERENCE_TAGS.length,
+    });
     expect(state.petTypes[0]).toEqual({ id: 2, name: 'سگ', slug: 'سگ', isActive: true });
     expect(state.tx.petType.create.mock.calls.map(([arg]: any) => arg.data.slug)).toEqual([
       'cat',
       'bird',
     ]);
-    expect(state.breeds.filter((row) => row.petTypeId === 2)).toHaveLength(10);
+    expect(state.breeds.filter((row) => row.petTypeId === 2)).toHaveLength(
+      REFERENCE_SPECIES[0].breeds.length,
+    );
   });
 
   it('refuses duplicate semantic species before any write', async () => {

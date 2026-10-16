@@ -136,5 +136,5 @@ it('applies dietary tags to the API query and resets pagination', async () => {
 it('explains missing dietary records rather than presenting an empty unlabeled group', async () => {
   vi.mocked(api.tags).mockResolvedValue([]);
   await show(<ProductsPage />, '/products');
-  expect(container.textContent).toContain('هنوز ویژگی رژیمی برای محصولات ثبت نشده است.');
+  expect(container.textContent).toContain('ویژگی رژیمی در دسترس نیست.');
 });

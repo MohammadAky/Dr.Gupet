@@ -11,7 +11,7 @@ const click = async (selector: string) => { const control = container.querySelec
 const key = async (control: Element, value: string) => { await act(async () => control.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true }))); };
 function Example({ value = '2026-03-21', max, withTime = false, change = () => {} }: { value?: string; max?: string; withTime?: boolean; change?(value: string): void }) {
   const [date, setDate] = useState(value);
-  return <form><label htmlFor="birthday">تاریخ شمسی</label><JalaliDateInput id="birthday" name="birthday" value={date} max={max} withTime={withTime} onChange={next => { setDate(next); change(next); }} /></form>;
+  return <form><label htmlFor="birthday">تاریخ</label><JalaliDateInput id="birthday" name="birthday" value={date} max={max} withTime={withTime} onChange={next => { setDate(next); change(next); }} /></form>;
 }
 it('shows Persian dates, a Saturday-first month, no native Gregorian controls, and restores focus on Escape', async () => {
   await act(async () => root.render(<Example />));
@@ -21,7 +21,7 @@ it('shows Persian dates, a Saturday-first month, no native Gregorian controls, a
   expect(document.activeElement?.getAttribute('data-day')).toBe('2026-03-21');
   expect(container.querySelectorAll('[data-day]')).toHaveLength(31);
   await key(document.activeElement!, 'Escape');
-  expect(container.querySelector('[aria-label="تقویم شمسی"]')).toBeNull();
+  expect(container.querySelector('[aria-label="تقویم"]')).toBeNull();
   expect(document.activeElement?.id).toBe('birthday');
 });
 it('chooses a day as the unchanged ISO API day and blocks future birth dates', async () => {
@@ -35,7 +35,7 @@ it('chooses a day as the unchanged ISO API day and blocks future birth dates', a
 it('supports RTL arrow and month/year keyboard navigation without selecting an uncommitted date', async () => {
   const change = vi.fn(); await act(async () => root.render(<Example change={change} />)); await click('#birthday');
   await key(document.activeElement!, 'ArrowLeft'); expect(document.activeElement?.getAttribute('data-day')).toBe('2026-03-22');
-  await key(document.activeElement!, 'PageUp'); expect(container.querySelector('[aria-label="ماه شمسی"]')?.getAttribute('aria-label')).toBeTruthy();
+  await key(document.activeElement!, 'PageUp'); expect(container.querySelector('[aria-label="ماه"]')?.getAttribute('aria-label')).toBeTruthy();
   expect(container.querySelector('.jalali-date__month')?.textContent).toBe('اسفند ۱۴۰۴');
   expect(container.querySelectorAll('[data-day]')).toHaveLength(29);
   expect(change).not.toHaveBeenCalled();
@@ -54,5 +54,5 @@ it('emits the existing form draft signal on actual changes and exposes clear onl
   await click('#birthday');
   const clear = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'پاک کردن تاریخ')!;
   await act(async () => clear.click()); expect(change).toHaveBeenLastCalledWith('');
-  expect(container.querySelector('#birthday')?.textContent).toContain('انتخاب تاریخ شمسی');
+  expect(container.querySelector('#birthday')?.textContent).toContain('انتخاب تاریخ');
 });

@@ -12,6 +12,9 @@ import { ConsentBanner } from './privacy/ConsentBanner';
 import { PageMetadata } from './components/PageMetadata';
 import { RouteBoundary } from './components/RouteBoundary';
 import { RouteLoading } from './components/RouteLoading';
+import { CartAddFeedback } from './components/CartAddFeedback';
+import { VisitPopup } from './components/VisitPopup';
+import { BackToTop } from './components/BackToTop';
 import { landingSample, safeLandingLink } from './features/landing/content';
 
 export function Shell() {
@@ -134,7 +137,10 @@ export function Shell() {
       <Footer />
       <MobileBottomNav status={status} />
       <ThemeToggle />
+      <BackToTop />
       <ConsentBanner />
+      <CartAddFeedback />
+      <VisitPopup />
     </div>
   );
 }

@@ -47,7 +47,10 @@ export class SettingsService {
   }
 
   async findAll() {
-    const rows = await this.prisma.setting.findMany({ orderBy: { key: 'asc' } });
+    const rows = await this.prisma.setting.findMany({
+      where: { key: { not: 'STOREFRONT_POPUP_V1' } },
+      orderBy: { key: 'asc' },
+    });
     return {
       data: rows.map((row) => ({
         key: row.key,

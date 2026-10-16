@@ -65,7 +65,8 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
     const width = measuredWidth.current;
     if (reduced || width <= 0) { setMotion('instant'); finish(next); return; }
     setMotion('slide'); setInteracting(true);
-    const target = -step * width;
+    // In this RTL carousel, dragging right advances to the next campaign.
+    const target = step * width;
     const start = offset.current;
     const startedAt = performance.now();
     function animate(time: number) {
@@ -202,7 +203,7 @@ export function LandingBanner({ content = landingSample }: { content?: LandingCo
     onDragStart={event => event.preventDefault()}
     onClickCapture={event => { if (suppressClick.current && event.detail > 0) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}>
     {panels.map(slot => {
-      const item = slides[(active + slot + slides.length) % slides.length]!;
+      const item = slides[(active - slot + slides.length) % slides.length]!;
       return <div key={slot} className="landing-banner__slide" data-banner-slot={slot} style={{ transform: `translate3d(${slot * 100}%, 0, 0)` }} aria-hidden={slot !== 0 ? true : undefined} inert={slot !== 0}>
         <div className="landing-banner__art" aria-hidden="true"><picture style={{ '--desktop-focus': `${item.desktopFocus.x}% ${item.desktopFocus.y}%`, '--mobile-focus': `${item.mobileFocus.x}% ${item.mobileFocus.y}%` } as CSSProperties}>
           {item.mobileImage && <source media="(max-width: 760px)" srcSet={landingImageSet(item.mobileImage) ?? item.mobileImage} sizes="100vw" />}

@@ -1,158 +1,63 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { GlassChevron, GlassOptionList, normalizeOption, type GlassOption } from './GlassOptionList';
 
-export interface FilterOption {
-  value: string;
-  label: string;
-}
-
+export type FilterOption = GlassOption;
 interface SearchableFilterProps {
-  label: string;
-  value: string;
-  options: FilterOption[];
-  onSelect: (value: string) => void;
-  onInputChange?: (value: string) => void;
-  placeholder?: string;
-  emptyLabel?: string;
+  label: string; value: string; options: FilterOption[]; onSelect(value: string): void;
+  onInputChange?(value: string): void; placeholder?: string; emptyLabel?: string;
+  id?: string; disabled?: boolean; showLabel?: boolean; autoComplete?: string;
+  'aria-describedby'?: string; 'aria-invalid'?: boolean | 'true' | 'false';
 }
 
-const normalize = (value: string) =>
-  value.trim().replaceAll('ي', 'ی').replaceAll('ك', 'ک').toLocaleLowerCase('fa');
-
-/** Searchable single-choice filter. Free text is committed by the parent form when supported. */
-export function SearchableFilter({
-  label,
-  value,
-  options,
-  onSelect,
-  onInputChange,
-  placeholder = 'انتخاب یا جستجو کنید',
-  emptyLabel = 'موردی پیدا نشد',
-}: SearchableFilterProps) {
-  const id = useId();
+/** One searchable glass control. Free text remains supported by the parent. */
+export function SearchableFilter({ label, value, options, onSelect, onInputChange, placeholder = 'انتخاب یا جستجو کنید', emptyLabel = 'موردی پیدا نشد', id, disabled, showLabel = true, autoComplete = 'off', 'aria-describedby': describedBy, 'aria-invalid': invalid }: SearchableFilterProps) {
+  const generated = useId();
+  const controlId = id ?? generated;
   const input = useRef<HTMLInputElement>(null);
-  const list = useRef<HTMLDivElement>(null);
+  const control = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
-  const chosen = options.find((option) => option.value === value)?.label ?? value;
-
-  const normalizedQuery = normalize(query);
-  const matches = options.filter((option) => normalize(option.label).includes(normalizedQuery));
-  useEffect(() => {
-    if (open) list.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView?.({ block: 'nearest' });
-  }, [active, open]);
-
-  function select(option: FilterOption) {
-    setQuery(option.label);
-    setOpen(false);
-    onSelect(option.value);
-    input.current?.focus();
+  const chosen = options.find(option => option.value === value)?.label ?? value;
+  const matches = options.filter(option => normalizeOption(option.label).includes(normalizeOption(query)));
+  const enabled = matches.flatMap((option, index) => option.disabled ? [] : [index]);
+  const expanded = open && !disabled;
+  const listId = `${controlId}-list`;
+  useEffect(() => { if (disabled) queueMicrotask(() => setOpen(false)); }, [disabled]);
+  function select(option: GlassOption) {
+    if (disabled || option.disabled) return;
+    setQuery(option.label); setOpen(false); onSelect(option.value); input.current?.focus();
   }
-
-  return (
-    <div
-      className="searchable-filter"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false);
-          setQuery(chosen);
-        }
-      }}
-    >
-      <label htmlFor={id}>{label}</label>
-      <div className="searchable-filter__control">
-        <input
-          ref={input}
-          id={id}
-          role="combobox"
-          type="text"
-          autoComplete="off"
-          aria-autocomplete="list"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-controls={open ? `${id}-list` : undefined}
-          aria-activedescendant={open && matches[active] ? `${id}-option-${active}` : undefined}
-          placeholder={placeholder}
-          value={open ? query : chosen}
-          onFocus={() => {
-            setQuery('');
-            setOpen(true);
-            setActive(0);
-          }}
-          onClick={() => setOpen(true)}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setActive(0);
-            setOpen(true);
-            onInputChange?.(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              setOpen(false);
-              setQuery(chosen);
-            }
-            if (event.key === 'ArrowDown') {
-              event.preventDefault();
-              setOpen(true);
-              setActive((index) => open ? Math.max(0, Math.min(index + 1, matches.length - 1)) : 0);
-            }
-            if (event.key === 'ArrowUp') {
-              event.preventDefault();
-              setOpen(true);
-              setActive((index) => Math.max(index - 1, 0));
-            }
-            if (open && (event.key === 'Home' || event.key === 'End')) {
-              event.preventDefault();
-              setActive(event.key === 'Home' ? 0 : Math.max(0, matches.length - 1));
-            }
-            if (event.key === 'Enter' && open && matches[active]) {
-              event.preventDefault();
-              select(matches[active]);
-            }
-          }}
-        />
-        <button
-          type="button"
-          aria-label={`نمایش گزینه‌های ${label}`}
-          aria-expanded={open}
-          onClick={() => {
-            setQuery('');
-            setOpen(true);
-            input.current?.focus();
-          }}
-        >
-          <span aria-hidden="true">⌄</span>
-        </button>
-      </div>
-      {open && (
-        <div
-          ref={list}
-          id={`${id}-list`}
-          role="listbox"
-          aria-label={label}
-          className="searchable-filter__list"
-        >
-          {matches.length ? (
-            matches.map((option, index) => (
-              <div
-                id={`${id}-option-${index}`}
-                data-index={index}
-                role="option"
-                aria-selected={option.value === value}
-                className={index === active ? 'is-active' : undefined}
-                key={option.value}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => select(option)}
-              >
-                {option.label}
-              </div>
-            ))
-          ) : (
-            <p className="searchable-filter__empty">{emptyLabel}</p>
-          )}
-        </div>
-      )}
+  function close() { setOpen(false); setQuery(chosen); }
+  return <div className={`searchable-filter${showLabel ? '' : ' searchable-filter--unlabelled'}`} onBlur={event => {
+    if (!event.currentTarget.contains(event.relatedTarget)) close();
+  }}>
+    {showLabel && <label htmlFor={controlId}>{label}</label>}
+    <div ref={control} className="searchable-filter__control" data-open={expanded} data-disabled={disabled || undefined}
+      onClick={() => { if (!disabled) { input.current?.focus(); setOpen(true); } }}>
+      <input ref={input} id={controlId} role="combobox" type="text" autoComplete={autoComplete} disabled={disabled}
+        aria-label={!showLabel ? label : undefined} aria-describedby={describedBy} aria-invalid={invalid}
+        aria-autocomplete="list" aria-haspopup="listbox" aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
+        aria-activedescendant={expanded && matches[active] ? `${listId}-option-${active}` : undefined}
+        placeholder={placeholder} value={expanded ? query : chosen}
+        onFocus={() => { setQuery(''); setOpen(true); setActive(0); }}
+        onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); onInputChange?.(event.target.value); }}
+        onKeyDown={event => {
+          if (event.key === 'Escape' && expanded) { event.preventDefault(); event.stopPropagation(); close(); }
+          else if (event.key === 'Tab') close();
+          else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault(); setOpen(true);
+            const position = enabled.indexOf(active);
+            const next = !expanded ? (event.key === 'ArrowUp' ? enabled.at(-1) : enabled[0]) : enabled[Math.max(0, Math.min(enabled.length - 1, position + (event.key === 'ArrowDown' ? 1 : -1)))];
+            setActive(next ?? 0);
+          } else if (expanded && (event.key === 'Home' || event.key === 'End')) {
+            event.preventDefault(); setActive((event.key === 'Home' ? enabled[0] : enabled.at(-1)) ?? 0);
+          } else if (event.key === 'Enter' && expanded && matches[active] && !matches[active]?.disabled) {
+            event.preventDefault(); select(matches[active]);
+          }
+        }} />
+      <GlassChevron />
     </div>
-  );
+    {expanded && <GlassOptionList anchor={control} id={listId} label={label} options={matches} value={value} active={active} onActive={setActive} onSelect={select} onDismiss={close} emptyLabel={emptyLabel} />}
+  </div>;
 }

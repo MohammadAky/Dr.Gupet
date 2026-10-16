@@ -1,1 +1,2 @@
-﻿name,price,stock,weightGram,compareAtPrice,sku,slug,ingredientsText,description,isActive
+﻿name,price,stock,weightGram,compareAtPrice,sku,slug,ingredientsText,description,brand,category,petType,نمایش
+,,,,,,,,,,,,F

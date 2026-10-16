@@ -1,4 +1,6 @@
+import { GlassSelect } from '../components/GlassSelect';
 import '../styles/content-pages.css';
+import '../styles/auth-profile-refinement.css';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -354,7 +356,6 @@ function PetEditSession() {
       <header className="account-heading">
         <div>
           <h1>{editingId ? 'ویرایش حیوان' : 'ثبت حیوان جدید'}</h1>
-          <p>کمی بیشتر از همراهتان بگویید تا انتخاب‌های مناسب‌تری داشته باشید.</p>
         </div>
         <Link className="account-secondary-link" to="/pets">
           حیوانات من
@@ -377,7 +378,7 @@ function PetEditSession() {
         </Field>
 
         <Field label="نوع حیوان" htmlFor="petType" error={errors.petTypeId}>
-          <select
+          <GlassSelect
             id="petType"
             disabled={save.isPending}
             value={form.petTypeId || ''}
@@ -392,11 +393,11 @@ function PetEditSession() {
                 {type.name}
               </option>
             ))}
-          </select>
+          </GlassSelect>
         </Field>
 
         <Field label="نژاد (اختیاری)" htmlFor="breed" error={errors.breedId}>
-          <select
+          <GlassSelect
             id="breed"
             value={form.breedId ?? ''}
             disabled={save.isPending || form.petTypeId < 1 || breeds.isPending}
@@ -410,14 +411,13 @@ function PetEditSession() {
                 {breed.name}
               </option>
             ))}
-          </select>
+          </GlassSelect>
         </Field>
 
         <Field
-          label="تاریخ تولد (شمسی)"
+          label="تاریخ تولد"
           htmlFor="birthDate"
           error={errors.birthDate}
-          hint="تاریخ را از تقویم شمسی انتخاب کنید؛ تاریخ آینده مجاز نیست."
         >
           <JalaliDateInput
             id="birthDate"
@@ -429,7 +429,7 @@ function PetEditSession() {
         </Field>
 
         <Field label="جنسیت" htmlFor="gender">
-          <select
+          <GlassSelect
             id="gender"
             disabled={save.isPending}
             value={form.gender}
@@ -438,7 +438,7 @@ function PetEditSession() {
             <option value="">نامشخص</option>
             <option value="MALE">نر</option>
             <option value="FEMALE">ماده</option>
-          </select>
+          </GlassSelect>
         </Field>
 
         <Field label="وزن (کیلوگرم)" htmlFor="weightKg" error={errors.weightKg}>
@@ -452,14 +452,14 @@ function PetEditSession() {
           />
         </Field>
 
-        <label className="account-check">
+        <label className="account-check account-check--compact">
           <input
             type="checkbox"
             disabled={save.isPending}
             checked={form.isNeutered}
             onChange={(event) => set('isNeutered', event.target.checked)}
           />
-          عقیم‌شده
+          عقیم شده
         </label>
 
         <Field label="تصویر" htmlFor="petPhoto" hint="JPEG، PNG یا WebP، حداکثر ۵ مگابایت">

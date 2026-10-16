@@ -18,8 +18,11 @@ import { safeImageUrl } from '../lib/image-url';
 import { API_BASE_URL } from '../lib/env';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SafeImage } from '../components/SafeImage';
+import { CommerceSteps } from '../components/CommerceSteps';
+import { ShippingProgress } from '../components/ShippingProgress';
+import { EmptyCartIllustration } from '../components/EmptyCartIllustration';
+import { QuantityField, parseQuantityInput } from '../components/QuantityField';
 import { readCheckoutIntent, writeCheckoutIntent } from '../features/checkout/intent';
-import { toEnDigits } from '../lib/format';
 
 /**
  * Cart (F8): the server view is always authoritative; totals are never
@@ -208,7 +211,6 @@ export function CartPage() {
             <h1 ref={headingRef} tabIndex={-1}>
               سبد خرید
             </h1>
-            <p>انتخاب‌های شما برای همراه کوچکتان.</p>
           </div>
         </header>
         <p>
@@ -297,28 +299,20 @@ export function CartPage() {
           <h1 ref={headingRef} tabIndex={-1}>
             سبد خرید
           </h1>
-          <p>انتخاب‌ها و تعدادشان را بررسی کنید، سپس به مرحلهٔ تحویل بروید.</p>
         </div>
         <Link className="account-secondary-link" to="/products">
           ادامه خرید
         </Link>
       </header>
-      <ol className="account-purchase-steps" aria-label="مراحل خرید">
-        <li aria-current="step">سبد خرید</li>
-        <li>تحویل</li>
-        <li>پرداخت</li>
-      </ol>
+      <div className="commerce-journey">
+        {view && <ShippingProgress cart={view} />}
+        <CommerceSteps current="cart" />
+      </div>
 
       {view && view.items.length === 0 && (
-        <div className="account-empty-cart">
+        <div className="account-empty-cart commerce-glass">
           <div className="account-empty-cart__copy">
-            <span className="account-empty-cart__label">سبد خرید شما خالی است.</span>
-            <h2>
-              یک انتخاب خوب،
-              <br />
-              برای یک همراه خوب.
-            </h2>
-            <p>محصولات را ببینید و آنچه برای همراه کوچکتان مناسب است، به سبد اضافه کنید.</p>
+            <h2>سبد خرید شما خالی است.</h2>
             <div className="account-actions">
               <Link className="account-primary-link" to="/products">
                 مشاهدهٔ محصولات <span aria-hidden="true">←</span>
@@ -328,13 +322,7 @@ export function CartPage() {
               </Link>
             </div>
           </div>
-          <SafeImage
-            src="/brand/companion-dog-960.webp"
-            width={960}
-            height={720}
-            alt=""
-            decoding="async"
-          />
+          <EmptyCartIllustration />
         </div>
       )}
 
@@ -527,15 +515,11 @@ function CartQuantity({
     onDirty(id, false);
     return () => onDirty(id, false);
   }, [id, quantity, onDirty]);
-  const parsed = Number(toEnDigits(draft));
-  const valid =
-    draft.trim() !== '' &&
-    Number.isSafeInteger(parsed) &&
-    parsed >= 1 &&
-    parsed <= MAX_CART_ITEM_QTY;
+  const parsed = parseQuantityInput(draft, MAX_CART_ITEM_QTY);
+  const valid = parsed !== null;
   function commit(value = parsed) {
     if (locked) return;
-    if (!valid || !Number.isSafeInteger(value) || value < 1 || value > MAX_CART_ITEM_QTY) {
+    if (!valid || typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > MAX_CART_ITEM_QTY) {
       setError(`تعداد باید عدد صحیح بین ۱ تا ${MAX_CART_ITEM_QTY.toLocaleString('fa-IR')} باشد.`);
       return;
     }
@@ -547,33 +531,18 @@ function CartQuantity({
   }
   return (
     <div className="commerce-quantity">
-      <label htmlFor={`quantity-${id}`}>تعداد</label>
-      <div className="commerce-quantity__controls">
-        <button
-          type="button"
-          aria-label={`کاهش تعداد ${name}`}
-          disabled={locked || !valid || parsed <= 1}
-          onClick={() => commit(parsed - 1)}
-        >
-          −
-        </button>
-        <input
+        <QuantityField
           id={`quantity-${id}`}
-          type="number"
-          inputMode="numeric"
-          dir="ltr"
-          min={1}
           max={MAX_CART_ITEM_QTY}
-          step={1}
-          aria-label={`تعداد ${name}`}
+          ariaLabel={`تعداد ${name}`}
           value={draft}
           disabled={locked}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `quantity-error-${id}` : undefined}
-          onChange={(event) => {
-            setDraft(event.target.value);
+          invalid={error ? true : undefined}
+          describedBy={error ? `quantity-error-${id}` : undefined}
+          onChange={(value) => {
+            setDraft(value);
             setError('');
-            onDirty(id, event.target.value !== String(quantity));
+            onDirty(id, value !== String(quantity));
           }}
           onBlur={(event) => {
             if (!event.currentTarget.closest('.commerce-quantity')?.contains(event.relatedTarget))
@@ -586,15 +555,6 @@ function CartQuantity({
             }
           }}
         />
-        <button
-          type="button"
-          aria-label={`افزایش تعداد ${name}`}
-          disabled={locked || !valid || parsed >= MAX_CART_ITEM_QTY}
-          onClick={() => commit(parsed + 1)}
-        >
-          +
-        </button>
-      </div>
       {draft !== String(quantity) && (
         <div className="commerce-quantity__actions">
           <button type="button" disabled={locked} onClick={() => commit()}>

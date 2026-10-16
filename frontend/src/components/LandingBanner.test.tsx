@@ -104,6 +104,7 @@ describe('cyclic landing banner interaction and motion', () => {
     await show();
     expect(container.querySelectorAll('button')).toHaveLength(landingSample.slides.length + 2);
     expect(container.querySelector('.landing-banner__play')).toBeNull();
+    // The controls follow RTL order: previous is physically right, next is left.
     expect(button('بنر قبلی').textContent).toBe('→');
     expect(button('بنر بعدی').textContent).toBe('←');
     expect(vi.getTimerCount()).toBe(1);
@@ -199,7 +200,7 @@ describe('cyclic landing banner interaction and motion', () => {
     expect(container.querySelectorAll('[data-banner-slot]')).toHaveLength(3);
   });
 
-  it('tracks a touch swipe directly and loops previous from the first slide to the last', async () => {
+  it('tracks a rightward RTL swipe directly and advances from first to second', async () => {
     await show();
     const capture = vi.fn(); banner().setPointerCapture = capture;
     await point('pointerdown', 100, 200); await tick(20);
@@ -208,21 +209,21 @@ describe('cyclic landing banner interaction and motion', () => {
     expect(capture).toHaveBeenCalledWith(1);
     expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')!.style.transform).toContain('+ 130px');
     await tick(200); await point('pointerup', 230, 202); await tick(1000);
-    expect(title()).toBe(landingSample.slides.at(-1)!.title);
+    expect(title()).toBe(landingSample.slides[1]!.title);
     expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')!.style.transform).toContain('+ 0px');
     expect(banner().hasAttribute('data-dragging')).toBe(false);
-    await tick(30000); expect(title()).toBe(landingSample.slides.at(-1)!.title);
+    await tick(30000); expect(title()).toBe(landingSample.slides[1]!.title);
   });
 
   it('supports desktop mouse dragging and keeps a released mouse from sticking to the pointer', async () => {
     await show(); await point('pointerdown', 250, 200, { kind: 'mouse' }); await tick(20);
     await point('pointermove', 100, 200, { kind: 'mouse' }); await tick(200);
     await point('pointerup', 100, 200, { kind: 'mouse', buttons: 0 }); await tick(1000);
-    expect(title()).toBe(landingSample.slides[1]!.title);
+    expect(title()).toBe(landingSample.slides.at(-1)!.title);
     await point('pointerdown', 250, 200, { kind: 'mouse' });
     await point('pointermove', 100, 200, { kind: 'mouse' });
     await point('pointermove', 80, 200, { kind: 'mouse', buttons: 0 }); await tick(1000);
-    expect(title()).toBe(landingSample.slides[1]!.title);
+    expect(title()).toBe(landingSample.slides.at(-1)!.title);
     expect(banner().hasAttribute('data-dragging')).toBe(false);
   });
 
@@ -271,7 +272,7 @@ describe('cyclic landing banner interaction and motion', () => {
     await point('lostpointercapture', 80, 200, { target: container.querySelector('h1')! });
     expect(banner().hasAttribute('data-dragging')).toBe(true);
     await tick(200); await point('pointerup', 80, 200); await tick(1000);
-    expect(title()).toBe(landingSample.slides[1]!.title);
+    expect(title()).toBe(landingSample.slides.at(-1)!.title);
   });
 
   it('pauses autoplay while hovered/hidden and stops it after keyboard focus or manual navigation', async () => {
@@ -296,11 +297,11 @@ describe('cyclic landing banner interaction and motion', () => {
     await show(content);
     await act(async () => button('بنر قبلی').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
     await tick(100);
-    expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')!.style.transform).toMatch(/\+ [\d.]+px/);
+    expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')!.style.transform).toContain('+ -');
     await tick(1000); expect(title()).toBe(content.slides[1]!.title);
     await act(async () => button('بنر بعدی').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
     await tick(100);
-    expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')!.style.transform).toContain('+ -');
+    expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')!.style.transform).toMatch(/\+ [\d.]+px/);
     await tick(1000); expect(title()).toBe(content.slides[0]!.title);
   });
 
@@ -485,7 +486,7 @@ describe('cyclic landing banner interaction and motion', () => {
     expect(container.querySelector<HTMLElement>('[data-banner-slot="0"]')?.style.transform).toContain('-180px');
     await point('pointerup', 100, 120);
     await tick(1000);
-    expect(title()).toBe(landingSample.slides[1]!.title);
+    expect(title()).toBe(landingSample.slides.at(-1)!.title);
   });
 
   it('measures normal layout despite the route entrance transform and observes actual header resizing', async () => {

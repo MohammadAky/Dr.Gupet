@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { ProductCard } from '../api/types';
 import { formatToman } from '../lib/format';
@@ -7,6 +7,22 @@ import { safeImageUrl } from '../lib/image-url';
 import { LIFE_STAGE_FA, SIZE_CLASS_FA } from '../lib/labels';
 import { SafeImage } from './SafeImage';
 import { isSampleProduct, publicRecordName } from '../lib/sample-records';
+import '../styles/product-card-hover.css';
+
+function ProductCardMedia({ image, alternate, name }: { image: string | null; alternate: string | null; name: string }) {
+  const [requested, setRequested] = useState(false);
+  const [ready, setReady] = useState(false);
+  return <div className="product-card__media" data-alternate-ready={ready}
+    onPointerEnter={event => {
+      if (event.pointerType === 'touch' || !alternate || alternate === image) return;
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) setRequested(true);
+    }}>
+    <SafeImage src={image ?? undefined} alt={name} loading="lazy"
+      sizes="(max-width: 760px) calc((100vw - 52px) / 2), (max-width: 1000px) 45vw, 320px" referrerPolicy="no-referrer" />
+    {requested && alternate && <SafeImage src={alternate} alt="" className="product-card__alternate" aria-hidden="true"
+      loading="eager" referrerPolicy="no-referrer" fallback={null} onLoad={() => setReady(true)} onError={() => setReady(false)} />}
+  </div>;
+}
 
 /**
  * The single product card renderer used by home, catalog, favorites and
@@ -22,19 +38,12 @@ export function ProductCardView({
   actions?: ReactNode;
 }) {
   const imageUrl = safeImageUrl(card.image, window.location.origin, API_BASE_URL);
+  const hoverUrl = safeImageUrl(card.hoverImage, window.location.origin, API_BASE_URL);
   const sample = isSampleProduct(card);
   return (
     <article className="product-card" data-product-id={card.id}>
       <Link to={`/products/${card.slug}`} className="product-card__link">
-        <div className="product-card__media">
-          <SafeImage
-            src={imageUrl ?? undefined}
-            alt={publicRecordName(card)}
-            loading="lazy"
-            sizes="(max-width: 760px) calc((100vw - 52px) / 2), (max-width: 1000px) 45vw, 320px"
-            referrerPolicy="no-referrer"
-          />
-        </div>
+        <ProductCardMedia key={`${imageUrl}|${hoverUrl}`} image={imageUrl} alternate={hoverUrl} name={publicRecordName(card)} />
         <h3>{publicRecordName(card)}</h3>
         <p className="product-card__brand">{publicRecordName({ ...card.brand, isSample: sample })}</p>
         <div className="product-card__bottom">

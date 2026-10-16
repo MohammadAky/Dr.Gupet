@@ -32,7 +32,11 @@ export class CartService {
                     name: true,
                     slug: true,
                     isActive: true,
-                    images: { take: 1, select: { url: true } },
+                    images: {
+                      take: 1,
+                      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                      select: { url: true },
+                    },
                   },
                 },
               },
@@ -56,7 +60,11 @@ export class CartService {
                       name: true,
                       slug: true,
                       isActive: true,
-                      images: { take: 1, select: { url: true } },
+                      images: {
+                        take: 1,
+                        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                        select: { url: true },
+                      },
                     },
                   },
                 },
@@ -106,7 +114,7 @@ export class CartService {
     // Estimated shipping — the server computes the authoritative amount at checkout
     const freeShippingThreshold = await this.settingsService.getNumber(
       'FREE_SHIPPING_THRESHOLD',
-      this.configService.get<number>('app.freeShippingThreshold') || 1500000,
+      this.configService.get<number>('app.freeShippingThreshold') || 6000000,
     );
     const shippingFlatCost = await this.settingsService.getNumber(
       'SHIPPING_FLAT_COST',

@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { ComponentPropsWithRef, ReactNode } from 'react';
+import { GlassSelect } from '../GlassSelect';
 
 type Tone = 'primary' | 'secondary' | 'quiet' | 'danger';
 
@@ -101,7 +102,7 @@ export function Select({
   const controlId = id ?? generated;
   return (
     <ControlFrame id={controlId} label={label} hint={hint} error={error}>
-      <select
+      <GlassSelect
         {...props}
         id={controlId}
         aria-invalid={Boolean(error) || undefined}
@@ -109,7 +110,7 @@ export function Select({
         className={`ui-control ${className}`}
       >
         {children}
-      </select>
+      </GlassSelect>
     </ControlFrame>
   );
 }

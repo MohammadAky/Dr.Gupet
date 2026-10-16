@@ -8,6 +8,7 @@ import { SmsService } from '../../sms/sms.service';
 import { OtpService } from './otp/otp.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { AUTH_USER_SELECT, AuthUser, safeSessionUser } from './auth-user';
+import { normalizePhone } from '../../common/utils/phone.util';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,49 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
+
+  /** The administrator login flow never provisions accounts or texts non-admins. */
+  async requestAdminOtp(phoneInput: string) {
+    const admin = await this.requireActiveAdmin(phoneInput);
+    return this.requestOtp(admin.phone);
+  }
+
+  async verifyAdminOtp(phoneInput: string, code: string) {
+    const admin = await this.requireActiveAdmin(phoneInput);
+    await this.otpService.verify(admin.phone, code);
+    // Re-read authority after consuming proof: the role/account may have been
+    // revoked while verification was pending. Never enter the customer upsert.
+    let current = await this.requireActiveAdmin(admin.phone);
+    if (current.id !== admin.id) throw this.adminRequired();
+    if (!current.isPhoneVerified) {
+      current = await this.prisma.user.update({
+        where: {
+          id: current.id,
+          phone: admin.phone,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        data: { isPhoneVerified: true },
+        select: AUTH_USER_SELECT,
+      });
+    }
+    return this.issueSession(current);
+  }
+
+  private async requireActiveAdmin(phoneInput: string): Promise<AuthUser> {
+    const phone = normalizePhone(phoneInput);
+    if (!phone) throw new AppException('VALIDATION_ERROR', 'شماره موبایل معتبر نیست', 400);
+    const user = await this.prisma.user.findUnique({ where: { phone }, select: AUTH_USER_SELECT });
+    if (!user || user.role !== 'ADMIN' || user.status !== 'ACTIVE' || user.deletedAt) {
+      throw this.adminRequired();
+    }
+    return user;
+  }
+
+  private adminRequired() {
+    return new AppException('ADMIN_REQUIRED', 'این حساب به پنل مدیریت دسترسی ندارد', 403);
+  }
 
   /**
    * Request OTP for phone number

@@ -1,0 +1,39 @@
+.product-detail .product-gallery { align-self: start; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.product-detail .product-gallery__media { position: relative; aspect-ratio: 1; height: auto; min-height: 0; padding: 0; background: transparent; border: 0; border-radius: 16px; overflow: hidden; }
+.product-detail .product-gallery__open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; }
+.product-detail .product-gallery__zoom-layer { position: absolute; inset: 0; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.product-detail .product-gallery__zoom-layer > img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; max-height: 100%; object-fit: contain; padding: 0; border-radius: 0; }
+.product-detail .product-gallery__zoom-layer > .safe-image-fallback,
+.product-detail .product-gallery__media > .safe-image-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
+.product-detail .product-gallery__thumbnails { position: absolute; inset-inline: 12px; bottom: 12px; z-index: 2; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 0; }
+.product-detail .product-gallery__thumbnails button { width: 64px; height: 64px; padding: 0; border: 0; border-radius: 8px; background: transparent; box-shadow: none; }
+.product-detail .product-gallery__thumbnails button img { opacity: .68; filter: brightness(.8) blur(.25px); }
+.product-detail .product-gallery__thumbnails button[aria-pressed='true'] img { opacity: 1; filter: none; }
+.product-detail .product-gallery__thumbnails button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.product-detail .product-gallery__thumbnails img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+.content-page .product-detail .commerce-variants { display: flex; flex-wrap: wrap; gap: 10px; border: 0; padding: 0; }
+.content-page .product-detail .commerce-variants label { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 0; flex: 0 1 auto; padding: 12px 14px; border: 1px solid var(--glass-border, var(--line)); border-radius: 14px; background: var(--glass-surface, var(--paper)); box-shadow: var(--glass-shadow, none); }
+.product-detail .commerce-variants input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.product-detail .commerce-variants label:has(input:checked) { border-color: var(--forest-soft); outline: 2px solid var(--forest-soft); outline-offset: 1px; }
+.product-detail .commerce-variants label:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
+.product-detail .commerce-variants label > span:not(.commerce-variant-stock) { gap: 2px; }
+.product-detail .commerce-variants .commerce-variant-stock { flex-basis: auto; padding-inline-start: 0; font-size: .72rem; }
+.content-page .product-detail .product-detail__info form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 12px; }
+.product-detail .commerce-product-price,
+.product-detail .commerce-variants { flex-basis: 100%; }
+.product-detail .product-detail__info form > .quantity-field { flex: 0 0 88px; min-width: 0; max-width: none; }
+.product-detail .product-detail__info input#qty { width: 100%; min-height: 48px; margin: 0; }
+.product-detail .product-detail__info form > button[type='submit'] { flex: 1 1 180px; }
+.product-detail .product-detail__info form > button[type='submit'],
+.product-detail .product-detail__info form > button[type='button'] { min-height: 48px; margin: 0; }
+.product-detail .product-detail__info form > a { flex-basis: 100%; }
+:root[data-theme='dark'] .product-detail .product-gallery__media { background: transparent; }
+.ui-dialog:has(.commerce-gallery-viewer) .ui-dialog__backdrop { background: rgb(7 21 12 / .64); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+@media (prefers-reduced-transparency: reduce) { .ui-dialog:has(.commerce-gallery-viewer) .ui-dialog__backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(7 21 12 / .88); } }
+@media (max-width: 600px) {
+  .product-detail .product-detail__info form > .quantity-field { flex-basis: 80px; }
+  .product-detail .product-detail__info form > button[type='button'] { flex-basis: 100%; }
+  .product-detail .product-gallery__media { aspect-ratio: 1.05; }
+  .product-detail .product-gallery__thumbnails button { width: 62px; height: 62px; }
+  .content-page .product-detail .commerce-variants label { padding: 10px 12px; }
+}

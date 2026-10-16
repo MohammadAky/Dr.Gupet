@@ -124,6 +124,7 @@
   border-radius: var(--radius-md);
   padding: 1.4rem 1.6rem;
   background: var(--sand);
+  margin-block-end: 24px;
 }
 
 .landing-location p {
@@ -263,7 +264,7 @@
   }
   .landing-center h3 a:hover,
   .landing-medicine h3 a:hover {
-    text-decoration: underline;
+    text-decoration: none;
     text-underline-offset: 0.25em;
   }
 }

@@ -56,7 +56,6 @@ function OrdersSession() {
       <header className="account-heading">
         <div>
           <h1>سفارش‌های من</h1>
-          <p>از ثبت تا تحویل؛ وضعیت هر سفارش را همین‌جا دنبال کنید.</p>
         </div>
       </header>
 

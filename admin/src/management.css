@@ -173,7 +173,7 @@
   background: transparent;
   color: #2b6936;
   border: 0;
-  text-decoration: underline;
+  text-decoration: none;
   text-underline-offset: 3px;
 }
 .manage-pagination {

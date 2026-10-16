@@ -14,7 +14,7 @@ describe('recommendations paging', () => {
     expect(queryKeys.recommendations(7, 1)).not.toEqual(queryKeys.recommendations(7, 2));
   });
   it('states only reported dietary matches and makes absent evidence explicit', () => {
-    expect(recommendationEvidence({ matchedTags: ['حساس', 'حساس', ' '] })).toBe('تطابق رژیمی ثبت‌شده: حساس');
-    expect(recommendationEvidence({ matchedTags: [] })).toBe('تطابق رژیمی مشخصی برای این محصول گزارش نشده است.');
+    expect(recommendationEvidence({ matchedTags: ['حساس', 'حساس', ' '] })).toBe('تطابق رژیمی: حساس');
+    expect(recommendationEvidence({ matchedTags: [] })).toBe('تطابق رژیمی گزارش نشده است.');
   });
 });

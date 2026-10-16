@@ -7,6 +7,7 @@ import {
   IsIn,
   Min,
   MinLength,
+  Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -203,6 +204,14 @@ export class AddProductImageDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+}
+
+export class SetHoverImageDto {
+  @ApiProperty({ example: 2, description: 'شناسهٔ تصویر دوم کارت، از تصاویر همین محصول' })
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  imageId: number;
 }
 
 export class SetProductTagsDto {

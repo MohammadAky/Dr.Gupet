@@ -1,5 +1,13 @@
 # Dr. Gupet visual system — owner-approved direction, refinements under review
 
+## Owner refinement — 2026-10-16, local review
+
+The owner's three iPhone Liquid Glass screenshots supersede the earlier opaque inner-control treatment. Use the middle transparency: light surface white at 42%, dark surface forest tint at 43%, a static soft rim/reflection, and a restrained stationary backdrop on distinct panels. Crisp content floats over one shared material; login tabs, coupon groups and nested fieldsets do not paint solid dark panels. Controls retain visible focus, error, selected/today, disabled and forced-color states. This is a CSS approximation, not a claim of Apple's native optical renderer. The screenshots remain references; no screenshot/Apple asset is bundled in the product.
+
+Keep the Persian green/gold/Vazirmatn contract. Use rounded-stroke chevrons, concise labels without calendar-system explanations, aligned control baselines and a compact 44px neutered control. The full-width purchase journey follows its smaller shipping meter; a confirmed threshold crossing has one short truck gesture. Successful pointer cart additions use 640ms flight and 520ms arrival feedback without delaying API state. Reduced motion removes movement. Password-strength suggestions do not change server password acceptance.
+
+The new visit popup uses the existing accessible dialog and only first-party raster image paths. It waits for the first cookie-notice choice and appears on home once per tab visit. Its admin configuration is shared through a validated MySQL/API contract; draft content is hidden publicly. See [implementation and evidence](VISUAL_REFINEMENT_20261016.md) and DEC-036/037 for release limits and the later CSV extension.
+
 This is the frontend visual contract for the current design pass. The owner supplied the logo and two exact colors. Other values below are implementation defaults for local preview and can be refined after visual review; they are not claims about a pre-existing brand manual. Build within the frontend development path (root `README.md` «مسیر توسعه») and preserve DEC-002's functional boundaries.
 
 ## Brand inputs and references
@@ -131,3 +139,13 @@ The owner approved the design and authorized release after two corrections. Clin
 Six `landing-{family,meal,treat}-mobile-{480,720}.webp` assets derive from the existing original campaign artwork documented in [LANDING_ASSETS](LANDING_ASSETS.md). They preserve the same portrait crop, composition and rights; no new stock source or generation is involved. Sharp quality 80, no enlargement, 480×600 and 720×900 respectively. Bytes: family 40,594 / 83,040; meal 22,436 / 45,596; treat 34,272 / 70,650. Originals remain for provenance and existing references. These derivatives raise the public raster inventory from 31 to 37; all are WebP. See [measured delivery changes and limitations](PERFORMANCE_REFINEMENT_REPORT.md).
 
 The published banner interaction supersedes the earlier no-autoplay wording: seven-second automatic rotation loops enabled slides; deliberate navigation/focus stops automatic rotation, and reduced motion disables it. The owner's later initial-loading instruction supersedes the earlier blanket no-delay wording only for first-entry landing: minimum 1200 ms from markup insertion. Internal routes use gray skeletons without that minimum hold. Public sample badges and repetitive fictional suffixes were removed at the owner's request; server sample/purchase/location guards remain.
+
+### Commerce material — local owner review, 2026-10-14
+
+The owner's supplied glassmorphism image is a visual reference only, not a licensed site asset. Shared customer card surfaces use a translucent brand tint, a static bright edge and subtle inset reflection. Text/images remain crisp; only a few distinct detail/summary panels have a stationary background blur. Dense lists and mobile do not stack blur layers. Reduced transparency, increased contrast and unsupported filters use solid fallbacks. Geometry, sticky positioning and input/button layout remain owned by page styles.
+
+Login is one centered form card on desktop and mobile; the decorative story/image column is removed. Product gallery thumbnails now overlay the main photograph without a material frame; a click opens the existing accessible viewer with a blurred backdrop, while 1.5× detail zoom is restricted to fine mouse input. Text/link underlines are removed across customer/admin UI; visible focus, selected states and structural checkout connectors remain.
+
+The empty basket is original inline vector artwork in `src/components/EmptyCartIllustration.tsx`, authored for this project; it uses no stock image, third-party file or new license. Existing raster product/campaign assets remain WebP and retain their recorded provenance. The text-free initial loader uses the original inline paw mark with eight rotating dots and an edge-to-edge green viewport; internal gray skeletons and the accepted initial 1200 ms minimum are preserved.
+
+Implementation evidence, owner approval status and untested physical-device/payment checks: [COMMERCE_REDESIGN_WORKLOG](COMMERCE_REDESIGN_WORKLOG.md). This is an uncommitted local candidate, not a production acceptance or a claim of Apple's native optical rendering.

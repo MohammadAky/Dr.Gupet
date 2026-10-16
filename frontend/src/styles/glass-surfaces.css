@@ -1,0 +1,156 @@
+/* Owner's middle-transparency reference: one material, crisp floating content. */
+:root {
+  --glass-surface: rgb(255 255 255 / 42%);
+  --glass-solid: #fffdf7;
+  --glass-border: rgb(255 255 255 / 78%);
+  --glass-highlight: rgb(255 255 255 / 28%);
+  --glass-control: rgb(255 255 255 / 16%);
+  --glass-control-edge: rgb(66 86 54 / 23%);
+  --glass-shadow: inset 0 1px 1px rgb(255 255 255 / 88%), inset 0 -1px 1px rgb(75 94 66 / 12%), 0 12px 32px rgb(30 52 30 / 7%);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23315237' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 5 6-5'/%3E%3C/svg%3E");
+}
+:root[data-theme='dark'] {
+  --glass-surface: rgb(37 54 43 / 43%);
+  --glass-solid: #192a1e;
+  --glass-border: rgb(230 244 228 / 27%);
+  --glass-highlight: rgb(240 250 232 / 14%);
+  --glass-control: rgb(225 240 218 / 4%);
+  --glass-control-edge: rgb(228 242 219 / 23%);
+  --glass-shadow: inset 0 1px 1px rgb(244 255 236 / 25%), inset 0 -1px 1px rgb(0 0 0 / 18%), 0 12px 32px rgb(0 0 0 / 14%);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23dbe8d7' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 5 6-5'/%3E%3C/svg%3E");
+}
+
+/* Quiet static light behind the material, visible on otherwise plain pages. */
+body {
+  background-image: radial-gradient(ellipse at 8% 25%, rgb(212 159 40 / 10%), transparent 42%), radial-gradient(ellipse at 92% 70%, rgb(105 151 114 / 12%), transparent 46%);
+  background-attachment: fixed;
+}
+:root .app-shell .app-main :is(
+  .product-card, .landing-center, .landing-medicine, .directory-card,
+  .directory-detail, .medicine-card, .medicine-detail, .pharmacy-detail,
+  .account-hero, .account-profile form, .account-list > li, .account-facts,
+  .account-order-items > li, .account-form, .account-pet-selector,
+  .account-cart-items > li, .account-shopping-summary,
+  .account-checkout-addresses, .account-checkout-summary, .commerce-disclosure,
+  .auth-shell, .ui-card, .commerce-glass, .filter-panel, .directory-location, .account-nav,
+  .directory-toolbar, .catalog-search, .nearest-location
+) {
+  background: linear-gradient(135deg, var(--glass-highlight), transparent 48%), var(--glass-surface);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+/* Only distinct surfaces filter the scene; dense catalog cards retain a clear tint. */
+:root .app-shell .app-main :is(.auth-shell, .account-form, .directory-detail,
+  .medicine-detail, .pharmacy-detail, .account-profile form,
+  .account-shopping-summary, .account-checkout-summary, .commerce-glass,
+  .filter-panel) {
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/* Inner groups share their parent's surface instead of painting a second panel. */
+:root .app-shell .content-page :is(.auth-methods, .account-coupon-form,
+  .account-checkout-coupon, .commerce-disclosure, .account-form fieldset,
+  .filter-panel fieldset, .price-filter, .catalog-diet-tags),
+:root .app-shell .content-page .auth-shell form {
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root .app-shell .content-page :is(.auth-methods, .account-coupon-form, .account-checkout-coupon) { border: 0; }
+:root .app-shell .content-page .auth-methods { padding: 0; gap: 10px; }
+
+/* Override lazy route colors without touching control geometry or positioning. */
+:root .app-shell :is(.header-search, .header-search button, .mobile-search input,
+  .header-actions > a, .header-actions > button, .landing-location button,
+  .landing-section__all, .landing-center__action,
+  .theme-toggle, .mobile-bottom-nav, .search-suggestions),
+:root .app-shell .content-page :is(button, .auth-switch, .auth-back a,
+  .button-primary, .button-secondary, .ui-button, .ui-chip, .account-address-option,
+  .account-primary-link, .account-secondary-link,
+  .commerce-variants label) {
+  color: var(--ink);
+  background-color: var(--glass-control);
+  border-color: var(--glass-control-edge);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 10px rgb(0 0 0 / 4%);
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, box-shadow var(--motion-state) ease, transform var(--motion-press) var(--ease-out);
+}
+:root .app-shell :is(.app-header, .mobile-bottom-nav, .search-suggestions) {
+  background: var(--glass-surface);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+:root .app-shell .app-main.content-page :is(input:not([type='checkbox']):not([type='radio']):not([type='file']), select, textarea),
+:root .app-shell .app-main :is(.searchable-filter__control, .searchable-filter__list) {
+  color: var(--ink);
+  background-color: var(--glass-control);
+  border-color: var(--glass-control-edge);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 3%), 0 1px 0 var(--glass-highlight);
+}
+:root .app-shell .content-page .searchable-filter__control input { background: transparent; box-shadow: none; }
+:root .app-shell .content-page .searchable-filter__control button { background: transparent; box-shadow: none; }
+:root .app-shell .content-page .searchable-filter__list { background: var(--glass-solid); }
+:root .app-shell .content-page .searchable-filter__list [role='option']:is(:hover, .is-active, [aria-selected='true']) {
+  background: var(--gold-soft); color: var(--ink);
+}
+:root .app-shell .content-page :is(.auth-methods button[aria-pressed='true'],
+  .ui-chip--selected, .commerce-variants label:has(:checked),
+  .account-address-option[data-selected='true'], .account-submit, .button-primary,
+  .ui-button--primary, button[type='submit']) {
+  background-color: rgb(212 159 40 / 17%);
+  border-color: color-mix(in srgb, var(--gold) 75%, transparent);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 12px rgb(212 159 40 / 8%);
+}
+:root .app-shell .content-page :is(button.account-danger, .account-feedback--error) { color: var(--danger); }
+:root .app-shell .content-page .password-input button { background: transparent; box-shadow: none; border: 0; color: var(--muted); }
+:root .app-shell .content-page .product-gallery__thumbnails button { background: transparent; box-shadow: none; border: 0; }
+:root .app-shell .content-page select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  background-size: 19px;
+  padding-inline-end: 40px;
+}
+:root .app-shell .content-page select option { background: var(--glass-solid); color: var(--ink); }
+:root .app-shell .content-page .jalali-date__navigation select { padding-inline: 7px 24px; background-position: left 4px center; background-size: 15px; }
+:root .app-shell .content-page .jalali-date__navigation { grid-template-columns: 36px minmax(70px, 1fr) 90px 36px; }
+:root .app-shell .content-page .jalali-date__calendar { background: var(--glass-control); border-color: var(--glass-control-edge); }
+:root .app-shell .content-page .jalali-date__grid button[aria-pressed='true'] { background: var(--gold-soft); border-color: var(--gold); color: var(--ink); font-weight: 700; }
+:root .app-shell .content-page .jalali-date__grid button[aria-current='date'] { border-color: var(--forest-soft); text-decoration: none; }
+:root .app-shell .app-main.content-page :is(input:not([type='checkbox']):not([type='radio']):not([type='file']), select, textarea, button)[aria-invalid='true'] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+.searchable-filter__control > button > svg { width: 19px; height: 19px; flex: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  :root .app-shell .content-page :is(button, .auth-switch, .auth-back a, .ui-chip):hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--glass-highlight) 45%, transparent);
+    border-color: var(--gold);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :root .app-shell .content-page :is(.auth-methods button, .auth-switch, .ui-button):active:not(:disabled) { transform: scale(.98); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root, :root[data-theme='dark'] { --glass-surface: var(--glass-solid); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  :root, :root[data-theme='dark'] { --glass-surface: var(--glass-solid); --glass-control: var(--glass-solid); --glass-highlight: transparent; --glass-shadow: none; --glass-border: var(--line); --glass-control-edge: var(--muted); }
+  body { background-image: none; }
+  :root .app-shell :is(.app-header, .mobile-bottom-nav, .search-suggestions),
+  :root .app-shell .app-main :is(.auth-shell, .account-form, .directory-detail,
+    .medicine-detail, .pharmacy-detail, .account-profile form,
+    .account-shopping-summary, .account-checkout-summary, .commerce-glass, .filter-panel) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .app-shell .content-page :is(button, .auth-switch, .auth-back a, .ui-button, .ui-chip) { transition: color 120ms ease, background-color 120ms ease; }
+}
+@media (forced-colors: active) {
+  :root, :root[data-theme='dark'] { --glass-solid: Canvas; --glass-surface: Canvas; --glass-border: CanvasText; --glass-control-edge: ButtonText; }
+  :root .app-shell .content-page select { appearance: auto; background-image: none; }
+}

@@ -9,10 +9,12 @@ import { queryKeys } from '../api/query-keys';
 import type { CartView, ProductDetail } from '../api/types';
 import { useAuth } from '../auth/auth-provider';
 import { ProductDetailPage } from './ProductDetailPage';
+import { signalCartAdded } from '../features/cart/cart-feedback';
 
 vi.mock('../api/endpoints-shop', () => ({
   shopApi: {
     product: vi.fn(),
+    products: vi.fn(),
     favorites: vi.fn(),
     addCartItem: vi.fn(),
     addFavorite: vi.fn(),
@@ -20,6 +22,7 @@ vi.mock('../api/endpoints-shop', () => ({
   },
 }));
 vi.mock('../auth/auth-provider', () => ({ useAuth: vi.fn() }));
+vi.mock('../features/cart/cart-feedback', () => ({ signalCartAdded: vi.fn() }));
 
 const detail: ProductDetail = {
   id: 1,
@@ -114,6 +117,7 @@ describe('product detail private actions', () => {
       typeof useAuth
     >);
     vi.mocked(shopApi.product).mockResolvedValue(detail);
+    vi.mocked(shopApi.products).mockResolvedValue({ data: [], meta: { page: 1, limit: 24, total: 0, totalPages: 0 } });
     vi.mocked(shopApi.favorites).mockResolvedValue({ data: [] });
     vi.mocked(shopApi.addCartItem).mockResolvedValue(cartView);
     vi.mocked(shopApi.addFavorite).mockResolvedValue(undefined);
@@ -167,7 +171,8 @@ describe('product detail private actions', () => {
     vi.mocked(shopApi.addCartItem).mockReturnValue(pending.promise);
     await showPage();
     const qty = container.querySelector<HTMLInputElement>('#qty')!;
-    expect(qty.step).toBe('1');
+    expect(qty.type).toBe('text');
+    expect(qty.inputMode).toBe('numeric');
     await changeInput(qty, '1.5');
     expect(qty.value).toBe('1.5');
     expect(qty.getAttribute('aria-invalid')).toBe('true');
@@ -183,8 +188,21 @@ describe('product detail private actions', () => {
     });
     expect(shopApi.addCartItem).toHaveBeenCalledTimes(1);
     expect(shopApi.addCartItem).toHaveBeenCalledWith(11, 2);
+    expect(signalCartAdded).not.toHaveBeenCalled();
     await act(async () => pending.resolve(cartView));
     expect(container.textContent).toContain('به سبد خرید اضافه شد.');
+    expect(signalCartAdded).toHaveBeenCalledTimes(1);
+    expect(signalCartAdded).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, keyboard: true }));
+  });
+
+  it('accepts typed Persian and Arabic quantities through the existing API maximum of twenty', async () => {
+    await showPage(); const qty = container.querySelector<HTMLInputElement>('#qty')!;
+    await changeInput(qty, '۲۰'); await act(async () => submitForm());
+    expect(shopApi.addCartItem).toHaveBeenLastCalledWith(11, 20);
+    await changeInput(qty, '١١'); await act(async () => submitForm());
+    expect(shopApi.addCartItem).toHaveBeenLastCalledWith(11, 11);
+    await changeInput(qty, '۲۱'); await act(async () => submitForm());
+    expect(shopApi.addCartItem).toHaveBeenCalledTimes(2);
   });
 
   it('does not submit an unavailable selected variant', async () => {
@@ -214,9 +232,21 @@ describe('product detail private actions', () => {
     expect(shopApi.addCartItem).toHaveBeenCalledTimes(2);
     await act(async () => oldRequest.resolve(cartView));
     expect(invalidation).not.toHaveBeenCalled();
+    expect(signalCartAdded).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain('به سبد خرید اضافه شد.');
     await act(async () => newRequest.resolve(cartView));
     expect(invalidation).toHaveBeenCalledWith({ queryKey: queryKeys.cart });
+    expect(signalCartAdded).toHaveBeenCalledTimes(1);
+    expect(signalCartAdded).toHaveBeenCalledWith(expect.objectContaining({ userId: 8 }));
+  });
+
+  it('does not signal a cart animation when the server rejects the addition', async () => {
+    vi.mocked(shopApi.addCartItem).mockRejectedValue(new Error('stock changed'));
+    await showPage();
+    await act(async () => submitForm());
+    expect(signalCartAdded).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('به سبد خرید اضافه شد.');
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
   });
 
   it('drops late favorite errors after account change without invalidating the next account cache', async () => {

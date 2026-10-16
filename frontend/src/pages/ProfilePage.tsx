@@ -139,7 +139,6 @@ function ProfileSession() {
           )}
           <div>
             <h1>سلام، {user.firstName || 'همراه گوپت'}</h1>
-            <p>همه چیز برای شما و همراه کوچکتان، در یک جا.</p>
           </div>
         </div>
         <div className="account-hero__meta">
@@ -153,22 +152,7 @@ function ProfileSession() {
       </header>
       <div className="account-settings-grid">
         <div className="account-profile">
-          <div>
-            <h2>ویرایش پروفایل</h2>
-            <p className="account-subtle">
-              نام و تصویرتان را به‌روز کنید. شماره موبایل این حساب ثابت است.
-            </p>
-          </div>
-          {avatarUrl && (
-            <SafeImage
-              className="account-pet-photo"
-              src={avatarUrl}
-              alt="تصویر پروفایل"
-              width={96}
-              height={96}
-              referrerPolicy="no-referrer"
-            />
-          )}
+          <h2>ویرایش پروفایل</h2>
 
           <form onSubmit={submit} noValidate aria-busy={save.isPending || upload.isPending}>
             <Field label="نام" htmlFor="firstName" error={fieldErrors.firstName}>
@@ -208,6 +192,9 @@ function ProfileSession() {
               htmlFor="avatar"
               hint="JPEG، PNG یا WebP، حداکثر ۵ مگابایت"
             >
+              {avatarUrl && <div className="account-profile-photo"><SafeImage
+                className="account-pet-photo" src={avatarUrl} alt="تصویر پروفایل"
+                width={56} height={56} referrerPolicy="no-referrer" /></div>}
               <ImagePicker
                 id="avatar"
                 label="انتخاب تصویر پروفایل"

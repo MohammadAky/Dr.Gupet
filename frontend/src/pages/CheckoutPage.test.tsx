@@ -8,6 +8,8 @@ import { api } from '../api/endpoints';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import type { Address, CartView, CouponPreview } from '../api/types';
+import { FREE_SHIPPING_THRESHOLD, SHIPPING_FLAT_COST } from '../lib/constants';
+import { formatToman } from '../lib/format';
 import { clearPendingOrder, readPendingOrder } from '../features/checkout/pending-order';
 import { CheckoutPage } from './CheckoutPage';
 import {
@@ -214,6 +216,7 @@ describe('checkout server estimates and order safeguards', () => {
   });
 
   it('uses a valid server shipping estimate even when the local threshold would say free, including zero', async () => {
+    vi.mocked(shopApi.cart).mockResolvedValue(cart(FREE_SHIPPING_THRESHOLD + 1, 75_000));
     await renderCheckout();
     expect(shippingRow()).toMatchObject({ label: 'ارسال (برآورد سامانه)', value: '۷۵٬۰۰۰ تومان' });
     await updateCache(queryKeys.cart, cart(2_000_000, 0));
@@ -239,6 +242,8 @@ describe('checkout server estimates and order safeguards', () => {
     expect(shippingRow().value).toBe('۵۰٬۰۰۰ تومان');
     await updateCache(queryKeys.cart, cart(2_000_000, null));
     expect(shippingRow().label).toContain('برآورد اولیه');
+    expect(shippingRow().value).toBe(formatToman(SHIPPING_FLAT_COST));
+    await updateCache(queryKeys.cart, cart(FREE_SHIPPING_THRESHOLD, null));
     expect(shippingRow().value).toBe('رایگان');
   });
 
@@ -381,9 +386,20 @@ describe('checkout server estimates and order safeguards', () => {
     >);
     vi.mocked(shopApi.startPayment).mockRejectedValue(new Error('gateway offline'));
     await renderCheckout();
+    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain('تحویل');
+    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe('commerce-shipping');
+    expect(container.querySelector('.account-checkout-summary .commerce-shipping')).toBeNull();
+    expect(submitButton().closest('.account-checkout-summary')).not.toBeNull();
+    expect(container.querySelector('.commerce-checkout-main .account-checkout-addresses')).not.toBeNull();
+    expect(container.querySelector('.commerce-checkout-main .account-checkout-coupon')).not.toBeNull();
+    expect(container.querySelector('.commerce-checkout-main .account-checkout-note')).not.toBeNull();
     await act(async () => submitForm());
     expect(shopApi.createOrder).toHaveBeenCalledTimes(1);
     expect(shopApi.startPayment).toHaveBeenCalledWith(44);
+    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain('پرداخت');
+    expect(container.querySelector('.commerce-shipping')).toBeNull();
+    expect(container.textContent).toContain('پرداخت هنوز تأیید نشده است');
+    expect(container.querySelector('button[type="submit"]')).toBeNull();
     const retry = [...container.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('همین سفارش'),
     )!;

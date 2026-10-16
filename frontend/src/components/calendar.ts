@@ -65,7 +65,7 @@ export function tehranInstant(date: string, hour: number, minute: number): strin
   throw new RangeError('This local time does not exist');
 }
 export function calendarLabel(iso: string, withTime = false): string {
-  if (!iso) return 'انتخاب تاریخ شمسی';
+  if (!iso) return 'انتخاب تاریخ';
   const time = withTime ? tehranFields(iso) : null;
   const day = toPersianDay(time?.date ?? iso);
   return `${digits(day.day)} ${MONTHS[day.month - 1]} ${digits(day.year)}${time ? `، ${digits(time.hour).padStart(2, '۰')}:${digits(time.minute).padStart(2, '۰')}` : ''}`;

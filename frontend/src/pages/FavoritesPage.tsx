@@ -107,10 +107,9 @@ function FavoritesContent() {
       <header className="account-heading">
         <div>
           <h1 ref={heading} tabIndex={-1}>علاقه‌مندی‌ها</h1>
-          <p>انتخاب‌های شما، برای وقتی که دوباره سراغشان می‌آیید.</p>
         </div>
         <Link className="account-secondary-link" to="/products">
-          کشف محصولات
+          محصولات
         </Link>
       </header>
       {notice && <p role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}

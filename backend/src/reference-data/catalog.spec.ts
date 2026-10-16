@@ -4,8 +4,57 @@ import {
   planReferenceData,
   REFERENCE_SPECIES,
   REFERENCE_TAGS,
+  referenceBreedIdentity,
 } from './catalog';
 describe('reference-only local repair plan', () => {
+  it('offers common breeds and explicit unknown/domestic selections without alias duplicates', () => {
+    expect(REFERENCE_SPECIES[0].breeds.length).toBeGreaterThanOrEqual(50);
+    expect(REFERENCE_SPECIES[1].breeds.length).toBeGreaterThanOrEqual(35);
+    expect(REFERENCE_SPECIES[2].breeds.length).toBeGreaterThanOrEqual(12);
+    for (const species of REFERENCE_SPECIES) {
+      expect(species.breeds).toContain('نامشخص');
+      expect(
+        new Set(species.breeds.map((name) => referenceBreedIdentity(species.slug, name))).size,
+      ).toBe(species.breeds.length);
+    }
+    expect(REFERENCE_SPECIES[0].breeds).toContain('دورگه / میکس');
+    expect(REFERENCE_SPECIES[1].breeds).toContain('خانگی کوتاه‌مو');
+  });
+  it('reuses spacing and known aliases without renaming existing breeds or creating duplicates', () => {
+    const plan = planReferenceData({
+      petTypes: [
+        { id: 2, name: 'سگ', slug: 'سگ', isActive: true },
+        { id: 3, name: 'گربه', slug: 'گربه', isActive: true },
+      ],
+      breeds: [
+        { petTypeId: 2, name: 'لابرادور رتریور', isActive: true },
+        { petTypeId: 2, name: 'شیت زو', isActive: true },
+        { petTypeId: 2, name: 'هاسکی سیبری', isActive: true },
+        { petTypeId: 3, name: 'مین کون', isActive: true },
+        { petTypeId: 3, name: 'خانگی کوتاه مو', isActive: true },
+      ],
+      tags: [],
+    });
+    expect(plan.conflicts).toHaveLength(0);
+    expect(
+      plan.breeds.some((row) =>
+        ['لابرادور', 'شیتزو', 'هاسکی', 'مین‌کوون', 'خانگی کوتاه‌مو'].includes(row.name),
+      ),
+    ).toBe(false);
+  });
+  it('refuses duplicate or disabled existing aliases rather than inserting or merging them', () => {
+    const plan = planReferenceData({
+      petTypes: [{ id: 2, name: 'سگ', slug: 'dog', isActive: true }],
+      breeds: [
+        { petTypeId: 2, name: 'لابرادور', isActive: true },
+        { petTypeId: 2, name: 'لابرادور رتریور', isActive: true },
+        { petTypeId: 2, name: 'هاسکی سیبری', isActive: false },
+      ],
+      tags: [],
+    });
+    expect(plan.conflicts).toHaveLength(2);
+    expect(plan.breeds.some((row) => ['لابرادور', 'هاسکی'].includes(row.name))).toBe(false);
+  });
   it('reuses the existing Persian species and tag identities rather than creating duplicates', () => {
     const plan = planReferenceData({
       petTypes: [{ id: 3, name: 'سگ', slug: 'سگ', isActive: true }],

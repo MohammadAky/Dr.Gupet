@@ -20,7 +20,11 @@ export class FavoritesService {
           product: {
             include: {
               brand: { select: { id: true, name: true } },
-              images: { take: 1, select: { url: true } },
+              images: {
+                take: 2,
+                orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                select: { url: true },
+              },
               variants: {
                 where: { isActive: true },
                 select: { price: true, stock: true },
@@ -51,6 +55,7 @@ export class FavoritesService {
           slug: product.slug,
           brand: product.brand,
           image: product.images[0]?.url || null,
+          hoverImage: product.images[1]?.url || null,
           minPrice,
           inStock,
           lifeStage: product.lifeStage,

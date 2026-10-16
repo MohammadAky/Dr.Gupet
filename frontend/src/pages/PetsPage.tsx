@@ -81,7 +81,6 @@ function PetsContent() {
       <header className="account-heading">
         <div>
           <h1>حیوانات من</h1>
-          <p>همراه‌های کوچک شما؛ اطلاعاتشان برای مراقبت بهتر، همیشه در دسترس.</p>
         </div>
         {!atLimit && items.length > 0 && (
           <Link className="account-primary-link" to="/pets/new">
@@ -94,7 +93,7 @@ function PetsContent() {
       {items.length === 0 && (
         <EmptyState
           text="هنوز حیوان خانگی ثبت نکرده‌اید."
-          action={<Link to="/pets/new">ثبت اولین حیوان</Link>}
+          action={<Link to="/pets/new">ثبت حیوان</Link>}
         />
       )}
 
@@ -144,7 +143,7 @@ function PetsContent() {
                 ))}
               </ul>
               <p className="account-actions">
-                <Link to={`/pets/${pet.id}`}>مشاهده پروفایل</Link>
+                <Link to={`/pets/${pet.id}`}>پروفایل</Link>
                 <Link to={`/pets/${pet.id}/edit`}>ویرایش</Link>
                 <button
                   className="account-danger"

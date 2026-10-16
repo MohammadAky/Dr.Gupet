@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -13,10 +13,47 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { normalizeFa } from '../../../common/utils/normalize-fa.util';
 
 export const SQL_INT_MAX = 2147483647;
 
 export class ImportProductRowDto {
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(SQL_INT_MAX)
+  brandId?: number;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? normalizeFa(value).trim() : value,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(191)
+  brandName?: string;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(SQL_INT_MAX)
+  categoryId?: number;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? normalizeFa(value).trim() : value,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(191)
+  categoryName?: string;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(SQL_INT_MAX)
+  petTypeId?: number;
+
   @IsString()
   @MinLength(2)
   @MaxLength(191)
@@ -71,20 +108,23 @@ export class ImportProductRowDto {
 }
 
 export class ImportProductsDto {
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   @Max(SQL_INT_MAX)
-  brandId: number;
+  brandId?: number;
 
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   @Max(SQL_INT_MAX)
-  categoryId: number;
+  categoryId?: number;
 
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   @Max(SQL_INT_MAX)
-  petTypeId: number;
+  petTypeId?: number;
 
   @IsArray()
   @ArrayMinSize(1)

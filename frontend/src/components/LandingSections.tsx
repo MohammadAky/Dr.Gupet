@@ -402,35 +402,27 @@ export function LandingSections({ content = landingSample }: { content?: Landing
           action="همهٔ کلینیک‌ها"
         />
         <div className="landing-location">
-          <div>
-            <p>کلینیک‌ها و داروخانه‌های نزدیک شما را با یک انتخاب پیدا می‌کنیم.</p>
-            <span>
-              با انتخاب این دکمه و اجازهٔ مرورگر، موقعیت شما برای محاسبهٔ فاصله به سرور ما ارسال
-              می‌شود؛ ذخیره نمی‌شود.
-            </span>
-          </div>
           <button
             type="button"
             className="button-primary"
             onClick={findNearby}
             disabled={locationState === 'pending'}
-            aria-describedby="landing-location-status"
+            aria-describedby={locationMessage ? 'landing-location-status' : undefined}
           >
             {locationState === 'pending'
               ? 'در حال بررسی…'
               : locationState === 'idle'
-                ? 'استفاده از موقعیت من'
+                ? 'نزدیک‌ترین کلینیک خود را پیدا کنید'
                 : 'بررسی دوبارهٔ موقعیت'}
           </button>
         </div>
-        <p
+        {locationMessage && <p
           id="landing-location-status"
           className="landing-location__status"
           role={locationState === 'error' ? 'alert' : 'status'}
         >
-          {locationMessage ||
-            'تا پیش از انتخاب موقعیت، ترتیب کلینیک‌ها و داروخانه‌ها بر اساس فاصله نیست.'}
-        </p>
+          {locationMessage}
+        </p>}
         {clinics.isLoading && <LoadingState />}
         {clinics.error && (
           <ErrorState error={clinics.error} onRetry={() => void clinics.refetch()} />
@@ -467,13 +459,7 @@ export function LandingSections({ content = landingSample }: { content?: Landing
           to="/pharmacies"
           action="همهٔ داروخانه‌ها"
         />
-        <p className="landing-section__note">
-          {locationState === 'idle'
-            ? 'مراکز نزدیک را با انتخاب موقعیت در بخش کلینیک‌ها ببینید.'
-            : locationState === 'pending'
-              ? 'در حال بررسی داروخانه‌های نزدیک شما…'
-              : 'فاصلهٔ مراکز دارای موقعیت معتبر نمایش داده می‌شود.'}
-        </p>
+        {locationState === 'pending' && <p className="landing-section__note">در حال بررسی داروخانه‌های نزدیک…</p>}
         {pharmacies.isLoading && <LoadingState />}
         {pharmacies.error && (
           <ErrorState error={pharmacies.error} onRetry={() => void pharmacies.refetch()} />

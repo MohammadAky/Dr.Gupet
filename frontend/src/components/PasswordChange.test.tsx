@@ -35,6 +35,7 @@ async function mount() {
 async function fill(id: string, value: string) {
   await act(async () => {
     const input = container.querySelector<HTMLInputElement>(`#${id}`)!;
+    input.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -92,4 +93,34 @@ it('focuses the first invalid field and clears corrected field errors before res
   await fill('new-password', 'new long password'); await fill('confirm-new-password', 'new long password');
   expect(container.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
   expect(auth.changePassword).not.toHaveBeenCalled();
+});
+it('starts current password empty and locked until deliberate pointer or keyboard input', async () => {
+  await mount();
+  const current = container.querySelector<HTMLInputElement>('#current-password')!;
+  expect(current.value).toBe('');
+  expect(current.autocomplete).toBe('off');
+  expect(current.readOnly).toBe(true);
+  await act(async () => current.focus());
+  expect(current.readOnly).toBe(true);
+  await act(async () => current.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true })));
+  expect(current.readOnly).toBe(false);
+});
+it('updates accessible password strength and checks while preserving lowercase password acceptance', async () => {
+  await mount();
+  const meter = () => container.querySelector('[role="meter"]')!;
+  expect(meter().getAttribute('aria-valuenow')).toBe('0');
+  await fill('new-password', 'A2');
+  expect(meter().getAttribute('aria-valuetext')).toBe('ضعیف');
+  expect(container.querySelectorAll('.password-strength [data-met="true"]')).toHaveLength(2);
+  await fill('new-password', 'Abcdefg2');
+  expect(meter().getAttribute('aria-valuetext')).toBe('خوب');
+  await fill('new-password', 'Abcdefghijkl2');
+  expect(meter().getAttribute('aria-valuetext')).toBe('عالی');
+  await fill('new-password', 'lowercase password');
+  expect(meter().getAttribute('aria-valuetext')).toBe('متوسط');
+  expect(container.textContent).not.toContain('بایت');
+  await fill('current-password', 'previous password');
+  await fill('confirm-new-password', 'lowercase password');
+  await act(async () => submit());
+  expect(auth.changePassword).toHaveBeenCalledExactlyOnceWith('previous password', 'lowercase password');
 });

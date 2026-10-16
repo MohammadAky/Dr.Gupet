@@ -1,0 +1,22 @@
+.password-strength { display: grid; gap: 10px; padding-block-start: 5px; font-size: .75rem; color: var(--muted); }
+.password-strength__heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.password-strength__heading > span { min-inline-size: 4.5em; }
+.password-strength__meter { display: flex; gap: 5px; inline-size: min(180px, 55%); }
+.password-strength__meter > span { flex: 1; block-size: 4px; border-radius: 99px; background: color-mix(in srgb, currentColor 18%, transparent); transition: background-color 180ms ease-out; }
+.password-strength[data-strength='1'] { --password-meter-color: var(--danger); }
+.password-strength[data-strength='2'] { --password-meter-color: var(--gold); }
+.password-strength[data-strength='3'], .password-strength[data-strength='4'] { --password-meter-color: var(--success); }
+.password-strength__meter > span[data-filled='true'] { background: var(--password-meter-color); }
+.password-strength__checks { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 0; padding: 0; list-style: none; }
+.password-strength__checks li { display: inline-flex; align-items: center; gap: 5px; line-height: 1.7; }
+.password-strength__checks li[data-met='true'] { color: var(--ink); }
+.password-strength__checks svg { flex: 0 0 auto; }
+.account-settings-grid .account-profile > h2 { margin: 0; }
+.account-settings-grid .account-profile { display: flex; flex-direction: column; gap: 16px; align-self: stretch; }
+.account-settings-grid .account-profile > form { flex: 1; margin: 0; display: flex; flex-direction: column; }
+.account-settings-grid .account-profile > form > button[type='submit'] { margin-block-start: auto; }
+.account-settings-grid .account-profile .account-profile-photo { display: flex; align-items: center; gap: 12px; }
+.account-settings-grid .account-profile-photo > .account-pet-photo { inline-size: 56px; block-size: 56px; border-radius: 50%; object-fit: cover; }
+.account-form > .account-check.account-check--compact { display: inline-flex; align-items: center; align-self: center; justify-self: start; gap: 10px; min-block-size: 44px; block-size: auto; padding: 8px 0; margin: 0; background: transparent; border: 0; box-shadow: none; }
+.account-check--compact input { inline-size: 18px; block-size: 18px; margin: 0; flex: 0 0 auto; accent-color: var(--forest); }
+@media (prefers-reduced-motion: reduce) { .password-strength__meter > span { transition: none; } }

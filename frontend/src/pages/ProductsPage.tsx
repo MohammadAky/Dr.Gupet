@@ -98,7 +98,6 @@ export function ProductsPage() {
       <div className="directory-page__heading">
         <span className="eyebrow">فروشگاه دکتر گوپت</span>
         <h1>محصولات</h1>
-        <p>با انتخاب نوع حیوان، برند و ویژگی‌ها، گزینهٔ مناسب همراهتان را پیدا کنید.</p>
       </div>
 
       <form className="catalog-search" ref={searchFormRef} onSubmit={submitSearch}>
@@ -195,7 +194,7 @@ export function ProductsPage() {
           />
         )}
         <fieldset className="catalog-diet-tags" disabled={dietTags.isPending || dietTags.isError}>
-          <legend>ویژگی‌های رژیمی ثبت‌شده</legend>
+          <legend>ویژگی‌های رژیمی</legend>
           {dietTags.isPending && <LoadingState text="در حال دریافت ویژگی‌ها…" />}
           {dietTags.data?.map((tag) => (
             <label key={tag.id} className="filter-check">
@@ -212,7 +211,7 @@ export function ProductsPage() {
               {tag.name}
             </label>
           ))}
-          {dietTags.data?.length === 0 && <p>هنوز ویژگی رژیمی برای محصولات ثبت نشده است.</p>}
+          {dietTags.data?.length === 0 && <p>ویژگی رژیمی در دسترس نیست.</p>}
         </fieldset>
         {dietTags.error && (
           <ErrorState error={dietTags.error} onRetry={() => void dietTags.refetch()} />

@@ -120,6 +120,18 @@ it('opens the SMS phone form when returning from an OTP number change', async ()
   expect(container.querySelector('#username')).toBeNull();
   expect(container.querySelector<HTMLInputElement>('#phone')?.autocomplete).toBe('tel');
 });
+it('shows live password guidance only when creating a password and omits redundant SMS explanations', async () => {
+  await mount();
+  expect(container.querySelector('[role="meter"]')).toBeNull();
+  await click('حساب ندارید؟ ثبت‌نام');
+  expect(container.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('0');
+  await fill('password', 'Account12345');
+  expect(container.querySelector('[role="meter"]')?.getAttribute('aria-valuetext')).toBe('عالی');
+  expect(container.querySelectorAll('.password-strength [data-met="true"]')).toHaveLength(3);
+  await click('کد پیامکی');
+  expect(container.textContent).not.toContain('نیازی به رمز عبور نیست');
+  expect(container.querySelector('[role="meter"]')).toBeNull();
+});
 
 it.each([
   ['رمز عبور را فراموش کرده‌اید؟', 'بازیابی رمز عبور'],

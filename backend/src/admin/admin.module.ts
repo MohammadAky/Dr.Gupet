@@ -7,6 +7,8 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { ReportsService } from './reports/reports.service';
 import { ReportsController } from './reports/reports.controller';
+import { AdminPopupController, PublicPopupController } from './storefront/popup.controller';
+import { PopupService } from './storefront/popup.service';
 
 /**
  * Admin core: audit log, runtime settings, dashboard and reports.
@@ -15,8 +17,15 @@ import { ReportsController } from './reports/reports.controller';
  */
 @Global()
 @Module({
-  controllers: [AuditController, SettingsController, DashboardController, ReportsController],
-  providers: [AuditService, SettingsService, DashboardService, ReportsService],
+  controllers: [
+    AuditController,
+    SettingsController,
+    DashboardController,
+    ReportsController,
+    AdminPopupController,
+    PublicPopupController,
+  ],
+  providers: [AuditService, SettingsService, DashboardService, ReportsService, PopupService],
   exports: [AuditService, SettingsService],
 })
 export class AdminModule {}

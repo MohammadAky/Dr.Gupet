@@ -128,12 +128,12 @@ export const adminApi = {
   loginPassword: (username: string, password: string) =>
     apiRequest<TokenPair>("/auth/password/login", { method: "POST", body: { username, password } }),
   requestOtp: (phone: string) =>
-    apiRequest<{ expiresIn: number; cooldownSeconds?: number }>("/auth/otp/request", {
+    apiRequest<{ expiresIn: number; cooldownSeconds?: number }>("/auth/admin/otp/request", {
       method: "POST",
       body: { phone },
     }),
   verifyOtp: (phone: string, code: string) =>
-    apiRequest<TokenPair & { user: AdminIdentity }>("/auth/otp/verify", {
+    apiRequest<TokenPair & { user: AdminIdentity }>("/auth/admin/otp/verify", {
       method: "POST",
       body: { phone, code },
     }),

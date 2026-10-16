@@ -22,8 +22,16 @@ export class AdminProductsService {
   private async lockProduct(tx: Prisma.TransactionClient, id: number) {
     // Both publication and variant edits use this parent lock so their checks
     // cannot observe different states and then commit an invalid combination.
-    const products = await tx.$queryRaw<Array<{ id: number; isActive: boolean }>>`
-      SELECT id, isActive FROM Product WHERE id = ${id} FOR UPDATE`;
+    const products = await tx.$queryRaw<
+      Array<{
+        id: number;
+        isActive: boolean;
+        brandId: number;
+        categoryId: number;
+        petTypeId: number;
+      }>
+    >`
+      SELECT id, isActive, brandId, categoryId, petTypeId FROM Product WHERE id = ${id} FOR UPDATE`;
     if (!products[0]) throw new NotFoundException('محصول یافت نشد');
     return products[0];
   }
@@ -46,6 +54,36 @@ export class AdminProductsService {
     if (data.petTypeId != null) {
       const petType = await this.prisma.petType.findUnique({ where: { id: data.petTypeId } });
       if (!petType) throw new AppException('NOT_FOUND', 'نوع حیوان یافت نشد', 404);
+    }
+  }
+
+  private async assertPublishableReferences(
+    tx: Prisma.TransactionClient,
+    data: {
+      brandId: number;
+      categoryId: number;
+      petTypeId: number;
+    },
+  ) {
+    const [brand, category, petType] = await Promise.all([
+      tx.brand.findUnique({ where: { id: data.brandId }, select: { isActive: true } }),
+      tx.productCategory.findUnique({
+        where: { id: data.categoryId },
+        select: { isActive: true, petTypeId: true },
+      }),
+      tx.petType.findUnique({ where: { id: data.petTypeId }, select: { isActive: true } }),
+    ]);
+    if (
+      !brand?.isActive ||
+      !category?.isActive ||
+      !petType?.isActive ||
+      (category.petTypeId !== null && category.petTypeId !== data.petTypeId)
+    ) {
+      throw new AppException(
+        'CONFLICT',
+        'پیش از انتشار، برند، دسته‌بندی و نوع حیوان فعال و سازگار را مشخص کنید',
+        409,
+      );
     }
   }
 
@@ -131,7 +169,7 @@ export class AdminProductsService {
         category: true,
         petType: true,
         variants: { orderBy: { weightGram: 'asc' } },
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
         tags: { include: { tag: true } },
       },
     });
@@ -155,20 +193,23 @@ export class AdminProductsService {
       throw new AppException('CONFLICT', 'slug محصول تکراری است', 409);
     }
 
-    return this.prisma.product.create({
-      data: {
-        name: normalizeFa(dto.name),
-        slug,
-        brandId: dto.brandId,
-        categoryId: dto.categoryId,
-        petTypeId: dto.petTypeId,
-        lifeStage: dto.lifeStage ?? 'ALL',
-        sizeClass: dto.sizeClass ?? 'ALL',
-        neuterSuitability: dto.neuterSuitability ?? 'ANY',
-        ingredientsText: dto.ingredientsText,
-        description: dto.description,
-        isActive: dto.isActive ?? true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.isActive ?? true) await this.assertPublishableReferences(tx, dto);
+      return tx.product.create({
+        data: {
+          name: normalizeFa(dto.name),
+          slug,
+          brandId: dto.brandId,
+          categoryId: dto.categoryId,
+          petTypeId: dto.petTypeId,
+          lifeStage: dto.lifeStage ?? 'ALL',
+          sizeClass: dto.sizeClass ?? 'ALL',
+          neuterSuitability: dto.neuterSuitability ?? 'ANY',
+          ingredientsText: dto.ingredientsText,
+          description: dto.description,
+          isActive: dto.isActive ?? true,
+        },
+      });
     });
   }
 
@@ -180,8 +221,13 @@ export class AdminProductsService {
     await this.assertReferences(dto);
 
     return this.prisma.$transaction(async (tx) => {
-      await this.lockProduct(tx, id);
-      if (dto.isActive === true) {
+      const current = await this.lockProduct(tx, id);
+      if (dto.isActive ?? current.isActive) {
+        await this.assertPublishableReferences(tx, {
+          brandId: dto.brandId ?? current.brandId,
+          categoryId: dto.categoryId ?? current.categoryId,
+          petTypeId: dto.petTypeId ?? current.petTypeId,
+        });
         const unweighed = await tx.productVariant.count({
           where: { productId: id, isActive: true, weightGram: { lte: 0 } },
         });
@@ -348,12 +394,27 @@ export class AdminProductsService {
   // Images & tags
   // -------------------------------------------------------------------
 
-  async addImage(productId: number, url: string, sortOrder = 0) {
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      throw new NotFoundException('محصول یافت نشد');
-    }
-    return this.prisma.productImage.create({ data: { productId, url, sortOrder } });
+  async addImage(productId: number, url: string, sortOrder?: number) {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockProduct(tx, productId);
+      let position = sortOrder;
+      if (position === undefined) {
+        const last = await tx.productImage.findFirst({
+          where: { productId },
+          orderBy: [{ sortOrder: 'desc' }, { id: 'desc' }],
+          select: { sortOrder: true },
+        });
+        position = (last?.sortOrder ?? -1) + 1;
+        if (position > 2147483647) {
+          throw new AppException(
+            'CONFLICT',
+            'ترتیب تصاویر به سقف مجاز رسیده است؛ ترتیب گالری را اصلاح کنید',
+            409,
+          );
+        }
+      }
+      return tx.productImage.create({ data: { productId, url, sortOrder: position } });
+    });
   }
 
   async removeImage(imageId: number) {
@@ -361,8 +422,15 @@ export class AdminProductsService {
     if (!image) {
       throw new NotFoundException('تصویر یافت نشد');
     }
-    await this.prisma.productImage.delete({ where: { id: imageId } });
-    return { deleted: true };
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockProduct(tx, image.productId);
+      const current = await tx.productImage.findUnique({ where: { id: imageId } });
+      if (!current || current.productId !== image.productId) {
+        throw new NotFoundException('تصویر یافت نشد');
+      }
+      await tx.productImage.delete({ where: { id: imageId } });
+      return { deleted: true };
+    });
   }
 
   /**
@@ -410,6 +478,36 @@ export class AdminProductsService {
     return this.prisma.product.findUnique({
       where: { id: productId },
       include: { tags: { include: { tag: true } } },
+    });
+  }
+  async setHoverImage(productId: number, imageId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockProduct(tx, productId);
+      const images = await tx.productImage.findMany({
+        where: { productId },
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        select: { id: true, url: true, sortOrder: true },
+      });
+      const selected = images.find((image) => image.id === imageId);
+      if (!selected) throw new NotFoundException('تصویر متعلق به این محصول یافت نشد');
+      if (images[0].id === imageId) {
+        throw new AppException(
+          'VALIDATION_ERROR',
+          'تصویر اصلی ثابت است؛ تصویر دیگری برای نمایش دوم انتخاب کنید',
+          400,
+        );
+      }
+      const reordered = [
+        images[0],
+        selected,
+        ...images.slice(1).filter((image) => image.id !== imageId),
+      ];
+      const result: Array<{ id: number; url: string; sortOrder: number }> = [];
+      for (const [sortOrder, image] of reordered.entries()) {
+        await tx.productImage.update({ where: { id: image.id }, data: { sortOrder } });
+        result.push({ ...image, sortOrder });
+      }
+      return { images: result, hoverImage: selected.url };
     });
   }
 }

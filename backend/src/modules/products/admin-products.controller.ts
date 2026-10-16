@@ -21,6 +21,7 @@ import {
   UpdateVariantDto,
   AddProductImageDto,
   SetProductTagsDto,
+  SetHoverImageDto,
 } from './dto/admin-product.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -217,6 +218,25 @@ export class AdminProductsController {
       ip: req.ip,
     });
     return image;
+  }
+
+  @Patch(':id/hover-image')
+  @ApiOperation({ summary: 'Select the second gallery image for product card hover (admin only)' })
+  async setHoverImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SetHoverImageDto,
+    @Req() req: { user: { sub: number }; ip: string },
+  ) {
+    const result = await this.adminProductsService.setHoverImage(id, dto.imageId);
+    await this.auditService.record({
+      adminId: req.user.sub,
+      action: 'UPDATE',
+      entity: 'Product',
+      entityId: id,
+      summary: `hover image: ${dto.imageId}`,
+      ip: req.ip,
+    });
+    return result;
   }
 
   @Delete('images/:imageId')

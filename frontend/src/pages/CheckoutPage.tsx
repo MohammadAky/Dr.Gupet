@@ -8,6 +8,8 @@ import { queryKeys } from '../api/query-keys';
 import type { CartView, CouponPreview } from '../api/types';
 import { useAuth } from '../auth/auth-provider';
 import { ErrorState, LoadingState } from '../components/states';
+import { CommerceSteps } from '../components/CommerceSteps';
+import { ShippingProgress } from '../components/ShippingProgress';
 import { cartFingerprint, shippingEstimate } from '../features/cart/cart-state';
 import { writePendingOrder } from '../features/checkout/pending-order';
 import { formatToman } from '../lib/format';
@@ -304,17 +306,15 @@ function CheckoutSession({ userId }: { userId: number | null }) {
       <header className="account-heading">
         <div>
           <h1>تکمیل خرید</h1>
-          <p>نشانی تحویل را انتخاب کنید و پیش از پرداخت، جزئیات را مرور کنید.</p>
         </div>
         <Link className="account-secondary-link" to="/cart">
           بازگشت به سبد خرید
         </Link>
       </header>
-      <ol className="account-purchase-steps" aria-label="مراحل خرید">
-        <li>سبد خرید</li>
-        <li aria-current="step">تحویل</li>
-        <li>پرداخت</li>
-      </ol>
+      <div className="commerce-journey">
+        {createdOrderId === null && <ShippingProgress cart={cart.data} />}
+        <CommerceSteps current={createdOrderId === null ? 'delivery' : 'payment'} />
+      </div>
 
       {shownFailure && (
         <p role="alert">
@@ -326,7 +326,8 @@ function CheckoutSession({ userId }: { userId: number | null }) {
         </p>
       )}
 
-      <form className="account-checkout-form" onSubmit={submit}>
+      <form className="account-checkout-form commerce-checkout-layout" onSubmit={submit}>
+        <div className="commerce-checkout-main">
         <fieldset className="account-checkout-addresses">
           <legend>آدرس تحویل</legend>
           {addressList.length === 0 && <p>آدرسی ثبت نکرده‌اید.</p>}
@@ -398,23 +399,6 @@ function CheckoutSession({ userId }: { userId: number | null }) {
           </fieldset>
         </details>
 
-        <fieldset className="account-checkout-summary">
-          <legend>خلاصه سفارش</legend>
-          <dl className="account-totals">
-            <dt>جمع کالاها</dt>
-            <dd dir="ltr">{formatToman(itemsTotal)}</dd>
-            <dt>تخفیف</dt>
-            <dd dir="ltr">{formatToman(discount)}</dd>
-            <dt>
-              {shipping.source === 'server' ? 'ارسال (برآورد سامانه)' : 'ارسال (برآورد اولیه)'}
-            </dt>
-            <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
-            <dt>قابل پرداخت (تخمینی)</dt>
-            <dd dir="ltr">{formatToman(payableEstimate)}</dd>
-          </dl>
-          <p>مبلغ قطعی هنگام ثبت سفارش محاسبه و در رسید ثبت می‌شود.</p>
-        </fieldset>
-
         <details
           className="account-checkout-note commerce-disclosure"
           open={initialIntent.note !== '' || undefined}
@@ -429,20 +413,30 @@ function CheckoutSession({ userId }: { userId: number | null }) {
             onChange={(event) => setNote(event.target.value.slice(0, 500))}
           />
         </details>
-
-        <button className="account-submit" type="submit" disabled={cannotSubmit}>
-          {submitOrder.isPending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و پرداخت'}
-        </button>
+        </div>
+        <aside className="account-checkout-summary" aria-labelledby="checkout-summary-title">
+          <h2 id="checkout-summary-title">خلاصه سفارش</h2>
+          {createdOrderId === null ? <>
+            <dl className="account-totals">
+              <dt>جمع کالاها</dt><dd dir="ltr">{formatToman(itemsTotal)}</dd>
+              <dt>تخفیف</dt><dd dir="ltr">{formatToman(discount)}</dd>
+              <dt>{shipping.source === 'server' ? 'ارسال (برآورد سامانه)' : 'ارسال (برآورد اولیه)'}</dt>
+              <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
+              <dt>قابل پرداخت (تخمینی)</dt><dd dir="ltr">{formatToman(payableEstimate)}</dd>
+            </dl>
+            <p>مبلغ قطعی هنگام ثبت سفارش محاسبه و در رسید ثبت می‌شود.</p>
+            <button className="account-submit" type="submit" disabled={cannotSubmit}>
+              {submitOrder.isPending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و پرداخت'}
+            </button>
+          </> : <>
+            <p role="status">سفارش ثبت شده است؛ پرداخت هنوز تأیید نشده است.</p>
+            <Link to={`/orders/${createdOrderId}`}>مشاهدهٔ سفارش و مبلغ قطعی</Link>
+            <button className="account-submit" type="button" disabled={userId === null || submitting || mutationPending} onClick={retryPayment}>
+              تلاش دوباره برای پرداخت همین سفارش
+            </button>
+          </>}
+        </aside>
       </form>
-      {createdOrderId !== null && (
-        <button
-          type="button"
-          disabled={userId === null || submitting || mutationPending}
-          onClick={retryPayment}
-        >
-          تلاش دوباره برای پرداخت همین سفارش
-        </button>
-      )}
     </section>
   );
 }

@@ -1,0 +1,5 @@
+.quantity-field { display: grid; gap: 8px; max-width: 170px; }
+.quantity-field label { color: var(--ink); font-weight: 600; }
+.quantity-field input[type='text'] { width: 100%; min-height: 46px; padding: 8px 12px; border: 1px solid var(--glass-border, var(--line)); border-radius: 12px; color: var(--ink); background: var(--glass-surface, var(--paper)); text-align: center; font-variant-numeric: tabular-nums; }
+.quantity-field input[aria-invalid='true'] { border-color: var(--danger); }
+.quantity-field p { margin: 0; color: var(--danger); font-size: .8rem; line-height: 1.7; }

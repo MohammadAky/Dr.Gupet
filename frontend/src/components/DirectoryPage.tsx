@@ -1,3 +1,4 @@
+import { GlassSelect } from './GlassSelect';
 import { SafeImage } from './SafeImage';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
@@ -78,11 +79,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
       <div className="directory-page__heading">
         <span className="eyebrow">راهنمای مراکز</span>
         <h1>{title}</h1>
-        <p>
-          {clinics
-            ? 'اطلاعات کلینیک‌های دامپزشکی را بر اساس شهر و استان پیدا کنید.'
-            : 'فهرست اطلاعاتی داروخانه‌ها؛ قیمت و موجودی دارو ارائه نمی‌شود.'}
-        </p>
+        {!clinics && <p>قیمت و موجودی دارو ارائه نمی‌شود.</p>}
       </div>
       <form className="filter-panel directory-page__filters" onSubmit={submit}>
         <div className="filter-panel__grid">
@@ -95,7 +92,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
               setCity('');
             }}
             options={provinces.map((name) => ({ value: name, label: name }))}
-            placeholder="استان را انتخاب یا تایپ کنید"
+            placeholder="انتخاب استان"
           />
           <SearchableFilter
             label="شهر"
@@ -103,7 +100,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
             onInputChange={setCity}
             onSelect={setCity}
             options={citySuggestions(province).map((name) => ({ value: name, label: name }))}
-            placeholder="شهر را انتخاب یا تایپ کنید"
+            placeholder="انتخاب شهر"
           />
         </div>
         <div className="filter-panel__actions">
@@ -116,13 +113,13 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
             فقط ۲۴ ساعته
           </label>
           {!clinics && (
-            <label className="directory-duty-filter">
+            <label className="directory-duty-filter" htmlFor="directory-duty">
               وضعیت کشیک
-              <select value={onDuty} onChange={(event) => setOnDuty(event.target.value)}>
+              <GlassSelect id="directory-duty" aria-label="وضعیت کشیک" value={onDuty} onChange={(event) => setOnDuty(event.target.value)}>
                 <option value="all">همه</option>
                 <option value="true">کشیک</option>
                 <option value="false">غیرکشیک</option>
-              </select>
+              </GlassSelect>
             </label>
           )}
           <button type="submit" className="filter-apply">
@@ -199,7 +196,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
                   {!isSampleReference(place) && place.address && <p className="directory-card__address">{place.address}</p>}
                   <div className={clinics ? 'clinic-card__actions' : undefined}>
                     <Link className="directory-card__link" to={`${base}/${place.id}`}>
-                      مشاهدهٔ اطلاعات <span aria-hidden="true">←</span>
+                      جزئیات <span aria-hidden="true">←</span>
                     </Link>
                     {clinics && place.phone && (
                       <a

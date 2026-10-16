@@ -218,7 +218,7 @@ describe('cart coupon and write consistency', () => {
     vi.mocked(shopApi.cart).mockResolvedValueOnce(initialCart).mockResolvedValue(changedCart);
     await renderCart();
     await submitCoupon('SAVE');
-    const quantity = container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    const quantity = container.querySelector<HTMLInputElement>('#quantity-1')!;
     await changeInput(quantity, '1.5');
     expect(shopApi.updateCartItem).not.toHaveBeenCalled();
 
@@ -239,7 +239,7 @@ describe('cart coupon and write consistency', () => {
 
   it('keeps incomplete quantity drafts local and permits restoring the server value', async () => {
     await renderCart();
-    const quantity = container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    const quantity = container.querySelector<HTMLInputElement>('#quantity-1')!;
     await changeInput(quantity, '');
     expect(quantity.value).toBe('');
     expect(shopApi.updateCartItem).not.toHaveBeenCalled();
@@ -249,6 +249,61 @@ describe('cart coupon and write consistency', () => {
     await act(async () => button(container, 'بازگرداندن تعداد').click());
     expect(quantity.value).toBe('1');
     expect(button(container, 'تکمیل خرید').disabled).toBe(false);
+  });
+
+  it('keeps invalid raw quantity drafts local and accepts Persian digits through Enter', async () => {
+    await renderCart();
+    const input = container.querySelector<HTMLInputElement>('#quantity-1')!;
+    expect(input.type).toBe('text');
+    expect(input.inputMode).toBe('numeric');
+    for (const raw of ['1e1', '-1', '1.5', '0', '21']) {
+      await changeInput(input, raw);
+      expect(input.value).toBe(raw);
+      await act(async () => button(container, 'به‌روزرسانی تعداد').click());
+      expect(shopApi.updateCartItem).not.toHaveBeenCalled();
+      expect(button(container, 'تکمیل خرید').disabled).toBe(true);
+    }
+    await changeInput(input, '۲');
+    expect(input.value).toBe('2');
+    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
+    expect(shopApi.updateCartItem).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('does not save when quantity focus moves to cancel, but commits when it leaves the editor', async () => {
+    await renderCart();
+    const input = container.querySelector<HTMLInputElement>('#quantity-1')!;
+    await changeInput(input, '2');
+    const cancel = button(container, 'بازگرداندن تعداد');
+    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: cancel })));
+    expect(shopApi.updateCartItem).not.toHaveBeenCalled();
+    await act(async () => cancel.click());
+    expect(input.value).toBe('1');
+    await changeInput(input, '3');
+    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: button(container, 'تکمیل خرید') })));
+    expect(shopApi.updateCartItem).toHaveBeenCalledWith(1, 3);
+  });
+
+  it('keeps shipping eligibility before coupons and shows the connected cart stage', async () => {
+    await renderCart();
+    const progress = container.querySelector('[role="progressbar"]')!;
+    expect(progress.getAttribute('aria-valuenow')).toBe('7');
+    expect(progress.closest('.commerce-journey')).not.toBeNull();
+    expect(progress.closest('.account-shopping-summary')).toBeNull();
+    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe('commerce-shipping');
+    await submitCoupon('SAVE');
+    expect(progress.getAttribute('aria-valuenow')).toBe('7');
+    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain('سبد خرید');
+  });
+
+  it('shows original decorative basket artwork and shopping links for an empty cart', async () => {
+    vi.mocked(shopApi.cart).mockResolvedValue({ items: [], itemsTotal: 0 });
+    await renderCart();
+    expect(container.querySelector('.commerce-empty-art[aria-hidden="true"] svg')).not.toBeNull();
+    expect(container.querySelector('.account-empty-cart img')).toBeNull();
+    expect(container.querySelector('.account-empty-cart a[href="/products"]')).not.toBeNull();
+    expect(container.querySelector('.account-empty-cart a[href="/favorites"]')).not.toBeNull();
+    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('0');
+    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe('commerce-shipping');
   });
 
   it('transfers only coupon text when continuing to checkout', async () => {
@@ -351,7 +406,7 @@ describe('cart coupon and write consistency', () => {
     );
     await renderCart();
     await submitCoupon('SAVE');
-    await changeInput(container.querySelector<HTMLInputElement>('input[type="number"]')!, '2');
+    await changeInput(container.querySelector<HTMLInputElement>('#quantity-1')!, '2');
     await act(async () => button(container, 'به‌روزرسانی تعداد').click());
     expect(shopApi.updateCartItem).toHaveBeenCalledWith(1, 2);
 

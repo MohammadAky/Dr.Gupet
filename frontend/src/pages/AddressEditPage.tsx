@@ -5,6 +5,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type CreateAddressInput } from '../api/endpoints';
 import { queryKeys } from '../api/query-keys';
 import { Field } from '../components/Field';
+import { SearchableFilter } from '../components/SearchableFilter';
+import { citySuggestions, provinces } from '../lib/locations';
 import { ErrorState, LoadingState } from '../components/states';
 import { addressSchema } from '../lib/schemas';
 import { errorText } from '../lib/labels';
@@ -204,7 +206,6 @@ function AddressEditSession() {
       <header className="account-heading">
         <div>
           <h1>{editingId ? 'ویرایش آدرس' : 'آدرس جدید'}</h1>
-          <p>نشانی و اطلاعات گیرنده را دقیق وارد کنید تا ارسال آسان‌تر شود.</p>
         </div>
         <Link className="account-secondary-link" to={returnTo}>
           {returnTo === '/checkout' ? 'بازگشت به تسویه' : 'بازگشت به آدرس‌ها'}
@@ -212,7 +213,7 @@ function AddressEditSession() {
       </header>
 
       <form className="account-form" onSubmit={submit} noValidate aria-busy={save.isPending}>
-        <Field label="عنوان (مثلاً خانه)" htmlFor="title" error={errors.title}>
+        <Field label="عنوان" htmlFor="title" error={errors.title}>
           <input
             id="title"
             disabled={save.isPending}
@@ -242,21 +243,29 @@ function AddressEditSession() {
           />
         </Field>
         <Field label="استان" htmlFor="province" error={errors.province}>
-          <input
+          <SearchableFilter
             id="province"
+            label="استان"
+            showLabel={false}
             disabled={save.isPending}
             autoComplete="address-level1"
             value={form.province}
-            onChange={(event) => set('province', event.target.value)}
+            options={provinces.map(name => ({ value: name, label: name }))}
+            onInputChange={value => set('province', value)}
+            onSelect={value => set('province', value)}
           />
         </Field>
         <Field label="شهر" htmlFor="city" error={errors.city}>
-          <input
+          <SearchableFilter
             id="city"
+            label="شهر"
+            showLabel={false}
             disabled={save.isPending}
             autoComplete="address-level2"
             value={form.city}
-            onChange={(event) => set('city', event.target.value)}
+            options={citySuggestions(form.province).map(name => ({ value: name, label: name }))}
+            onInputChange={value => set('city', value)}
+            onSelect={value => set('city', value)}
           />
         </Field>
         <Field label="نشانی کامل" htmlFor="fullAddress" error={errors.fullAddress}>

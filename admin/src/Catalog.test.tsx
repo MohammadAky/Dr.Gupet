@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Catalog } from "./Catalog";
 
@@ -7,6 +7,7 @@ const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 vi.mock("./auth", () => ({ useAuth: () => ({ request: requestMock }) }));
 
 afterEach(() => {
+  document.querySelector(".admin-confirm")?.dispatchEvent(new Event("cancel", { cancelable: true }));
   cleanup();
   requestMock.mockReset();
 });
@@ -17,6 +18,122 @@ function page(name = "محصول ثبت‌شده", currentPage = 1) {
     meta: { page: currentPage, limit: 12, total: 24, totalPages: 2 },
   };
 }
+
+function productDeletes() {
+  return requestMock.mock.calls.filter(([path, options]) => /^\/admin\/products\/\d+$/.test(path) && options?.method === "DELETE");
+}
+
+it("names the product and deletion consequences, then cancels without writing", async () => {
+  requestMock.mockImplementation((path: string) => path.startsWith("/admin/products?") ? Promise.resolve(page()) : Promise.resolve([]));
+  render(<Catalog />);
+  const remove = await screen.findByRole("button", { name: "حذف محصول ثبت‌شده" });
+  fireEvent.click(remove); fireEvent.click(remove);
+  const dialog = await screen.findByRole("dialog", { name: "حذف محصول" });
+  expect(within(dialog).getByText(/محصول «محصول ثبت‌شده» حذف می‌شود/)).toBeTruthy();
+  expect(dialog.textContent).toContain("اگر در سفارش استفاده شده باشد، فقط غیرفعال می‌شود");
+  fireEvent.click(within(dialog).getByRole("button", { name: "بازگشت" }));
+  await waitFor(() => expect((remove as HTMLButtonElement).disabled).toBe(false));
+  expect(productDeletes()).toHaveLength(0);
+  expect(screen.getByText("محصول ثبت‌شده")).toBeTruthy();
+});
+
+it("sends one confirmed row DELETE and refetches the list while duplicate actions are blocked", async () => {
+  let resolveDelete: ((value: unknown) => void) | undefined;
+  let listReads = 0;
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) {
+      listReads += 1;
+      return Promise.resolve(listReads === 1 ? page() : { data: [], meta: { page: 1, limit: 12, total: 0, totalPages: 1 } });
+    }
+    if (path === "/admin/products/1" && options?.method === "DELETE")
+      return new Promise(resolve => { resolveDelete = resolve; });
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  const remove = await screen.findByRole("button", { name: "حذف محصول ثبت‌شده" });
+  fireEvent.click(remove);
+  const confirm = within(await screen.findByRole("dialog")).getByRole("button", { name: "حذف محصول" });
+  fireEvent.click(confirm); fireEvent.click(confirm);
+  await waitFor(() => expect(productDeletes()).toHaveLength(1));
+  expect(requestMock).toHaveBeenCalledWith("/admin/products/1", { method: "DELETE" });
+  expect((remove as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "مشاهده ←" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "بعدی" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(remove);
+  expect(productDeletes()).toHaveLength(1);
+  await act(async () => { resolveDelete?.({ deleted: true, deactivated: false }); });
+  await screen.findByText("محصول «محصول ثبت‌شده» حذف شد.");
+  await waitFor(() => expect(listReads).toBe(2));
+  expect(screen.queryByRole("button", { name: "حذف محصول ثبت‌شده" })).toBeNull();
+});
+
+it("preserves the row and unlocks actions after a row deletion fails", async () => {
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) return Promise.resolve(page());
+    if (path === "/admin/products/1" && options?.method === "DELETE") return Promise.reject(new Error("حذف پذیرفته نشد"));
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  const remove = await screen.findByRole("button", { name: "حذف محصول ثبت‌شده" });
+  fireEvent.click(remove);
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "حذف محصول" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("حذف پذیرفته نشد");
+  expect(screen.getByText("محصول ثبت‌شده")).toBeTruthy();
+  await waitFor(() => expect((remove as HTMLButtonElement).disabled).toBe(false));
+  expect(productDeletes()).toHaveLength(1);
+  expect(requestMock.mock.calls.filter(([path]) => path.startsWith("/admin/products?"))).toHaveLength(1);
+});
+
+it("keeps ordered products as inactive rows and accurately reports deactivation", async () => {
+  let inactive = false;
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) {
+      const result = page();
+      return Promise.resolve({ ...result, data: result.data.map(row => ({ ...row, isActive: !inactive })) });
+    }
+    if (path === "/admin/products/1" && options?.method === "DELETE") {
+      inactive = true;
+      return Promise.resolve({ deleted: false, deactivated: true });
+    }
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  fireEvent.click(await screen.findByRole("button", { name: "حذف محصول ثبت‌شده" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "حذف محصول" }));
+  await screen.findByText("محصول «محصول ثبت‌شده» به‌دلیل وابستگی به سفارش، غیرفعال شد.");
+  const row = (await screen.findByText("محصول ثبت‌شده")).closest("tr")!;
+  expect(within(row).getByText("پیش‌نویس")).toBeTruthy();
+  expect(screen.queryByText("محصول «محصول ثبت‌شده» حذف شد.")).toBeNull();
+  expect(productDeletes()).toHaveLength(1);
+});
+
+it("returns to the previous page after deleting its last product without losing search or active filters", async () => {
+  let removed = false;
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) {
+      const pageNumber = Number(new URLSearchParams(path.split("?")[1]).get("page"));
+      return Promise.resolve(page(pageNumber === 2 ? "محصول آخر" : "محصول صفحهٔ اول", pageNumber));
+    }
+    if (path === "/admin/products/2" && options?.method === "DELETE") {
+      removed = true;
+      return Promise.resolve({ deleted: true, deactivated: false });
+    }
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  await screen.findByText("محصول صفحهٔ اول");
+  fireEvent.change(screen.getByRole("textbox", { name: "جستجوی محصول" }), { target: { value: "غذا" } });
+  fireEvent.click(screen.getByRole("button", { name: "جستجو" }));
+  fireEvent.click(screen.getByRole("button", { name: "فعال" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "بعدی" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "بعدی" }));
+  fireEvent.click(await screen.findByRole("button", { name: "حذف محصول آخر" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "حذف محصول" }));
+  await screen.findByText("محصول «محصول آخر» حذف شد.");
+  await screen.findByText("محصول صفحهٔ اول");
+  expect(removed).toBe(true);
+  expect(requestMock).toHaveBeenLastCalledWith("/admin/products?page=1&limit=12&search=%D8%BA%D8%B0%D8%A7&isActive=true", { withMeta: true });
+});
 
 it("keeps product and reference editors unavailable until their reference data is ready", async () => {
   let resolveBrands: ((value: unknown) => void) | undefined;
@@ -51,6 +168,51 @@ it("opens the separate CSV review screen after references are ready without writ
   expect(requestMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "بازگشت به محصولات" }));
   expect(screen.getByRole("heading", { name: "محصولات" })).toBeTruthy();
+});
+
+it("refreshes imported brands and categories for the next product editor while retaining import success", async () => {
+  let imported = false;
+  let resolveBrands: ((value: unknown) => void) | undefined;
+  let resolveCategories: ((value: unknown) => void) | undefined;
+  const petType = { id: 3, name: "گربه", isActive: true };
+  const brand = { id: 8, name: "برند تازه", isActive: true };
+  const category = { id: 9, name: "دسته تازه", petTypeId: 3, isActive: true };
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path === "/admin/products/import" && options?.method === "POST") {
+      imported = true;
+      return Promise.resolve({ imported: 1, products: [{ id: 10, name: "محصول واردشده", slug: "imported-product" }] });
+    }
+    if (path.startsWith("/admin/products?")) return Promise.resolve(page());
+    if (path === "/admin/brands") return imported ? new Promise(resolve => { resolveBrands = resolve; }) : Promise.resolve([]);
+    if (path === "/admin/categories") return imported ? new Promise(resolve => { resolveCategories = resolve; }) : Promise.resolve([]);
+    if (path === "/admin/pet-types") return Promise.resolve([petType]);
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  const openImport = screen.getByRole("button", { name: "ورود از CSV" });
+  await waitFor(() => expect((openImport as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(openImport);
+  const source = "name,price,brandName,categoryName,petTypeId\nمحصول واردشده,100,برند تازه,دسته تازه,3";
+  const file = new File([source], "new-references.csv", { type: "text/csv" });
+  Object.defineProperty(file, "text", { value: () => Promise.resolve(source) });
+  await act(async () => fireEvent.change(screen.getByLabelText("فایل محصولات"), { target: { files: [file] } }));
+  const submit = screen.getByRole("button", { name: "بررسی و ثبت محصولات" });
+  expect((submit as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(submit);
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "تأیید ورود محصولات" }));
+  await waitFor(() => expect(resolveBrands).toBeTypeOf("function"));
+  expect(screen.getByText("۱ محصول ثبت شد و در فهرست محصولات قابل ویرایش است.")).toBeTruthy();
+  expect(requestMock).toHaveBeenCalledWith("/admin/products/import", expect.objectContaining({
+    method: "POST", body: { rows: [expect.objectContaining({ brandName: "برند تازه", categoryName: "دسته تازه", petTypeId: 3 })] },
+  }));
+  await act(async () => { resolveBrands?.([brand]); resolveCategories?.([category]); });
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت به محصولات" }));
+  fireEvent.click(screen.getByRole("button", { name: "+ ثبت محصول" }));
+  fireEvent.change(screen.getByLabelText(/نوع حیوان/), { target: { value: "3" } });
+  expect(within(screen.getByLabelText(/^برند/)).getByRole("option", { name: "برند تازه" }).getAttribute("value")).toBe("8");
+  expect(within(screen.getByLabelText(/دسته‌بندی/)).getByRole("option", { name: "دسته تازه" }).getAttribute("value")).toBe("9");
+  expect(requestMock.mock.calls.filter(([path]) => path === "/admin/brands")).toHaveLength(2);
+  expect(requestMock.mock.calls.filter(([path]) => path === "/admin/categories")).toHaveLength(2);
 });
 
 it("shows a recoverable reference error instead of opening an incomplete product form", async () => {
@@ -191,4 +353,110 @@ it("clears a successfully attached image and cannot upload it again when reloadi
   await waitFor(() => expect(reads).toBe(3));
   expect(requestMock.mock.calls.filter(([path]) => path === "/upload/image")).toHaveLength(1);
   expect(requestMock.mock.calls.filter(([path, options]) => path === "/admin/products/1/images" && options?.method === "POST")).toHaveLength(1);
+});
+
+function galleryDetail(selectedThird = false) {
+  return {
+    ...productDetail(),
+    // Deliberately unsorted: the interface must derive primary/hover from persisted order.
+    images: [
+      { id: 11, url: "/uploads/third.webp", sortOrder: selectedThird ? 1 : 2 },
+      { id: 12, url: "/uploads/primary.webp", sortOrder: 0 },
+      { id: 13, url: "/uploads/second.webp", sortOrder: selectedThird ? 2 : 1 },
+    ],
+  };
+}
+
+function galleryImage(filename: string) {
+  const image = screen.getAllByRole("img").find(item => (item as HTMLImageElement).src.endsWith(filename));
+  expect(image).toBeTruthy();
+  return image!.closest(".catalog-image-item") as HTMLElement;
+}
+
+function hoverMutations() {
+  return requestMock.mock.calls.filter(([path, options]) => path === "/admin/products/1/hover-image" && options?.method === "PATCH");
+}
+
+it("protects the primary, locks hover selection while saving and reloading, then reflects persisted image order", async () => {
+  let reads = 0;
+  let resolveSave: ((value: unknown) => void) | undefined;
+  let resolveDetail: ((value: unknown) => void) | undefined;
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) return Promise.resolve(page());
+    if (path === "/admin/products/1/hover-image" && options?.method === "PATCH")
+      return new Promise(resolve => { resolveSave = resolve; });
+    if (path === "/admin/products/1") {
+      reads += 1;
+      return reads === 1 ? Promise.resolve(galleryDetail()) : new Promise(resolve => { resolveDetail = resolve; });
+    }
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  fireEvent.click(await screen.findByRole("button", { name: "مشاهده ←" }));
+  await screen.findByText("تصویر اصلی");
+  const primary = galleryImage("primary.webp");
+  expect(within(primary).getByText("تصویر اصلی")).toBeTruthy();
+  expect(within(primary).queryByRole("button", { name: /هاور/ })).toBeNull();
+  const current = within(galleryImage("second.webp")).getByRole("button", { name: "عکس هنگام هاور" }) as HTMLButtonElement;
+  expect(current.disabled).toBe(true); expect(current.getAttribute("aria-pressed")).toBe("true");
+  const select = within(galleryImage("third.webp")).getByRole("button", { name: "انتخاب برای هاور" }) as HTMLButtonElement;
+  expect(select.disabled).toBe(false); expect(select.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(select); fireEvent.click(select);
+  expect(select.disabled).toBe(true); expect(hoverMutations()).toHaveLength(1);
+  expect(requestMock).toHaveBeenCalledWith("/admin/products/1/hover-image", { method: "PATCH", body: { imageId: 11 } });
+  await act(async () => { resolveSave?.({ images: galleryDetail(true).images, hoverImage: "/uploads/third.webp" }); });
+  await waitFor(() => expect(resolveDetail).toBeTypeOf("function"));
+  expect(select.disabled).toBe(true); expect(reads).toBe(2);
+  await act(async () => { resolveDetail?.(galleryDetail(true)); });
+  const updated = within(galleryImage("third.webp")).getByRole("button", { name: "عکس هنگام هاور" }) as HTMLButtonElement;
+  expect(updated.disabled).toBe(true); expect(updated.getAttribute("aria-pressed")).toBe("true");
+  expect((within(galleryImage("second.webp")).getByRole("button", { name: "انتخاب برای هاور" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(within(galleryImage("primary.webp")).getByText("تصویر اصلی")).toBeTruthy();
+  expect(hoverMutations()).toHaveLength(1);
+});
+
+it("retries only the read after a saved hover selection cannot be reloaded", async () => {
+  let reads = 0;
+  let allowReload = false;
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) return Promise.resolve(page());
+    if (path === "/admin/products/1/hover-image" && options?.method === "PATCH") return Promise.resolve({ hoverImage: "/uploads/third.webp" });
+    if (path === "/admin/products/1") {
+      reads += 1;
+      return reads === 1 ? Promise.resolve(galleryDetail()) : allowReload ? Promise.resolve(galleryDetail(true)) : Promise.reject(new TypeError("offline"));
+    }
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  fireEvent.click(await screen.findByRole("button", { name: "مشاهده ←" }));
+  const select = await screen.findByRole("button", { name: "انتخاب برای هاور" }) as HTMLButtonElement;
+  fireEvent.click(select);
+  const retry = await screen.findByRole("button", { name: "دریافت دوبارهٔ جزئیات" }) as HTMLButtonElement;
+  await waitFor(() => expect(retry.disabled).toBe(false));
+  expect(screen.getByText("عکس هنگام هاور ثبت شد؛ تصویر اصلی تغییر نکرد.")).toBeTruthy();
+  expect(select.disabled).toBe(true); expect(screen.getByRole("alert")).toBeTruthy();
+  fireEvent.click(select); expect(hoverMutations()).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "دریافت دوبارهٔ جزئیات" }));
+  await waitFor(() => expect(reads).toBe(3));
+  await waitFor(() => expect((screen.getByRole("button", { name: "دریافت دوبارهٔ جزئیات" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(select.disabled).toBe(true); expect(hoverMutations()).toHaveLength(1);
+  allowReload = true; fireEvent.click(screen.getByRole("button", { name: "دریافت دوبارهٔ جزئیات" }));
+  await waitFor(() => expect(within(galleryImage("third.webp")).getByRole("button", { name: "عکس هنگام هاور" }).getAttribute("aria-pressed")).toBe("true"));
+  expect(screen.queryByRole("alert")).toBeNull(); expect(hoverMutations()).toHaveLength(1);
+});
+
+it("does not claim a saved hover photo when the mutation fails and leaves the current selection intact", async () => {
+  requestMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.startsWith("/admin/products?")) return Promise.resolve(page());
+    if (path === "/admin/products/1") return Promise.resolve(galleryDetail());
+    if (path === "/admin/products/1/hover-image" && options?.method === "PATCH") return Promise.reject(new Error("تغییر عکس پذیرفته نشد"));
+    return Promise.resolve([]);
+  });
+  render(<Catalog />); fireEvent.click(await screen.findByRole("button", { name: "مشاهده ←" }));
+  const select = await screen.findByRole("button", { name: "انتخاب برای هاور" }) as HTMLButtonElement;
+  fireEvent.click(select); await screen.findByRole("alert");
+  await waitFor(() => expect(select.disabled).toBe(false));
+  expect(screen.queryByText("عکس هنگام هاور ثبت شد؛ تصویر اصلی تغییر نکرد.")).toBeNull();
+  expect(within(galleryImage("second.webp")).getByRole("button", { name: "عکس هنگام هاور" }).getAttribute("aria-pressed")).toBe("true");
+  expect(requestMock.mock.calls.filter(([path]) => path === "/admin/products/1")).toHaveLength(1);
 });

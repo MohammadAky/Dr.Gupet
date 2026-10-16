@@ -211,7 +211,7 @@ describe("admin identity and browser storage", () => {
 
   it("uses one refresh token for simultaneous expired requests", async () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith("/auth/otp/verify"))
+      if (url.endsWith("/auth/admin/otp/verify"))
         return response({ accessToken: "access-1", refreshToken: "refresh-1" });
       if (url.endsWith("/admin/me"))
         return response({ id: 1, role: "ADMIN", phone: "09120000000" });
@@ -239,7 +239,7 @@ describe("admin identity and browser storage", () => {
   it("keeps a new admin session when an earlier session returns a delayed 403", async () => {
     let releaseOldRead: ((value: Response) => void) | undefined;
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith("/auth/otp/verify"))
+      if (url.endsWith("/auth/admin/otp/verify"))
         return response({ accessToken: "old-access", refreshToken: "old-refresh" });
       if (url.endsWith("/auth/password/login"))
         return response({ accessToken: "new-access", refreshToken: "new-refresh" });
@@ -282,7 +282,7 @@ describe("admin identity and browser storage", () => {
     let releaseLate401: ((value: Response) => void) | undefined;
     let oldReads = 0;
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith("/auth/otp/verify"))
+      if (url.endsWith("/auth/admin/otp/verify"))
         return response({ accessToken: "access-1", refreshToken: "refresh-1" });
       if (url.endsWith("/admin/me"))
         return response({ id: 1, role: "ADMIN", phone: "09120000000" });

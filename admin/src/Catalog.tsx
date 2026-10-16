@@ -1,10 +1,11 @@
 import { TomanInput } from './TomanInput';
+import './catalog-list-actions.css';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError, type PageResult } from "./api/client";
 import { useAuth } from "./auth";
 import { ProductCsvImport } from "./ProductCsvImport";
 import { parseAdminLocation } from "./navigation";
-import { validateRequiredFields } from "./management";
+import { confirmAction, validateRequiredFields } from "./management";
 import {
   CatalogReferencesManager,
   type CatalogReferences,
@@ -1585,11 +1586,11 @@ function Detail({
             <span>۰۳</span>
             <div>
               <h2>تصاویر</h2>
-              <p>تصاویر به ترتیب ثبت نمایش داده می‌شوند.</p>
+              <p>تصویر اول اصلی است؛ تصویر دوم روی کارت با حرکت ماوس نمایش داده می‌شود.</p>
             </div>
           </div>
           <div className="catalog-images">
-            {product.images.map((item) => {
+            {[...product.images].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id).map((item, index) => {
               const src = safeImageUrl(item.url);
               return (
                 <div key={item.id} className="catalog-image-item">
@@ -1610,6 +1611,13 @@ function Detail({
                   ) : (
                     <span>نشانی تصویر نامعتبر</span>
                   )}
+                  {index === 0 ? <span>تصویر اصلی</span> : <button
+                    type="button" className="catalog-link" disabled={busy || index === 1}
+                    aria-pressed={index === 1}
+                    onClick={() => void run(() => request(`/admin/products/${id}/hover-image`, {
+                      method: "PATCH", body: { imageId: item.id },
+                    }), "عکس هنگام هاور ثبت شد؛ تصویر اصلی تغییر نکرد.")}
+                  >{index === 1 ? "عکس هنگام هاور" : "انتخاب برای هاور"}</button>}
                   {confirmImageId !== item.id ? (
                     <button
                       type="button"
@@ -1799,6 +1807,9 @@ function TagEditor({
 
 export function Catalog() {
   const { request } = useAuth();
+  const mounted = useRef(true);
+  const deleting = useRef<number | null>(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [section, setSection] = useState<Section>("list");
   const [refs, setRefs] = useState<References>({
     brands: [],
@@ -1825,6 +1836,44 @@ export function Catalog() {
   const [refsLoading, setRefsLoading] = useState(true);
   const [refsRevision, setRefsRevision] = useState(0);
   const [refresh, setRefresh] = useState(0);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteNotice, setDeleteNotice] = useState("");
+
+  async function removeRow(row: ProductRow) {
+    if (deleting.current !== null || loading) return;
+    deleting.current = row.id;
+    setDeletingId(row.id);
+    setDeleteError("");
+    setDeleteNotice("");
+    try {
+      const accepted = await confirmAction(
+        `محصول «${row.name}» حذف می‌شود. اگر در سفارش استفاده شده باشد، فقط غیرفعال می‌شود تا سابقهٔ سفارش حفظ شود. حذف کامل قابل بازگشت نیست.`,
+        "حذف محصول",
+      );
+      if (!accepted || !mounted.current) return;
+      const result = await request<{ deleted: boolean; deactivated: boolean }>(
+        `/admin/products/${row.id}`, { method: "DELETE" },
+      );
+      if (!mounted.current) return;
+      setDeleteNotice(result.deleted
+        ? `محصول «${row.name}» حذف شد.`
+        : `محصول «${row.name}» به‌دلیل وابستگی به سفارش، غیرفعال شد.`);
+      // An ordered product remains in the unfiltered/inactive list after deactivation.
+      const leavesList = result.deleted || activeFilter === "true";
+      setRows((current) => leavesList
+        ? current.filter((item) => item.id !== row.id)
+        : current.map((item) => item.id === row.id ? { ...item, isActive: false } : item));
+      setLoading(true);
+      if (leavesList && rows.length === 1 && page > 1) setPage(page - 1);
+      else setRefresh((value) => value + 1);
+    } catch (problem) {
+      if (mounted.current) setDeleteError(`حذف «${row.name}» انجام نشد: ${errorText(problem)}`);
+    } finally {
+      deleting.current = null;
+      if (mounted.current) setDeletingId(null);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -1923,7 +1972,7 @@ export function Catalog() {
     </>
   );
 
-  if (section !== "list" && (refsLoading || refsError))
+  if (section !== "list" && section !== "import" && (refsLoading || refsError))
     return (
       <>
         <Intro
@@ -1941,7 +1990,7 @@ export function Catalog() {
     );
 
   if (section === "import")
-    return <ProductCsvImport refs={refs} onBack={() => setSection("list")} onImported={() => setRefresh(value => value + 1)} />;
+    return <ProductCsvImport refs={refs} onBack={() => setSection("list")} onImported={() => { setRefresh(value => value + 1); setRefsRevision(value => value + 1); }} />;
   if (section === "create")
     return (
       <CreateProduct
@@ -1980,14 +2029,14 @@ export function Catalog() {
         text="محصولات منتشرشده و پیش‌نویس‌ها را یک‌جا ببینید و محصول تازه ثبت کنید."
         actions={
           <>
-            <button type="button" className="button button--ghost" disabled={refsLoading || !!refsError} onClick={() => setSection("import")}>
+            <button type="button" className="button button--ghost" disabled={deletingId !== null || refsLoading || !!refsError} onClick={() => setSection("import")}>
               ورود از CSV
             </button>
             <button
               type="button"
               className="button button--ghost"
               onClick={() => setSection("references")}
-              disabled={refsLoading || !!refsError}
+              disabled={deletingId !== null || refsLoading || !!refsError}
             >
               داده‌های مرجع
             </button>
@@ -1995,7 +2044,7 @@ export function Catalog() {
               type="button"
               className="button button--primary"
               onClick={() => setSection("create")}
-              disabled={refsLoading || !!refsError}
+              disabled={deletingId !== null || refsLoading || !!refsError}
             >
               + ثبت محصول
             </button>
@@ -2020,11 +2069,12 @@ export function Catalog() {
             </label>
             <input
               id="product-search"
+              disabled={deletingId !== null}
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}
               placeholder="جستجو با نام یا نامک…"
             />
-            <button type="submit" className="button button--outline">
+            <button type="submit" className="button button--outline" disabled={deletingId !== null}>
               جستجو
             </button>
           </form>
@@ -2044,6 +2094,7 @@ export function Catalog() {
                 key={value}
                 type="button"
                 aria-pressed={activeFilter === value}
+                disabled={deletingId !== null}
                 onClick={() => {
                   setActiveFilter(value);
                   setPage(1);
@@ -2054,6 +2105,8 @@ export function Catalog() {
             ))}
           </div>
         </div>
+        {deleteError && <p className="catalog-notice catalog-notice--warning" role="alert">{deleteError}</p>}
+        {deleteNotice && <p className="catalog-notice" role="status">{deleteNotice}</p>}
         {error && (
           <div className="catalog-notice catalog-notice--warning" role="alert">
             {error}
@@ -2075,7 +2128,7 @@ export function Catalog() {
         )}
         {!loading && !error && (
           <div className="catalog-table-wrap">
-            <table className="catalog-table">
+            <table className="catalog-table catalog-table--quick-actions">
               <thead>
                 <tr>
                   <th scope="col">محصول</th>
@@ -2083,7 +2136,7 @@ export function Catalog() {
                   <th scope="col">قیمت پایه</th>
                   <th scope="col">موجودی</th>
                   <th scope="col">وضعیت</th>
-                  <th scope="col">جزئیات</th>
+                  <th scope="col">عملیات</th>
                 </tr>
               </thead>
               <tbody>
@@ -2103,13 +2156,26 @@ export function Catalog() {
                       <StatusBadge active={row.isActive} />
                     </td>
                     <td>
+                      <div className="catalog-row-actions" role="group" aria-label={`عملیات ${row.name}`}>
                       <button
                         type="button"
                         className="catalog-link"
+                        disabled={deletingId !== null}
                         onClick={() => showDetail(row.id)}
                       >
                         مشاهده ←
                       </button>
+                      <button type="button" className="catalog-link catalog-delete-action"
+                        disabled={deletingId !== null}
+                        aria-label={`حذف ${row.name}`} title={`حذف ${row.name}`}
+                        onClick={() => void removeRow(row)}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6" />
+                        </svg>
+                        {deletingId === row.id ? "در حال بررسی…" : "حذف"}
+                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2128,14 +2194,14 @@ export function Catalog() {
             </span>
             <button
               type="button"
-              disabled={loading || page <= 1}
+              disabled={loading || deletingId !== null || page <= 1}
               onClick={() => setPage(page - 1)}
             >
               قبلی
             </button>
             <button
               type="button"
-              disabled={loading || page >= meta.totalPages}
+              disabled={loading || deletingId !== null || page >= meta.totalPages}
               onClick={() => setPage(page + 1)}
             >
               بعدی

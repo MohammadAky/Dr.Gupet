@@ -13,6 +13,6 @@ export default registerAs('app', () => ({
     10,
   ),
   shippingFlatCost: parseInt(process.env.SHIPPING_FLAT_COST || '50000', 10),
-  freeShippingThreshold: parseInt(process.env.FREE_SHIPPING_THRESHOLD || '1500000', 10),
+  freeShippingThreshold: parseInt(process.env.FREE_SHIPPING_THRESHOLD || '6000000', 10),
   orderExpireMinutes: parseInt(process.env.ORDER_EXPIRE_MINUTES || '30', 10),
 }));

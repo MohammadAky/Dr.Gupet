@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/auth-provider';
-import { passwordError, passwordHint } from '../lib/password';
+import { passwordError } from '../lib/password';
 import { Field } from './Field';
 import { PasswordInput } from './PasswordInput';
+import { PasswordStrength } from './PasswordStrength';
 import { focusFirstInvalid } from '../lib/form-validation';
 
 export function PasswordChange() {
@@ -75,14 +76,6 @@ export function PasswordChange() {
       <h2>رمز عبور</h2>
       {user?.username ? (
         <form onSubmit={(event) => void submit(event)} noValidate aria-busy={busy}>
-          <input
-            type="text"
-            name="username"
-            autoComplete="username"
-            value={user.username}
-            readOnly
-            hidden
-          />
           <Field label="رمز عبور فعلی" htmlFor="current-password" error={errors.current}>
             <PasswordInput
               id="current-password"
@@ -90,9 +83,11 @@ export function PasswordChange() {
               value={current}
               onChange={(value) => change('current', value)}
               disabled={busy}
+              autoComplete="off"
+              requireInteraction
             />
           </Field>
-          <Field label="رمز عبور جدید" htmlFor="new-password" hint={passwordHint} error={errors.password}>
+          <Field label="رمز عبور جدید" htmlFor="new-password" error={errors.password}>
             <PasswordInput
               id="new-password"
               required
@@ -100,7 +95,9 @@ export function PasswordChange() {
               onChange={(value) => change('password', value)}
               disabled={busy}
               autoComplete="new-password"
+              aria-describedby="new-password-guidance"
             />
+            <div id="new-password-guidance"><PasswordStrength value={password} /></div>
           </Field>
           <Field label="تکرار رمز عبور جدید" htmlFor="confirm-new-password" error={errors.confirm}>
             <PasswordInput
