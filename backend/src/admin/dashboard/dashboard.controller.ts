@@ -6,6 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { withUsername } from '../../modules/auth/auth-user';
+import { AdminDashboardQueryDto } from '../dto/admin-query.dto';
 
 @ApiTags('Admin - Dashboard')
 @Controller('admin')
@@ -43,7 +44,7 @@ export class DashboardController {
   @Get('dashboard')
   @ApiOperation({ summary: 'Dashboard KPIs and charts (admin only)' })
   @ApiResponse({ status: 200, description: 'Dashboard overview' })
-  async overview(@Query('tz') tz?: string) {
-    return this.dashboardService.getOverview(tz);
+  async overview(@Query() query: AdminDashboardQueryDto) {
+    return this.dashboardService.getOverview(query.tz);
   }
 }

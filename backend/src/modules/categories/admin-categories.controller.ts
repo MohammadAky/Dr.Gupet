@@ -1,3 +1,4 @@
+import { AdminPetReferenceListQueryDto } from '../../admin/dto/admin-query.dto';
 import {
   Controller,
   Get,
@@ -30,14 +31,10 @@ export class AdminCategoriesController {
 
   @Get()
   @ApiOperation({ summary: 'Flat list of categories incl. inactive (admin only)' })
-  async findAll(
-    @Query('petTypeId') petTypeId?: string,
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.categoriesService.findAllAdmin(petTypeId ? Number(petTypeId) : undefined, {
-      search,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
+  async findAll(@Query() query: AdminPetReferenceListQueryDto) {
+    return this.categoriesService.findAllAdmin(query.petTypeId, {
+      search: query.search,
+      isActive: query.isActive,
     });
   }
 

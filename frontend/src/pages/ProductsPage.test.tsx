@@ -8,7 +8,7 @@ import { api } from '../api/endpoints';
 import { shopApi } from '../api/endpoints-shop';
 import { ProductsPage } from './ProductsPage';
 
-vi.mock('../api/endpoints', () => ({ api: { petTypes: vi.fn() } }));
+vi.mock('../api/endpoints', () => ({ api: { petTypes: vi.fn(), tags: vi.fn() } }));
 vi.mock('../api/endpoints-shop', () => ({ shopApi: { brands: vi.fn(), products: vi.fn() } }));
 
 describe('catalog URL forms', () => {
@@ -23,6 +23,7 @@ describe('catalog URL forms', () => {
     root = createRoot(container);
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     vi.mocked(api.petTypes).mockResolvedValue([]);
+    vi.mocked(api.tags).mockResolvedValue([]);
     vi.mocked(shopApi.brands).mockResolvedValue([]);
     vi.mocked(shopApi.products).mockResolvedValue({
       data: [],
@@ -61,22 +62,83 @@ describe('catalog URL forms', () => {
   });
 
   it('formats price filters while preserving API Toman values and rejecting exponent syntax', async () => {
-    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/products']}><ProductsPage /></MemoryRouter></QueryClientProvider>));
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={['/products']}>
+            <ProductsPage />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+    );
     async function edit(id: string, value: string) {
       await act(async () => {
         const input = container.querySelector<HTMLInputElement>(`#${id}`)!;
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+          input,
+          value,
+        );
         input.dispatchEvent(new Event('input', { bubbles: true }));
       });
     }
-    await edit('minPrice', '۱۲۳٬۰۰۰'); await edit('maxPrice', '456000');
+    await edit('minPrice', '۱۲۳٬۰۰۰');
+    await edit('maxPrice', '456000');
     expect(container.querySelector<HTMLInputElement>('#maxPrice')!.value).toBe('۴۵۶٬۰۰۰');
-    await act(async () => container.querySelector('.price-filter')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    await vi.waitFor(() => expect(shopApi.products).toHaveBeenCalledWith(expect.objectContaining({ minPrice: 123000, maxPrice: 456000 })));
+    await act(async () =>
+      container
+        .querySelector('.price-filter')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+    );
+    await vi.waitFor(() =>
+      expect(shopApi.products).toHaveBeenCalledWith(
+        expect.objectContaining({ minPrice: 123000, maxPrice: 456000 }),
+      ),
+    );
     const calls = vi.mocked(shopApi.products).mock.calls.length;
     await edit('minPrice', '1e3');
-    await act(async () => container.querySelector('.price-filter')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await act(async () =>
+      container
+        .querySelector('.price-filter')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+    );
     expect(container.querySelector('#price-filter-error')).not.toBeNull();
     expect(vi.mocked(shopApi.products).mock.calls.length).toBe(calls);
+  });
+
+  it('keeps URL filters when opening the mobile disclosure and applies stock filtering from the sidebar', async () => {
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={['/products?q=food&brandId=7&page=3']}>
+            <ProductsPage />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+    );
+    const sidebar = container.querySelector('aside')!;
+    const disclosure = sidebar.querySelector<HTMLButtonElement>(
+      '[aria-controls="catalog-filter-panel"]',
+    )!;
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => disclosure.click());
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
+    await vi.waitFor(() =>
+      expect(shopApi.products).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'food', brandId: 7, page: 3 }),
+      ),
+    );
+    const stock = Array.from(sidebar.querySelectorAll('label'))
+      .find((label) => label.textContent?.trim() === 'فقط موجود')!
+      .querySelector<HTMLInputElement>('input')!;
+    await act(async () => stock.click());
+    await vi.waitFor(() =>
+      expect(shopApi.products).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'food', brandId: 7, page: 1, inStock: true }),
+      ),
+    );
+    expect(container.querySelector('h1')?.textContent).toBe('محصولات');
+    expect(container.querySelector('nav[aria-label="مسیر صفحه"]')?.textContent).toBe(
+      'فروشگاه دکتر گوپت/محصولات',
+    );
   });
 });

@@ -351,12 +351,15 @@ npm run start:dev                  # http://localhost:3000/api/v1  ·  Swagger: 
 | لاگ‌ها | `GET /admin/audit-logs` · `GET /admin/sms/logs` (فیلتر phone/kind/status) |
 | کاربران | `GET/POST/PATCH/DELETE /admin/users...` + `PATCH /admin/users/:id/restore` |
 | کاتالوگ | `admin/products` (+ `variants`/`images`/`tags`)، `admin/brands`، `admin/categories`، `admin/pet-types`، `admin/breeds`، `admin/tags` — همه با `search`/`isActive` |
+| CSV کاتالوگ | `GET /admin/products/export.csv` با `columns` و فیلترهای فهرست؛ `POST /admin/products/sync/preview` و `/sync` برای پیش‌نمایش و ثبت اتمیک ایجاد/ویرایش حداکثر ۵۰۰ ردیف گزینه |
 | سفارش‌ها | `GET/PATCH /admin/orders...` — `:id/transition`، `:id/tracking`، `:id/cancel`، `:id/refund` (ساخت سفارش فقط از `POST /orders`) |
 | پرداخت‌ها | `GET /admin/payments...` — `:id/reconcile`، `:id/mark-failed` |
 | کوپن‌ها | CRUD `/admin/coupons` + آمار مصرف |
 | دارو/داروخانه/کلینیک | CRUD `/admin/medicines`، `/admin/pharmacies` (+ لینک دارو، `onDuty`)، `/admin/clinics` |
 
 ## ۱۶. استراتژی تست
+
+**مرحلهٔ ۱۷ اکتبر:** خروجی CSV ستون‌پذیر و ورود مجدد با حفظ شناسه‌ها و snapshot موجودی، بخش‌بندی مستقیم تنظیمات صفحهٔ اصلی، فضای مستقل داده‌های مرجع، تغییر مستقیم وضعیت سفارش و اصلاح اعتبارسنجی فیلترهای ادمین آماده شده‌اند. DTO هر مسیر، فیلترهای همان مسیر را همراه صفحه‌بندی می‌پذیرد؛ whitelist سراسری خاموش نشده است. کارت/فیلتر فروشگاه نیز طبق نمونهٔ مالک فشرده و کناری شده‌اند. مالک طرح را دیده و انتشار با ترتیب «VPS، سپس GitHub» را تأیید کرده است؛ [گزارش پذیرش مرحله](frontend/docs/ADMIN_WORKFLOW_20261017.md) شواهد و حدود آزمون را ثبت می‌کند. مجوز انتشار، به‌تنهایی شاهد موفقیت انتشار نیست؛ revision واقعی سرو‌شده باید بررسی شود.
 
 - **واحد بک‌اند (Jest):** آخرین gate انتشار ثبت‌شده **۴۵ سوییت / ۴۳۴ تست** است؛ OTP (هش، سقف‌ها، همزمانی)، جریان `requestOtp`، درایورهای SMS + لاگ `SmsLog`، سخت‌سازی callback پرداخت، cancel/expire اتمیک، سهمیه/تبدیل آپلود، `POST /admin/users`، CSV injection، جستجوها، سبد/پت/آدرس/علاقه‌مندی و ابزارها را پوشش می‌دهد. مرحلهٔ جدید قیمت/سرعت بک‌اند را تغییر نداده و این gate تاریخی را دوباره اجرا نکرده است.
 - **رابط‌ها (Vitest):** در کاندید محلی ۱۳ اکتبر، فرانت‌اند **۵۹ فایل / ۴۲۵ تست** و ادمین **۱۹ فایل / ۱۱۸ تست** پاس شدند؛ lint، TypeScript و build تولیدی نیز پاس شدند. تست‌های ایزولهٔ درخواست‌ها، پذیرش زندهٔ SMS، درگاه یا ذخیرهٔ واقعی دیتابیس محسوب نمی‌شوند.

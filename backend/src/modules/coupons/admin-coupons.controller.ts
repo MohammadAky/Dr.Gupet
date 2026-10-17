@@ -17,7 +17,7 @@ import { CreateCouponDto, UpdateCouponDto } from './dto/admin-coupon.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminCouponListQueryDto } from '../../admin/dto/admin-query.dto';
 
 @ApiTags('Admin - Coupons')
 @Controller('admin/coupons')
@@ -33,16 +33,8 @@ export class AdminCouponsController {
   @Get()
   @ApiOperation({ summary: 'List coupons with usage counts (admin only)' })
   @ApiResponse({ status: 200, description: 'Paginated coupons' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.adminCouponsService.findAllAdmin({
-      ...query,
-      search,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
-    });
+  async findAll(@Query() query: AdminCouponListQueryDto) {
+    return this.adminCouponsService.findAllAdmin(query);
   }
 
   @Get(':id')

@@ -35,6 +35,7 @@ it("never opens admin from a demo URL and leaves theme changes out of cookies", 
 });
 
 it("requires OTP and refuses a non-admin identity", async () => {
+  window.history.replaceState(null, "", "/#references");
   const fetchMock = vi.fn()
     .mockResolvedValueOnce(response({ expiresIn: 120 }))
     .mockResolvedValueOnce(response({ accessToken: "a", refreshToken: "r" }))
@@ -235,13 +236,14 @@ function adminResponses() {
     if (url.includes("/admin/reports/sales")) return Promise.resolve(response(sales));
     if (url.includes("/admin/reports/users")) return Promise.resolve(response({ totals: { users: 5, admins: 2, customers: 3 } }));
     if (url.includes("/admin/orders?")) return Promise.resolve(response({ data: [], meta: { page: 1, totalPages: 0, total: 0, limit: 20 } }));
+    if (/\/admin\/(brands|categories|pet-types|breeds|tags)$/.test(url)) return Promise.resolve(response([]));
     throw new Error(`Unexpected admin request: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
-async function loginAdmin() {
+async function loginAdmin(heading = "نمای کلی") {
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "کد پیامکی" }));
   fireEvent.change(screen.getByLabelText("شمارهٔ موبایل"), { target: { value: "۰۹۱۲۰۰۰۰۰۰۰" } });
@@ -249,7 +251,7 @@ async function loginAdmin() {
   await screen.findByLabelText("کد تأیید");
   fireEvent.change(screen.getByLabelText("کد تأیید"), { target: { value: "۱۲۳۴۵" } });
   fireEvent.click(screen.getByRole("button", { name: "ورود به پنل" }));
-  await screen.findByRole("heading", { name: "نمای کلی" });
+  await screen.findByRole("heading", { name: heading });
 }
 
 it("traps mobile drawer focus, hides the workspace, and restores the menu trigger on close", async () => {
@@ -268,7 +270,7 @@ it("traps mobile drawer focus, hides the workspace, and restores the menu trigge
   expect(workspace.hasAttribute("inert")).toBe(true);
   expect(sidebar.hasAttribute("inert")).toBe(false);
   fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-  expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "محتوای صفحهٔ اصلی" }));
+  expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "داده‌های مرجع" }));
   fireEvent.keyDown(document, { key: "Tab" });
   expect(document.activeElement).toBe(close);
 
@@ -295,6 +297,11 @@ it("opens the authenticated landing editor and protects its actual edits on sect
   await screen.findByRole("heading", { name: "محتوای صفحهٔ اصلی" });
   expect(window.location.hash).toBe("#landing");
   fireEvent.change(screen.getByLabelText("متن اعلان"), { target: { value: "اعلان پیش‌نویس" } });
+  const panes = screen.getByRole("navigation", { name: "بخش‌های ویرایش صفحهٔ اصلی" });
+  fireEvent.click(within(panes).getByRole("button", { name: "بنرها" }));
+  fireEvent.click(within(panes).getByRole("button", { name: "نوار اعلان" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect((screen.getByLabelText("متن اعلان") as HTMLInputElement).value).toBe("اعلان پیش‌نویس");
   fireEvent.click(screen.getByRole("button", { name: "سفارش‌ها" }));
   const dialog = await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
   fireEvent.click(within(dialog).getByRole("button", { name: "بازگشت" }));
@@ -307,6 +314,29 @@ it("opens the authenticated landing editor and protects its actual edits on sect
   fireEvent.click(within(discard).getByRole("button", { name: "کنار گذاشتن تغییرها" }));
   await screen.findByRole("heading", { name: "سفارش‌ها" });
   expect(window.location.hash).toBe("#orders");
+});
+
+it("opens references directly after administrator authentication and guards departure from its draft", async () => {
+  mobileViewport(false);
+  const fetchMock = adminResponses();
+  vi.stubGlobal("scrollTo", vi.fn());
+  window.history.replaceState(null, "", "/#references?token=ignored");
+  await loginAdmin("داده‌های مرجع");
+  await screen.findByRole("button", { name: "ثبت مورد تازه" });
+  expect(window.location.hash).toBe("#references");
+  expect(fetchMock.mock.calls.filter(([url]) => /\/admin\/(brands|categories|pet-types|breeds|tags)$/.test(url))).toHaveLength(5);
+  expect(screen.queryByRole("button", { name: "بازگشت به محصولات" })).toBeNull();
+  fireEvent.change(screen.getByLabelText(/نام \*/ ), { target: { value: "پیش‌نویس مرجع" } });
+  fireEvent.click(screen.getByRole("button", { name: "محتوای صفحهٔ اصلی" }));
+  const dialog = await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "بازگشت" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(window.location.hash).toBe("#references");
+  expect((screen.getByLabelText(/نام \*/) as HTMLInputElement).value).toBe("پیش‌نویس مرجع");
+  fireEvent.click(screen.getByRole("button", { name: "محتوای صفحهٔ اصلی" }));
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" })).getByRole("button", { name: "کنار گذاشتن تغییرها" }));
+  await screen.findByRole("heading", { name: "محتوای صفحهٔ اصلی" });
+  expect(window.location.hash).toBe("#landing");
 });
 
 it("labels operational rows as actions and separates current queues from selected-period customer registrations", async () => {

@@ -59,6 +59,7 @@ function Harness() {
           .catch((error: Error) => setResult(error.message))
       }>parallel</button>
       <button onClick={auth.logout}>logout</button>
+      <button onClick={() => void auth.download("/admin/products/export.csv", { timeoutMs: 70_000 }).then(() => setResult("downloaded")).catch((error: Error) => setResult(error.message))}>download</button>
       <button onClick={() => void auth.loginPassword("kian", "test password").then(() => setResult("ok")).catch((error: Error) => setResult(error.message))}>password login</button>
       <span data-testid="result">{result}</span>
     </div>
@@ -79,6 +80,32 @@ afterEach(() => {
 });
 
 describe("admin identity and browser storage", () => {
+  it("forwards an export timeout through authenticated Blob download and a rotated-token retry", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ accessToken: "export-a", refreshToken: "export-r" }))
+      .mockResolvedValueOnce(response({ id: 1, role: "ADMIN", phone: "09120000000" }))
+      .mockResolvedValueOnce(response(null, 401))
+      .mockResolvedValueOnce(response({ accessToken: "export-next", refreshToken: "export-next-r" }))
+      .mockResolvedValueOnce(new Response("sku,stock\nfood,0", { headers: { "Content-Type": "text/csv" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const timeout = vi.spyOn(window, "setTimeout");
+    try {
+      render(<AuthProvider><Harness /></AuthProvider>);
+      fireEvent.click(screen.getByText("verify"));
+      await waitFor(() => expect(screen.getByTestId("mode").textContent).toBe("admin"));
+      fireEvent.click(screen.getByText("download"));
+      await waitFor(() => expect(screen.getByTestId("result").textContent).toBe("downloaded"));
+      const exports = fetchMock.mock.calls.filter(([url]) => url === "/api/v1/admin/products/export.csv");
+      expect(exports).toHaveLength(2);
+      expect(exports.map(([, options]) => options.headers.Authorization)).toEqual(["Bearer export-a", "Bearer export-next"]);
+      for (const [, options] of exports) {
+        expect(options.headers.Accept).toBe("text/csv"); expect(options.credentials).toBe("omit");
+      }
+      expect(timeout.mock.calls.filter(([, delay]) => delay === 70_000)).toHaveLength(2);
+      expect(timeout.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(3);
+    } finally { timeout.mockRestore(); }
+  });
+
   it("requires the live admin identity gate for password login and keeps credentials and tokens out of storage", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(response({ accessToken: "password-a", refreshToken: "password-r" }))
       .mockResolvedValueOnce(response({ id: 1, username: "kian", phone: "09120000000", role: "ADMIN" }));

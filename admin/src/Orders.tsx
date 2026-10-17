@@ -18,6 +18,7 @@ import {
 } from "./management";
 import { parseAdminLocation } from "./navigation";
 import "./management.css";
+import "./order-status-editor.css";
 
 type OrderStatus =
   | "PENDING_PAYMENT"
@@ -75,11 +76,17 @@ const labels: Record<OrderStatus, string> = {
   DELIVERED: "تحویل‌شده",
   CANCELED: "لغوشده",
 };
-const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = {
-  PAID: "PROCESSING",
-  PROCESSING: "SHIPPED",
-  SHIPPED: "DELIVERED",
-};
+const fulfillment = ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"];
+function statusRestriction(order: Pick<OrderDetail, "status" | "refundedAt">, target: OrderStatus): string | null {
+  if (target === order.status) return "وضعیت فعلی";
+  if (target === "PENDING_PAYMENT") return "فقط هنگام ثبت سفارش";
+  if (target === "PAID") return "فقط با تأیید پرداخت";
+  if (target === "CANCELED") return order.status === "PENDING_PAYMENT" ? null : "فقط پیش از پرداخت";
+  if (order.refundedAt) return "استرداد ثبت شده است";
+  if (order.status === "PENDING_PAYMENT") return "نیازمند پرداخت موفق";
+  if (!fulfillment.includes(order.status) || order.status === "DELIVERED") return "وضعیت نهایی است";
+  return fulfillment.indexOf(target) > fulfillment.indexOf(order.status) ? null : "بازگشت به مرحلهٔ قبلی مجاز نیست";
+}
 const name = (person: Person) =>
   [person.firstName, person.lastName].filter(Boolean).join(" ") || person.phone;
 
@@ -103,6 +110,7 @@ export function Orders() {
   const [shippingMethod, setShippingMethod] = useState("");
   const [note, setNote] = useState("");
   const [refundNote, setRefundNote] = useState("");
+  const [statusChoice, setStatusChoice] = useState<{ orderId: number; value: OrderStatus } | null>(null);
   const query = useMemo(() => {
     const q = new URLSearchParams({ page: String(page), limit: "20" });
     if (applied) q.set("search", applied);
@@ -148,6 +156,7 @@ export function Orders() {
       await request(path, { method, body });
       if (!mounted.current) return;
       draftOwners.forEach(markFormSaved);
+      if (version === selectionVersion.current && (path.endsWith('/transition') || path.endsWith('/cancel'))) setStatusChoice(null);
       setRevision((value) => value + 1);
       if (version === selectionVersion.current) setMessage(success);
     } catch (problem) {
@@ -162,6 +171,7 @@ export function Orders() {
     setApplied(search.trim());
   }
   const order = detail.data;
+  const chosenStatus = order && statusChoice?.orderId === order.id ? statusChoice.value : order?.status ?? "PENDING_PAYMENT";
   const address =
     order?.addressSnapshot && typeof order.addressSnapshot === "object"
       ? (order.addressSnapshot as Record<string, unknown>)
@@ -239,6 +249,7 @@ export function Orders() {
                           onClick={(event) => {
                             revealDetail(event.currentTarget);
                             setSelected(item.id);
+                            setStatusChoice(null);
                             selectionVersion.current += 1; setError(""); setMessage("");
                             setMessage("");
                             setError("");
@@ -259,8 +270,12 @@ export function Orders() {
       {selected && (
         <section ref={detailPanelRef} tabIndex={-1} className="manage-card" aria-label="جزئیات سفارش">
           <div className="manage-actions">
-            <button type="button" onClick={async (event) => { if (await discardDrafts(event.currentTarget.closest("section"))) { selectionVersion.current += 1; setSelected(null); restoreDetail(); } }}>
+            <button type="button" onClick={async (event) => { if (await discardDrafts(event.currentTarget.closest("section"))) { selectionVersion.current += 1; setStatusChoice(null); setSelected(null); restoreDetail(); } }}>
               بستن جزئیات
+            </button>
+            <button type="button" data-draft-keep disabled={busy || detail.loading}
+              onClick={async event => { if (await discardDrafts(event.currentTarget.closest("section"))) { setStatusChoice(null); setRevision(value => value + 1); } }}>
+              تازه‌سازی جزئیات
             </button>
           </div>
           <QueryState
@@ -351,48 +366,46 @@ export function Orders() {
               </div>
               <Notice message={error} />
               <Notice message={message} kind="success" />
-              {nextStatus[order.status] && (
-                <div className="manage-actions">
-                  <button
-                    className="manage-primary"
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      void mutate(
-                        `/admin/orders/${order.id}/transition`,
-                        "PATCH",
-                        {
-                          to: nextStatus[order.status],
-                          ...(order.status === "PROCESSING"
-                            ? {
-                                trackingCode: trackingCode.trim() || undefined,
-                                shippingMethod:
-                                  shippingMethod.trim() || undefined,
-                              }
-                            : {}),
-                          ...(order.status === "PAID" && note.trim()
-                            ? { note: note.trim() }
-                            : {}),
-                        },
-                        `وضعیت به ${labels[nextStatus[order.status]!]} تغییر کرد.`,
-                      )
-                    }
-                  >
-                    انتقال به {labels[nextStatus[order.status]!]}
-                  </button>
+              <div className="order-status-editor" data-draft-editor>
+                <h3>تغییر وضعیت سفارش</h3>
+                <div className="manage-form">
+                  <label>وضعیت جدید سفارش
+                    <select name="to" value={chosenStatus} disabled={busy || detail.loading}
+                      aria-describedby="order-status-policy" onChange={event => setStatusChoice({ orderId: order.id, value: event.target.value as OrderStatus })}>
+                      {(Object.entries(labels) as Array<[OrderStatus, string]>).map(([value, label]) => {
+                        const reason = statusRestriction(order, value);
+                        return <option key={value} value={value} disabled={reason !== null}>{label}{reason ? ` — ${reason}` : ""}</option>;
+                      })}
+                    </select>
+                  </label>
+                  {chosenStatus === "PROCESSING" && statusRestriction(order, chosenStatus) === null && <label>یادداشت پردازش
+                    <input name="note" value={note} disabled={busy} onChange={event => setNote(event.target.value)} />
+                  </label>}
+                  {chosenStatus === "CANCELED" && order.status === "PENDING_PAYMENT" && <label>دلیل لغو
+                    <input name="note" value={note} disabled={busy} onChange={event => setNote(event.target.value)} />
+                  </label>}
                 </div>
-              )}
-              {order.status === "PAID" && (
-                <label className="manage-form">
-                  یادداشت پردازش
-                  <input
-                    value={note}
-                    name="note"
-                    disabled={busy}
-                    onChange={(event) => setNote(event.target.value)}
-                  />
-                </label>
-              )}
+                <p id="order-status-policy">پرداخت فقط با تأیید درگاه ثبت می‌شود؛ لغو فقط پیش از پرداخت است. مراحل بعدی آماده‌سازی، ارسال و تحویل را می‌توانید مستقیم انتخاب کنید.</p>
+                {order.refundedAt && <p className="order-status-editor__locked" role="status">استرداد ثبت شده است؛ تغییر وضعیت آماده‌سازی، ارسال و تحویل مجاز نیست.</p>}
+                <div className="manage-actions">
+                  <button type="button" className={chosenStatus === "CANCELED" ? "manage-danger" : "manage-primary"}
+                    disabled={busy || detail.loading || statusRestriction(order, chosenStatus) !== null}
+                    onClick={() => {
+                      if (detail.loading || statusRestriction(order, chosenStatus) !== null) return;
+                      if (chosenStatus === "CANCELED") {
+                        void mutate(`/admin/orders/${order.id}/cancel`, "POST",
+                          { reason: note.trim() || undefined, expectedStatus: order.status }, "سفارش لغو شد.",
+                          `سفارش ${order.orderNumber} لغو و موجودی آن آزاد شود؟`);
+                      } else {
+                        void mutate(`/admin/orders/${order.id}/transition`, "PATCH", {
+                          to: chosenStatus, expectedStatus: order.status,
+                          ...(chosenStatus === "SHIPPED" ? { trackingCode: trackingCode.trim() || undefined, shippingMethod: shippingMethod.trim() || undefined } : {}),
+                          ...(chosenStatus === "PROCESSING" && note.trim() ? { note: note.trim() } : {}),
+                        }, `وضعیت به ${labels[chosenStatus]} تغییر کرد.`);
+                      }
+                    }}>ثبت وضعیت</button>
+                </div>
+              </div>
               {(["PAID", "PROCESSING", "SHIPPED"] as OrderStatus[]).includes(
                 order.status,
               ) && (
@@ -441,35 +454,6 @@ export function Orders() {
                       ثبت رهگیری
                     </button>
                   </div>
-                </div>
-              )}
-              {order.status === "PENDING_PAYMENT" && (
-                <div className="manage-actions">
-                  <button
-                    className="manage-danger"
-                    disabled={busy}
-                    type="button"
-                    onClick={() =>
-                      void mutate(
-                        `/admin/orders/${order.id}/cancel`,
-                        "POST",
-                        { reason: note.trim() || undefined },
-                        "سفارش لغو شد.",
-                        `سفارش ${order.orderNumber} لغو و موجودی آن آزاد شود؟`,
-                      )
-                    }
-                  >
-                    لغو سفارش
-                  </button>
-                  <label>
-                    دلیل لغو
-                    <input
-                      value={note}
-                      name="note"
-                      disabled={busy}
-                      onChange={(event) => setNote(event.target.value)}
-                    />
-                  </label>
                 </div>
               )}
               {order.payments.some((payment) => payment.status === "SUCCESS") &&

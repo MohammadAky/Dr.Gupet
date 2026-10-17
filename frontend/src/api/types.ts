@@ -157,6 +157,8 @@ export interface ProductCard {
   name: string;
   slug: string;
   brand: { id: number; name: string };
+  /** Older responses may omit the animal type; never infer it from product text. */
+  petType?: { id: number; name: string; slug?: string };
   image: string | null;
   minPrice: number;
   /** Gallery position 1 selected by the administrator; old API versions may omit it. */

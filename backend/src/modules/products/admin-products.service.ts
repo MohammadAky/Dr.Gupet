@@ -57,7 +57,7 @@ export class AdminProductsService {
     }
   }
 
-  private async assertPublishableReferences(
+  async assertPublishableReferences(
     tx: Prisma.TransactionClient,
     data: {
       brandId: number;

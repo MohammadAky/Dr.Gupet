@@ -28,3 +28,7 @@ it("restores the scoped landing editor without carrying unknown query data", () 
     "#landing",
   );
 });
+
+it("opens the independent reference workspace without carrying credentials or product filters", () => {
+  expect(parseAdminLocation("#references?active=false&token=private").canonical).toBe("#references");
+});

@@ -16,7 +16,7 @@ import { MedicinesService } from './medicines.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminMedicineListQueryDto } from '../../admin/dto/admin-query.dto';
 
 @ApiTags('Admin - Medicines')
 @Controller('admin/medicines')
@@ -31,16 +31,8 @@ export class AdminMedicinesController {
 
   @Get()
   @ApiOperation({ summary: 'List medicines incl. inactive (admin only)' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('q') q?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.medicinesService.findAllAdmin({
-      ...query,
-      q,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
-    });
+  async findAll(@Query() query: AdminMedicineListQueryDto) {
+    return this.medicinesService.findAllAdmin(query);
   }
 
   @Get(':id')

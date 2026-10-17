@@ -4,11 +4,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStockService } from './order-stock.service';
 import { AppException } from '../../common/filters/all-exceptions.filter';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
+import { Prisma } from '@prisma/client';
+import { ORDER_STATUSES } from './dto/admin-order.dto';
 
 /** Allowed admin transitions: from -> to[] */
 const TRANSITIONS: Record<string, string[]> = {
-  PAID: ['PROCESSING'],
-  PROCESSING: ['SHIPPED'],
+  PAID: ['PROCESSING', 'SHIPPED', 'DELIVERED'],
+  PROCESSING: ['SHIPPED', 'DELIVERED'],
   SHIPPED: ['DELIVERED'],
 };
 
@@ -40,6 +42,24 @@ export class AdminOrdersService {
     private prisma: PrismaService,
     private orderStockService: OrderStockService,
   ) {}
+
+  private staleOrder() {
+    return new AppException(
+      'ORDER_STALE_STATE',
+      'وضعیت سفارش تغییر کرده است؛ جزئیات را تازه‌سازی و دوباره بررسی کنید',
+      409,
+    );
+  }
+
+  private assertExpectedStatus(status: string, expectedStatus?: string) {
+    if (
+      expectedStatus !== undefined &&
+      !(ORDER_STATUSES as readonly string[]).includes(expectedStatus)
+    ) {
+      throw new AppException('VALIDATION_ERROR', 'وضعیت مورد انتظار معتبر نیست', 400);
+    }
+    if (expectedStatus !== undefined && expectedStatus !== status) throw this.staleOrder();
+  }
 
   /**
    * List all orders (admin) with filters
@@ -120,47 +140,51 @@ export class AdminOrdersService {
   }
 
   /**
-   * Admin state machine: PAID -> PROCESSING -> SHIPPED -> DELIVERED
+   * Direct forward fulfillment only; payment, cancellation and refund stay separate.
    */
   async transition(
     id: number,
-    data: { to: string; trackingCode?: string; shippingMethod?: string; note?: string },
+    data: {
+      to: string;
+      expectedStatus?: string;
+      trackingCode?: string;
+      shippingMethod?: string;
+      note?: string;
+    },
   ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true },
-    });
-
-    if (!order) {
-      throw new NotFoundException('سفارش یافت نشد');
-    }
-
-    const allowed = TRANSITIONS[order.status] || [];
-    if (!allowed.includes(data.to)) {
-      throw new AppException(
-        'ORDER_INVALID_STATE',
-        `گذار از وضعیت ${order.status} به ${data.to} مجاز نیست`,
-        400,
-      );
-    }
-
-    const updateData: any = { status: data.to };
-    if (data.to === 'PROCESSING' && data.note) {
-      updateData.note = data.note;
-    }
-    if (data.to === 'SHIPPED') {
-      updateData.shippedAt = new Date();
-      if (data.trackingCode != null) updateData.trackingCode = data.trackingCode;
-      if (data.shippingMethod != null) updateData.shippingMethod = data.shippingMethod;
-    }
-    if (data.to === 'DELIVERED') {
-      updateData.deliveredAt = new Date();
-    }
-
-    return this.prisma.order.update({
-      where: { id },
-      data: updateData,
-      include: ADMIN_ORDER_INCLUDE,
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id } });
+      if (!order) throw new NotFoundException('سفارش یافت نشد');
+      this.assertExpectedStatus(order.status, data.expectedStatus);
+      if (order.refundedAt) {
+        throw new AppException(
+          'ORDER_INVALID_STATE',
+          'پس از ثبت استرداد، آماده‌سازی، ارسال و تحویل سفارش مجاز نیست',
+          400,
+        );
+      }
+      if (!(TRANSITIONS[order.status] || []).includes(data.to)) {
+        throw new AppException(
+          'ORDER_INVALID_STATE',
+          'فقط تغییر مستقیم به مراحل بعدی آماده‌سازی، ارسال و تحویل مجاز است',
+          400,
+        );
+      }
+      const updateData: Prisma.OrderUpdateManyMutationInput = { status: data.to };
+      if (data.to === 'PROCESSING' && data.note) updateData.note = data.note;
+      if (data.to === 'SHIPPED') {
+        updateData.shippedAt = new Date();
+        if (data.trackingCode != null) updateData.trackingCode = data.trackingCode;
+        if (data.shippingMethod != null) updateData.shippingMethod = data.shippingMethod;
+      }
+      // A direct delivery records delivery only; skipped intermediate events are unknown.
+      if (data.to === 'DELIVERED') updateData.deliveredAt = new Date();
+      const claimed = await tx.order.updateMany({
+        where: { id, status: order.status, refundedAt: null },
+        data: updateData,
+      });
+      if (claimed.count !== 1) throw this.staleOrder();
+      return tx.order.findUniqueOrThrow({ where: { id }, include: ADMIN_ORDER_INCLUDE });
     });
   }
 
@@ -189,25 +213,27 @@ export class AdminOrdersService {
   /**
    * Cancel a PENDING_PAYMENT order (admin) — releases stock like the user cancel flow
    */
-  async cancel(id: number, reason?: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true },
-    });
-
-    if (!order) {
-      throw new NotFoundException('سفارش یافت نشد');
-    }
-
-    if (order.status !== 'PENDING_PAYMENT') {
-      throw new AppException(
-        'ORDER_INVALID_STATE',
-        'فقط سفارش‌های در انتظار پرداخت قابل لغو هستند',
-        400,
-      );
-    }
-
+  async cancel(id: number, reason?: string, expectedStatus?: string) {
     return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id }, include: { items: true } });
+      if (!order) throw new NotFoundException('سفارش یافت نشد');
+      this.assertExpectedStatus(order.status, expectedStatus);
+      if (order.status !== 'PENDING_PAYMENT') {
+        throw new AppException(
+          'ORDER_INVALID_STATE',
+          'فقط سفارش‌های در انتظار پرداخت قابل لغو هستند',
+          400,
+        );
+      }
+      // Claim before releasing stock/coupon: only one admin, customer or expiry can win.
+      const claimed = await tx.order.updateMany({
+        where: { id, status: 'PENDING_PAYMENT' },
+        data: {
+          status: 'CANCELED',
+          note: reason ? `${order.note ? order.note + ' | ' : ''}لغو ادمین: ${reason}` : order.note,
+        },
+      });
+      if (claimed.count !== 1) throw this.staleOrder();
       await this.orderStockService.release(
         tx,
         order.items.map((item) => ({
@@ -220,14 +246,7 @@ export class AdminOrdersService {
         await tx.couponRedemption.deleteMany({ where: { orderId: order.id } });
       }
 
-      return tx.order.update({
-        where: { id },
-        data: {
-          status: 'CANCELED',
-          note: reason ? `${order.note ? order.note + ' | ' : ''}لغو ادمین: ${reason}` : order.note,
-        },
-        include: ADMIN_ORDER_INCLUDE,
-      });
+      return tx.order.findUniqueOrThrow({ where: { id }, include: ADMIN_ORDER_INCLUDE });
     });
   }
 

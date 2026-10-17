@@ -24,7 +24,7 @@ interface AuthValue {
   loginPassword(username: string, password: string): Promise<void>;
   read<T>(path: string): Promise<T>;
   request<T>(path: string, options?: Omit<Options, "token">): Promise<T>;
-  download(path: string): Promise<Blob>;
+  download(path: string, options?: Pick<Options, "timeoutMs">): Promise<Blob>;
   logout(): void;
 }
 
@@ -127,8 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return request<T>(path);
   }
 
-  function download(path: string): Promise<Blob> {
-    return request<Blob>(path, { responseType: "blob" });
+  function download(path: string, options: Pick<Options, "timeoutMs"> = {}): Promise<Blob> {
+    return request<Blob>(path, { ...options, responseType: "blob" });
   }
 
   function logout() {

@@ -17,6 +17,7 @@ export const sidebarGroups: Array<{ title: string; items: Array<{ id: AdminSecti
     { id: "audit", label: "لاگ تغییرات", index: "۰۹" },
     { id: "settings", label: "تنظیمات", index: "۱۰" },
     { id: "landing", label: "محتوای صفحهٔ اصلی", index: "۱۱" },
+    { id: "references", label: "داده‌های مرجع", index: "۱۲" },
   ] },
 ];
 

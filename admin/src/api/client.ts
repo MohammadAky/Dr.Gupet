@@ -41,14 +41,19 @@ export interface Options {
   formData?: FormData;
   withMeta?: boolean;
   responseType?: "json" | "blob";
+  timeoutMs?: number;
 }
 
 export async function apiRequest<T>(
   path: string,
   options: Options = {},
 ): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 70_000) {
+    throw new ApiError("زمان انتظار درخواست معتبر نیست.", 0, "INVALID_TIMEOUT");
+  }
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 15_000);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? "GET",

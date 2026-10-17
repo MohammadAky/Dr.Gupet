@@ -26,7 +26,7 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminProductListQueryDto } from '../../admin/dto/admin-query.dto';
 import { ImportProductsDto } from './dto/import-products.dto';
 import { ProductsImportService } from './products-import.service';
 
@@ -45,22 +45,8 @@ export class AdminProductsController {
   @Get()
   @ApiOperation({ summary: 'List products incl. inactive (admin only)' })
   @ApiResponse({ status: 200, description: 'Paginated products' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-    @Query('brandId') brandId?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('petTypeId') petTypeId?: string,
-  ) {
-    return this.adminProductsService.findAllAdmin({
-      ...query,
-      search,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
-      brandId: brandId ? Number(brandId) : undefined,
-      categoryId: categoryId ? Number(categoryId) : undefined,
-      petTypeId: petTypeId ? Number(petTypeId) : undefined,
-    });
+  async findAll(@Query() query: AdminProductListQueryDto) {
+    return this.adminProductsService.findAllAdmin(query);
   }
 
   @Post('import')

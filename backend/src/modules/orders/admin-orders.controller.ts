@@ -15,7 +15,7 @@ import { AdminOrdersService } from './admin-orders.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminOrderListQueryDto } from '../../admin/dto/admin-query.dto';
 import {
   TransitionOrderDto,
   SetTrackingDto,
@@ -37,22 +37,8 @@ export class AdminOrdersController {
   @Get()
   @ApiOperation({ summary: 'List all orders with filters (admin only)' })
   @ApiResponse({ status: 200, description: 'Paginated orders' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('status') status?: string,
-    @Query('search') search?: string,
-    @Query('userId') userId?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.adminOrdersService.findAllAdmin({
-      ...query,
-      status,
-      search,
-      userId: userId ? Number(userId) : undefined,
-      from,
-      to,
-    });
+  async findAll(@Query() query: AdminOrderListQueryDto) {
+    return this.adminOrdersService.findAllAdmin(query);
   }
 
   @Get(':id')
@@ -64,9 +50,10 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/transition')
-  @ApiOperation({ summary: 'Move order through PAID→PROCESSING→SHIPPED→DELIVERED (admin only)' })
+  @ApiOperation({ summary: 'Move directly forward through fulfillment after payment (admin only)' })
   @ApiResponse({ status: 200, description: 'Order transitioned' })
   @ApiResponse({ status: 400, description: 'Illegal transition' })
+  @ApiResponse({ status: 409, description: 'Order changed since the reviewed state' })
   async transition(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: TransitionOrderDto,
@@ -108,12 +95,13 @@ export class AdminOrdersController {
   @ApiOperation({ summary: 'Cancel a PENDING_PAYMENT order and release stock (admin only)' })
   @ApiResponse({ status: 200, description: 'Order canceled' })
   @ApiResponse({ status: 400, description: 'Only PENDING_PAYMENT orders can be canceled' })
+  @ApiResponse({ status: 409, description: 'Another order operation already claimed the state' })
   async cancel(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CancelOrderDto,
     @Req() req: any,
   ) {
-    const order = await this.adminOrdersService.cancel(id, dto.reason);
+    const order = await this.adminOrdersService.cancel(id, dto.reason, dto.expectedStatus);
     await this.auditService.record({
       adminId: req.user.sub,
       action: 'STATUS_CHANGE',

@@ -1,3 +1,4 @@
+import { AdminPetReferenceListQueryDto } from '../../admin/dto/admin-query.dto';
 import {
   Controller,
   Get,
@@ -30,14 +31,10 @@ export class AdminBreedsController {
 
   @Get()
   @ApiOperation({ summary: 'List breeds incl. inactive (admin only)' })
-  async findAll(
-    @Query('petTypeId') petTypeId?: string,
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.breedsService.findAllAdmin(petTypeId ? Number(petTypeId) : undefined, {
-      search,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
+  async findAll(@Query() query: AdminPetReferenceListQueryDto) {
+    return this.breedsService.findAllAdmin(query.petTypeId, {
+      search: query.search,
+      isActive: query.isActive,
     });
   }
 

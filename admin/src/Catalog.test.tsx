@@ -67,6 +67,24 @@ it("sends one confirmed row DELETE and refetches the list while duplicate action
   expect(screen.queryByRole("button", { name: "حذف محصول ثبت‌شده" })).toBeNull();
 });
 
+it("keeps the table visible while refreshing after a confirmed row deletion", async () => {
+  let reads = 0; let finishRefresh: ((value: unknown) => void) | undefined;
+  const initial = page(); initial.data.push({ ...initial.data[0]!, id: 2, name: "محصول باقی‌مانده" });
+  requestMock.mockImplementation((path: string, options?: {method?: string}) => {
+    if (path.startsWith("/admin/products?")) return ++reads === 1 ? Promise.resolve(initial) : new Promise(resolve => { finishRefresh = resolve; });
+    if (options?.method === "DELETE") return Promise.resolve({deleted: true, deactivated: false});
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  fireEvent.click(await screen.findByRole("button", {name: "حذف محصول ثبت‌شده"}));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", {name: "حذف محصول"}));
+  await waitFor(() => expect(reads).toBe(2));
+  expect(screen.getByText("محصول باقی‌مانده")).toBeTruthy();
+  expect(screen.queryByText("در حال دریافت محصولات…")).toBeNull();
+  await act(async () => finishRefresh?.({ ...initial, data: [initial.data[1]] }));
+  expect(screen.getByText("محصول باقی‌مانده")).toBeTruthy();
+});
+
 it("preserves the row and unlocks actions after a row deletion fails", async () => {
   requestMock.mockImplementation((path: string, options?: { method?: string }) => {
     if (path.startsWith("/admin/products?")) return Promise.resolve(page());
@@ -135,7 +153,7 @@ it("returns to the previous page after deleting its last product without losing 
   expect(requestMock).toHaveBeenLastCalledWith("/admin/products?page=1&limit=12&search=%D8%BA%D8%B0%D8%A7&isActive=true", { withMeta: true });
 });
 
-it("keeps product and reference editors unavailable until their reference data is ready", async () => {
+it("keeps product editors unavailable until references are ready and moves reference management outside Catalog", async () => {
   let resolveBrands: ((value: unknown) => void) | undefined;
   requestMock.mockImplementation((path: string) => {
     if (path.startsWith("/admin/products?")) return Promise.resolve(page());
@@ -144,15 +162,13 @@ it("keeps product and reference editors unavailable until their reference data i
   });
   render(<Catalog />);
   const create = screen.getByRole("button", { name: "+ ثبت محصول" }) as HTMLButtonElement;
-  const references = screen.getByRole("button", { name: "داده‌های مرجع" }) as HTMLButtonElement;
   expect(create.disabled).toBe(true);
-  expect(references.disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "داده‌های مرجع" })).toBeNull();
   expect((screen.getByRole("button", { name: "ورود از CSV" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("در حال دریافت داده‌های مرجع…")).toBeTruthy();
   await waitFor(() => expect(resolveBrands).toBeTypeOf("function"));
   await act(async () => { resolveBrands?.([]); });
   expect(create.disabled).toBe(false);
-  expect(references.disabled).toBe(false);
   fireEvent.click(create);
   expect(screen.getByRole("heading", { name: "ثبت محصول" })).toBeTruthy();
 });
@@ -168,6 +184,53 @@ it("opens the separate CSV review screen after references are ready without writ
   expect(requestMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "بازگشت به محصولات" }));
   expect(screen.getByRole("heading", { name: "محصولات" })).toBeTruthy();
+});
+
+it("opens export with applied filters instead of an unsubmitted search draft and keeps the list context", async () => {
+  requestMock.mockImplementation((path: string) => path.startsWith("/admin/products?") ? Promise.resolve(page()) : Promise.resolve([]));
+  render(<Catalog />);
+  await screen.findByText("محصول ثبت‌شده");
+  const search = screen.getByRole("textbox", { name: "جستجوی محصول" });
+  fireEvent.change(search, { target: { value: "غذا" } });
+  fireEvent.click(screen.getByRole("button", { name: "جستجو" }));
+  fireEvent.click(screen.getByRole("button", { name: "فعال" }));
+  await waitFor(() => expect(requestMock).toHaveBeenCalledWith(expect.stringContaining("isActive=true"), { withMeta: true }));
+  fireEvent.change(search, { target: { value: "جستجوی ثبت‌نشده" } });
+  fireEvent.click(screen.getByRole("button", { name: "خروجی CSV" }));
+  expect(screen.getByText("جستجو: غذا · فعال")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "خروجی محصولات" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "بازگشت به محصولات" }));
+  expect((screen.getByRole("textbox", { name: "جستجوی محصول" }) as HTMLInputElement).value).toBe("جستجوی ثبت‌نشده");
+  expect(screen.queryByRole("button", { name: "داده‌های مرجع" })).toBeNull();
+});
+
+it("retains sync success while products and references refresh after an accepted batch", async () => {
+  let saved = false;
+  let resolveBrands: ((value: unknown) => void) | undefined;
+  const normalized = { variantId: 8, productId: 7, stock: 0, expectedStock: 5, expectedUpdatedAt: "2026-10-17T12:00:00Z" };
+  const totals = { created: 0, updated: 1, unchanged: 0, variantsAdded: 0 };
+  requestMock.mockImplementation((path: string) => {
+    if (path.startsWith("/admin/products?")) return Promise.resolve(page());
+    if (path === "/admin/products/sync/preview") return Promise.resolve({ rows: [{ line: 2, action: "update", data: normalized, changes: [{ field: "stock", before: 5, after: 0 }] }], totals });
+    if (path === "/admin/products/sync") { saved = true; return Promise.resolve(totals); }
+    if (path === "/admin/brands" && saved) return new Promise(resolve => { resolveBrands = resolve; });
+    return Promise.resolve([]);
+  });
+  render(<Catalog />);
+  await screen.findByText("محصول ثبت‌شده");
+  fireEvent.click(screen.getByRole("button", { name: "به‌روزرسانی با CSV" }));
+  const source = "variantId,stock\n8,0";
+  const selected = new File([source], "stock.csv", { type: "text/csv" });
+  Object.defineProperty(selected, "text", { value: () => Promise.resolve(source) });
+  await act(async () => fireEvent.change(screen.getByLabelText("فایل CSV"), { target: { files: [selected] } }));
+  fireEvent.click(screen.getByRole("button", { name: "بررسی تغییرات" }));
+  fireEvent.click(await screen.findByRole("button", { name: "تأیید و ثبت تغییرات" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "ثبت تغییرات CSV" }));
+  await waitFor(() => expect(resolveBrands).toBeTypeOf("function"));
+  expect(screen.getByText("تغییرات ثبت شد.")).toBeTruthy();
+  expect(requestMock.mock.calls.filter(([path]) => path.startsWith("/admin/products?"))).toHaveLength(2);
+  await act(async () => resolveBrands?.([]));
+  expect(screen.getByText("تغییرات ثبت شد.")).toBeTruthy();
 });
 
 it("refreshes imported brands and categories for the next product editor while retaining import success", async () => {

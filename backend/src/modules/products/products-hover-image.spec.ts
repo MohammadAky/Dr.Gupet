@@ -150,6 +150,7 @@ describe('Real second-image public card contract', () => {
       slug: 'food',
       isActive: true,
       brand: {},
+      petType: { id: 3, name: 'پرنده', slug: 'bird' },
       images,
       variants: [{ price: 123456, compareAtPrice: null, stock: 5 }],
       lifeStage: 'ALL',
@@ -188,6 +189,7 @@ describe('Real second-image public card contract', () => {
         image: '/uploads/main.webp',
         hoverImage: '/uploads/chosen.webp',
         minPrice: 123456,
+        petType: { id: 3, name: 'پرنده', slug: 'bird' },
       });
     }
     for (const call of h.prisma.product.findMany.mock.calls) {

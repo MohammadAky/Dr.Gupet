@@ -6,9 +6,11 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import * as helmet from 'helmet';
 import { AppModule } from './app.module';
 import { uploadStaticHeaders } from './upload/upload-static-headers';
+import { productSyncJson } from './modules/products/sync-body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.use('/api/v1/admin/products/sync', productSyncJson());
 
   const configService = app.get(ConfigService);
 

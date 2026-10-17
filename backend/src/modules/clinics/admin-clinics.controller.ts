@@ -16,7 +16,7 @@ import { ClinicsService } from './clinics.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminClinicListQueryDto } from '../../admin/dto/admin-query.dto';
 
 @ApiTags('Admin - Clinics')
 @Controller('admin/clinics')
@@ -63,22 +63,8 @@ export class AdminClinicsController {
   @Get()
   @ApiOperation({ summary: 'List all clinics for admin (including inactive)' })
   @ApiResponse({ status: 200, description: 'Paginated clinics' })
-  async findAllAdmin(
-    @Query() query: PaginationQueryDto,
-    @Query('q') q?: string,
-    @Query('city') city?: string,
-    @Query('province') province?: string,
-    @Query('isActive') isActive?: string,
-    @Query('isVerified') isVerified?: string,
-  ) {
-    return this.clinicsService.findAllAdmin({
-      ...query,
-      q,
-      city,
-      province,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
-      isVerified: isVerified === undefined ? undefined : isVerified === 'true',
-    });
+  async findAllAdmin(@Query() query: AdminClinicListQueryDto) {
+    return this.clinicsService.findAllAdmin(query);
   }
 
   @Get(':id')

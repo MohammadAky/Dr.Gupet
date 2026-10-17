@@ -2,7 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { AdminSmsListQueryDto } from '../admin/dto/admin-query.dto';
 import { SmsLogsService } from './sms-logs.service';
 
 @ApiTags('Admin - SMS logs')
@@ -15,12 +15,7 @@ export class AdminSmsLogsController {
 
   @Get('logs')
   @ApiOperation({ summary: 'SMS delivery log (OTP/notifications) with filters' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('phone') phone?: string,
-    @Query('kind') kind?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.smsLogsService.findAllAdmin({ ...query, phone, kind, status });
+  async findAll(@Query() query: AdminSmsListQueryDto) {
+    return this.smsLogsService.findAllAdmin(query);
   }
 }

@@ -1,0 +1,14 @@
+.order-status-editor {
+  min-width: 0;
+  margin-block: 22px;
+  padding-block-start: 20px;
+  border-block-start: 1px solid var(--line);
+}
+.order-status-editor h3 { margin: 0 0 14px; color: var(--title); font-size: 16px; }
+.order-status-editor p { max-width: 74ch; margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.9; }
+.order-status-editor .manage-form { align-items: end; }
+.order-status-editor .manage-form label { min-width: 0; }
+.order-status-editor select { min-width: 0; }
+.order-status-editor option:disabled { color: var(--muted); }
+.order-status-editor .manage-actions { margin-block-start: 12px; }
+.order-status-editor .order-status-editor__locked { font-weight: 700; color: var(--ink); }

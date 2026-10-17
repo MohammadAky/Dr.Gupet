@@ -1,3 +1,4 @@
+import { AdminTagListQueryDto } from '../../admin/dto/admin-query.dto';
 import {
   Controller,
   Get,
@@ -30,14 +31,10 @@ export class AdminTagsController {
 
   @Get()
   @ApiOperation({ summary: 'List tags with usage counts (admin only)' })
-  async findAll(
-    @Query('type') type?: string,
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.tagsService.findAllAdmin(type, {
-      search,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
+  async findAll(@Query() query: AdminTagListQueryDto) {
+    return this.tagsService.findAllAdmin(query.type, {
+      search: query.search,
+      isActive: query.isActive,
     });
   }
 

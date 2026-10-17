@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { AuditService } from './audit.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminAuditListQueryDto } from '../dto/admin-query.dto';
 
 @ApiTags('Admin - Audit')
 @Controller('admin/audit-logs')
@@ -16,17 +16,7 @@ export class AuditController {
   @Get()
   @ApiOperation({ summary: 'List admin audit logs (admin only)' })
   @ApiResponse({ status: 200, description: 'Paginated audit logs' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('entity') entity?: string,
-    @Query('action') action?: string,
-    @Query('adminId') adminId?: string,
-  ) {
-    return this.auditService.findAll({
-      ...query,
-      entity,
-      action,
-      adminId: adminId ? Number(adminId) : undefined,
-    });
+  async findAll(@Query() query: AdminAuditListQueryDto) {
+    return this.auditService.findAll(query);
   }
 }

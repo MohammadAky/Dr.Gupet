@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   landingSample,
   landingSectionOrder,
@@ -20,6 +20,17 @@ import "./landing-content.css";
 const cloneSample = (): Content =>
   JSON.parse(JSON.stringify(landingSample)) as Content;
 const number = new Intl.NumberFormat("fa-IR");
+const landingPanes = [
+  { id: "announcement", label: "نوار اعلان" },
+  { id: "banners", label: "بنرها" },
+  { id: "ranking", label: "معیار پرفروش‌ترین‌ها" },
+  { id: "products", label: "محصولات" },
+  { id: "clinics", label: "کلینیک‌ها" },
+  { id: "pharmacies", label: "داروخانه‌ها" },
+  { id: "medicines", label: "داروها" },
+] as const;
+type LandingPane = (typeof landingPanes)[number]["id"];
+type SectionPane = keyof Content["sections"];
 type LocalImage = { file: File; url: string; name: string };
 const internalHref = (value: unknown): value is string =>
   typeof value === "string" && value !== "" && safeLandingLink(value);
@@ -87,6 +98,10 @@ export function validateLandingImport(value: unknown): value is Content {
 }
 
 export function LandingContent() {
+  const [pane, setPane] = useState<LandingPane>("announcement");
+  const [sectionPane, setSectionPane] = useState<SectionPane>("products");
+  const [selectedItems, setSelectedItems] = useState<Partial<Record<SectionPane, string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string> | null>(null);
   const [content, setContent] = useState<Content>(cloneSample);
   const [selected, setSelected] = useState(landingSample.slides[0]?.id ?? "");
   const [localImages, setLocalImages] = useState<Record<string, LocalImage>>(
@@ -111,6 +126,18 @@ export function LandingContent() {
   const mobileSource =
     localImages[slide.id]?.url ?? slide.mobileImage ?? slide.image;
   const imageFailed = !!failedImages[source] || !!failedImages[mobileSource];
+
+  function choosePane(next: LandingPane) {
+    if (formRef.current) showFieldErrors(formRef.current, {});
+    setFieldErrors(null);
+    setPane(next);
+    if (landingSectionOrder.includes(next as SectionPane))
+      setSectionPane(next as SectionPane);
+  }
+
+  useLayoutEffect(() => {
+    if (fieldErrors && formRef.current) showFieldErrors(formRef.current, fieldErrors);
+  }, [fieldErrors]);
 
   useEffect(() => {
     mounted.current = true;
@@ -289,19 +316,23 @@ export function LandingContent() {
   function exportDraft() {
     if (pending.current || !formRef.current) return;
     const errors: Record<string, string> = {};
+    const invalidSlide = content.slides.find(
+      (item) => item.enabled && (!item.title.trim() || !item.alt.trim() || !item.ctaLabel.trim() || !internalHref(item.href) || !assetPath(item.image)),
+    );
+    const validationSlide = invalidSlide ?? slide;
     if (content.announcement.enabled && !content.announcement.text.trim())
       errors.announcementText = "متن نوار اعلان را وارد کنید.";
     if (content.announcement.href && !internalHref(content.announcement.href))
       errors.announcementHref = "نشانی داخلی سایت را با / آغاز کنید.";
     if (!content.slides.some((item) => item.enabled))
       errors.slideEnabled = "دست‌کم یک اسلاید فعال باشد.";
-    if (!internalHref(slide.href))
+    if (!internalHref(validationSlide.href))
       errors.slideHref = "نشانی داخلی سایت را با / آغاز کنید.";
-    if (slide.enabled && !slide.title.trim())
+    if (validationSlide.enabled && !validationSlide.title.trim())
       errors.slideTitle = "عنوان اسلاید را وارد کنید.";
-    if (slide.enabled && !slide.alt.trim())
+    if (validationSlide.enabled && !validationSlide.alt.trim())
       errors.slideAlt = "توضیح قابل‌فهمی برای تصویر بنویسید.";
-    if (slide.enabled && !slide.ctaLabel.trim())
+    if (validationSlide.enabled && !validationSlide.ctaLabel.trim())
       errors.slideCta = "متن دکمه را وارد کنید.";
     for (const key of landingSectionOrder) {
       const section = content.sections[key];
@@ -318,22 +349,29 @@ export function LandingContent() {
             "لینک داخلی را با / آغاز کنید.";
       }
     }
-    const invalidSlide = content.slides.find(
-      (item) =>
-        item.enabled &&
-        (!item.title.trim() ||
-          !item.alt.trim() ||
-          !item.ctaLabel.trim() ||
-          !internalHref(item.href) ||
-          !assetPath(item.image)),
-    );
-    showFieldErrors(formRef.current, errors);
     if (
       Object.keys(errors).length ||
       invalidSlide ||
       !validateLandingImport(content) ||
       !completeLandingSections(content.sections)
     ) {
+      const firstField = Object.keys(errors)[0];
+      if (firstField?.startsWith("announcement")) choosePane("announcement");
+      else if (firstField?.startsWith("slide") || invalidSlide) {
+        choosePane("banners");
+        if (invalidSlide) chooseSlide(invalidSlide.id);
+      } else {
+        for (const key of landingSectionOrder) {
+          const invalidItem = content.sections[key].items.find(item =>
+            errors[`itemTitle-${key}-${item.id}`] || errors[`itemImage-${key}-${item.id}`] || errors[`itemHref-${key}-${item.id}`]);
+          if (errors[`sectionTitle-${key}`] || invalidItem) {
+            choosePane(key);
+            if (invalidItem) setSelectedItems(current => ({ ...current, [key]: invalidItem.id }));
+            break;
+          }
+        }
+      }
+      setFieldErrors(errors);
       setError(
         invalidSlide && invalidSlide.id !== slide.id
           ? "یکی از اسلایدهای فعال ناقص است. عنوان، توضیح تصویر و دکمهٔ همهٔ اسلایدهای فعال را بررسی کنید."
@@ -341,6 +379,7 @@ export function LandingContent() {
       );
       return;
     }
+    showFieldErrors(formRef.current, {});
     downloadLandingFile(
       new Blob([JSON.stringify(content, null, 2)], {
         type: "application/json",
@@ -385,6 +424,8 @@ export function LandingContent() {
       setLocalImages({});
       setContent(imported);
       setSectionRevision((current) => current + 1);
+      setSelectedItems({});
+      setFieldErrors(null);
       chooseSlide(imported.slides[0]!.id);
       dirty();
       setNotice(
@@ -443,7 +484,58 @@ export function LandingContent() {
           <legend className="landing-sr-only">
             پیش‌نویس محتوای صفحهٔ اصلی
           </legend>
-          <section className="manage-card">
+          <div className="landing-export-bar">
+            <div>
+              <strong>نگهداری پیش‌نویس</strong>
+              <p>
+                خروجی تنظیمات شامل تصاویر نیست. تصویرهای تازه را جداگانه دانلود
+                کنید.
+              </p>
+            </div>
+            <div className="landing-row-actions">
+              <input
+                ref={importInput}
+                data-draft-selector
+                type="file"
+                accept="application/json,.json"
+                className="landing-sr-only"
+                tabIndex={-1}
+                aria-label="فایل تنظیمات لندینگ"
+                onChange={(event) => void importDraft(event)}
+              />
+              <button
+                type="button"
+                data-draft-keep
+                onClick={() => importInput.current?.click()}
+              >
+                باز کردن فایل تنظیمات
+              </button>
+              <button
+                className="landing-primary"
+                type="button"
+                onClick={exportDraft}
+              >
+                دانلود تنظیمات پیش‌نویس
+              </button>
+            </div>
+          </div>
+          <nav className="landing-pane-nav" aria-label="بخش‌های ویرایش صفحهٔ اصلی">
+            {landingPanes.map((item) => (
+              <button
+                key={item.id}
+                id={`landing-nav-${item.id}`}
+                type="button"
+                data-draft-keep
+                aria-pressed={pane === item.id}
+                aria-controls="landing-pane-content"
+                onClick={() => choosePane(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div id="landing-pane-content" className="landing-pane-content" role="region" aria-labelledby={`landing-nav-${pane}`}>
+          <section className="manage-card landing-pane" hidden={pane !== "announcement"}>
             <h2>نوار اعلان بالای منو</h2>
             <div className="landing-form-grid">
               <label className="landing-check">
@@ -485,7 +577,7 @@ export function LandingContent() {
             </div>
           </section>
 
-          <section className="manage-card">
+          <section className="manage-card landing-pane" hidden={pane !== "banners"}>
             <div className="landing-section-head">
               <h2>اسلایدهای بنر</h2>
               <button
@@ -757,7 +849,7 @@ export function LandingContent() {
             </aside>
           </section>
 
-          <section className="manage-card">
+          <section className="manage-card landing-pane" hidden={pane !== "ranking"}>
             <h2>معیار پرفروش‌ترین‌ها</h2>
             <p className="landing-help">
               پس از اتصال به سرور، این معیار فقط فروش پرداخت‌شده را می‌سنجد.
@@ -834,8 +926,12 @@ export function LandingContent() {
               </label>
             </div>
           </section>
+          <div className="landing-pane" hidden={!landingSectionOrder.includes(pane as SectionPane)}>
           <LandingSectionsEditor
             key={sectionRevision}
+            selected={sectionPane}
+            selectedItem={selectedItems[sectionPane] ?? ""}
+            onSelectItem={(id) => setSelectedItems(current => ({ ...current, [sectionPane]: id }))}
             sections={content.sections}
             onChange={(sections) => {
               dirty();
@@ -846,40 +942,7 @@ export function LandingContent() {
               setBusy(value);
             }}
           />
-          <div className="landing-export-bar">
-            <div>
-              <strong>نگهداری پیش‌نویس</strong>
-              <p>
-                خروجی تنظیمات شامل تصاویر نیست. تصویرهای تازه را جداگانه دانلود
-                کنید.
-              </p>
-            </div>
-            <div className="landing-row-actions">
-              <input
-                ref={importInput}
-                data-draft-selector
-                type="file"
-                accept="application/json,.json"
-                className="landing-sr-only"
-                tabIndex={-1}
-                aria-label="فایل تنظیمات لندینگ"
-                onChange={(event) => void importDraft(event)}
-              />
-              <button
-                type="button"
-                data-draft-keep
-                onClick={() => importInput.current?.click()}
-              >
-                باز کردن فایل تنظیمات
-              </button>
-              <button
-                className="landing-primary"
-                type="button"
-                onClick={exportDraft}
-              >
-                دانلود تنظیمات پیش‌نویس
-              </button>
-            </div>
+          </div>
           </div>
         </fieldset>
       </form>

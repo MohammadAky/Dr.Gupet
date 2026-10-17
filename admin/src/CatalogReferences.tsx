@@ -33,7 +33,7 @@ export function CatalogReferencesManager({
   onChanged,
 }: {
   refs: CatalogReferences;
-  onBack: () => void;
+  onBack?: () => void;
   onChanged: () => void;
 }) {
   const { request } = useAuth();
@@ -216,14 +216,14 @@ export function CatalogReferencesManager({
     <>
       <div className="catalog-intro">
         <div>
-          <span className="eyebrow">کاتالوگ / داده‌های مرجع</span>
+          <span className="eyebrow">مدیریت فروشگاه</span>
           <h1>داده‌های مرجع</h1>
           <p>
             برند، دسته‌بندی، نوع حیوان، نژاد و برچسب‌های قابل استفاده در
             فروشگاه.
           </p>
         </div>
-        <div className="catalog-intro__actions">
+        {onBack && <div className="catalog-intro__actions">
           <button
             type="button"
             className="button button--ghost"
@@ -231,7 +231,7 @@ export function CatalogReferencesManager({
           >
             بازگشت به محصولات
           </button>
-        </div>
+        </div>}
       </div>
       <div className="reference-layout">
         <section className="catalog-panel reference-list" aria-label={label}>

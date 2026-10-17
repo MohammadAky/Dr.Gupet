@@ -16,7 +16,7 @@ import { PharmaciesService } from './pharmacies.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminPharmacyListQueryDto } from '../../admin/dto/admin-query.dto';
 
 @ApiTags('Admin - Pharmacies')
 @Controller('admin/pharmacies')
@@ -31,20 +31,8 @@ export class AdminPharmaciesController {
 
   @Get()
   @ApiOperation({ summary: 'List pharmacies incl. inactive (admin only)' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('q') q?: string,
-    @Query('city') city?: string,
-    @Query('province') province?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.pharmaciesService.findAllAdmin({
-      ...query,
-      q,
-      city,
-      province,
-      isActive: isActive === undefined ? undefined : isActive === 'true',
-    });
+  async findAll(@Query() query: AdminPharmacyListQueryDto) {
+    return this.pharmaciesService.findAllAdmin(query);
   }
 
   @Get(':id')

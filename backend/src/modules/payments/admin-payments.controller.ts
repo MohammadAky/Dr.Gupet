@@ -4,7 +4,7 @@ import { AdminPaymentsService } from './admin-payments.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminPaymentListQueryDto } from '../../admin/dto/admin-query.dto';
 
 @ApiTags('Admin - Payments')
 @Controller('admin/payments')
@@ -20,14 +20,8 @@ export class AdminPaymentsController {
   @Get()
   @ApiOperation({ summary: 'List all payments with filters (admin only)' })
   @ApiResponse({ status: 200, description: 'Paginated payments' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('status') status?: string,
-    @Query('gateway') gateway?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.adminPaymentsService.findAllAdmin({ ...query, status, gateway, from, to });
+  async findAll(@Query() query: AdminPaymentListQueryDto) {
+    return this.adminPaymentsService.findAllAdmin(query);
   }
 
   @Get(':id')

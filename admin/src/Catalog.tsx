@@ -4,12 +4,11 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { ApiError, type PageResult } from "./api/client";
 import { useAuth } from "./auth";
 import { ProductCsvImport } from "./ProductCsvImport";
+import { ProductCsvSync } from "./ProductCsvSync";
+import { ProductCsvExport } from "./ProductCsvExport";
 import { parseAdminLocation } from "./navigation";
 import { confirmAction, validateRequiredFields } from "./management";
-import {
-  CatalogReferencesManager,
-  type CatalogReferences,
-} from "./CatalogReferences";
+import type { CatalogReferences } from "./CatalogReferences";
 import {
   createProductWorkflow,
   emptyProductDraft,
@@ -41,7 +40,7 @@ const neuterSuitabilityLabels: Record<string, string> = {
   ANY: "بدون محدودیت", NEUTERED_ONLY: "مخصوص عقیم‌شده",
 };
 
-type Section = "list" | "create" | "detail" | "references" | "import";
+type Section = "list" | "create" | "detail" | "import" | "sync" | "export";
 type RefKind = "brand" | "category" | "petType";
 type References = CatalogReferences;
 
@@ -1809,6 +1808,8 @@ export function Catalog() {
   const { request } = useAuth();
   const mounted = useRef(true);
   const deleting = useRef<number | null>(null);
+  const listVersion = useRef(0);
+  const quietRefresh = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [section, setSection] = useState<Section>("list");
   const [refs, setRefs] = useState<References>({
@@ -1852,6 +1853,7 @@ export function Catalog() {
         "حذف محصول",
       );
       if (!accepted || !mounted.current) return;
+      listVersion.current += 1;
       const result = await request<{ deleted: boolean; deactivated: boolean }>(
         `/admin/products/${row.id}`, { method: "DELETE" },
       );
@@ -1864,7 +1866,8 @@ export function Catalog() {
       setRows((current) => leavesList
         ? current.filter((item) => item.id !== row.id)
         : current.map((item) => item.id === row.id ? { ...item, isActive: false } : item));
-      setLoading(true);
+      quietRefresh.current = true;
+      if (leavesList) setMeta(current => ({ ...current, total: Math.max(0, current.total - 1), totalPages: Math.max(1, Math.ceil((current.total - 1) / current.limit)) }));
       if (leavesList && rows.length === 1 && page > 1) setPage(page - 1);
       else setRefresh((value) => value + 1);
     } catch (problem) {
@@ -1906,18 +1909,21 @@ export function Catalog() {
   useEffect(() => {
     let active = true;
     const query = new URLSearchParams({ page: String(page), limit: "12" });
+    const version = ++listVersion.current;
+    const quietly = quietRefresh.current;
+    quietRefresh.current = false;
     if (search) query.set("search", search);
     if (activeFilter !== "all") query.set("isActive", activeFilter);
     queueMicrotask(() => {
       if (!active) return;
-      setLoading(true);
+      if (!quietly) setLoading(true);
       setError("");
       void request<PageResult<ProductRow>>(
         "/admin/products?" + query.toString(),
         { withMeta: true },
       )
         .then((result) => {
-          if (active) {
+          if (active && version === listVersion.current) {
             setRows(result.data);
             setMeta(result.meta);
           }
@@ -1972,7 +1978,7 @@ export function Catalog() {
     </>
   );
 
-  if (section !== "list" && section !== "import" && (refsLoading || refsError))
+  if ((section === "create" || section === "detail") && (refsLoading || refsError))
     return (
       <>
         <Intro
@@ -1991,6 +1997,10 @@ export function Catalog() {
 
   if (section === "import")
     return <ProductCsvImport refs={refs} onBack={() => setSection("list")} onImported={() => { setRefresh(value => value + 1); setRefsRevision(value => value + 1); }} />;
+  if (section === "sync")
+    return <ProductCsvSync onBack={() => setSection("list")} onSynced={() => { setRefresh(value => value + 1); setRefsRevision(value => value + 1); }} />;
+  if (section === "export")
+    return <ProductCsvExport filters={{ search: search || undefined, isActive: activeFilter === "all" ? undefined : activeFilter === "true" }} onBack={() => setSection("list")} />;
   if (section === "create")
     return (
       <CreateProduct
@@ -2013,14 +2023,6 @@ export function Catalog() {
         onUpdated={() => setRefresh((value) => value + 1)}
       />
     );
-  if (section === "references")
-    return (
-      <CatalogReferencesManager
-        refs={refs}
-        onBack={() => setSection("list")}
-        onChanged={() => setRefsRevision((value) => value + 1)}
-      />
-    );
   return (
     <>
       <Intro
@@ -2035,11 +2037,12 @@ export function Catalog() {
             <button
               type="button"
               className="button button--ghost"
-              onClick={() => setSection("references")}
-              disabled={deletingId !== null || refsLoading || !!refsError}
+              onClick={() => setSection("sync")}
+              disabled={deletingId !== null}
             >
-              داده‌های مرجع
+              به‌روزرسانی با CSV
             </button>
+            <button type="button" className="button button--ghost" disabled={deletingId !== null} onClick={() => setSection("export")}>خروجی CSV</button>
             <button
               type="button"
               className="button button--primary"

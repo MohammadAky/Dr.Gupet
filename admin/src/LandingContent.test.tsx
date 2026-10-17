@@ -23,6 +23,24 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const copy = () => JSON.parse(JSON.stringify(landingSample));
+const openPane = (name: string) => fireEvent.click(within(screen.getByRole("navigation", { name: "بخش‌های ویرایش صفحهٔ اصلی" })).getByRole("button", { name }));
+
+it("offers seven direct panes with only the selected workspace visible and no draft created by navigation", () => {
+  function Protected() { useDraftProtection(); return <LandingContent />; }
+  render(<Protected />);
+  const panes = ["نوار اعلان", "بنرها", "معیار پرفروش‌ترین‌ها", "محصولات", "کلینیک‌ها", "داروخانه‌ها", "داروها"];
+  const navigation = screen.getByRole("navigation", { name: "بخش‌های ویرایش صفحهٔ اصلی" });
+  expect(within(navigation).getAllByRole("button")).toHaveLength(7);
+  for (const name of panes) {
+    openPane(name);
+    expect(within(navigation).getByRole("button", { name, pressed: true })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name })).getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(document.querySelectorAll(".landing-pane:not([hidden])")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "دانلود تنظیمات پیش‌نویس" })).toBeTruthy();
+    expect(hasUnsavedDrafts()).toBe(false);
+  }
+  expect(screen.queryByLabelText("بخش صفحهٔ اصلی")).toBeNull();
+});
 
 it("rejects unknown section keys before replacing the draft and keeps a subsequent export usable", async () => {
   vi.stubGlobal("Blob", NativeBlob);
@@ -84,6 +102,7 @@ it("locks the parent draft during card-image decoding and releases its local pre
     return <LandingContent />;
   }
   render(<Protected />);
+  openPane("محصولات");
   fireEvent.change(screen.getByLabelText("فایل تصویر مورد"), {
     target: { files: [new File(["image"], "test.png", { type: "image/png" })] },
   });
@@ -111,6 +130,12 @@ it("locks the parent draft during card-image decoding and releases its local pre
   expect(
     screen.getByRole("button", { name: "دانلود تصویر اصلی مورد" }),
   ).toBeTruthy();
+  expect(hasUnsavedDrafts()).toBe(true);
+  openPane("نوار اعلان");
+  openPane("کلینیک‌ها");
+  openPane("محصولات");
+  expect(document.querySelector(".landing-item-preview img")?.getAttribute("src")).toBe("blob:local-card");
+  expect(revoke).not.toHaveBeenCalledWith("blob:local-card");
   expect(hasUnsavedDrafts()).toBe(true);
   fireEvent.change(screen.getByLabelText("فایل تنظیمات لندینگ"), {
     target: {
@@ -149,9 +174,11 @@ it("downloads the actual edited versioned JSON while retaining its unpublished d
   fireEvent.change(screen.getByLabelText("متن اعلان"), {
     target: { value: "اطلاعیهٔ تازه" },
   });
+  openPane("معیار پرفروش‌ترین‌ها");
   fireEvent.change(screen.getByLabelText("معیار فروش"), {
     target: { value: "paid_revenue" },
   });
+  openPane("محصولات");
   fireEvent.change(screen.getByLabelText("عنوان بخش"), {
     target: { value: "محصولات برای ارائه" },
   });
@@ -197,6 +224,7 @@ it("imports a compatible draft and its separate mobile source but refuses unsafe
       "اعلان واردشده",
     ),
   );
+  openPane("بنرها");
   expect(screen.getAllByRole("img")[1]!.getAttribute("src")).toBe(
     "/brand/mobile-custom.webp",
   );
@@ -245,6 +273,7 @@ it("keeps ordering and local announcement changes under the existing draft depar
   }
   render(<Protected />);
   expect(hasUnsavedDrafts()).toBe(false);
+  openPane("بنرها");
   fireEvent.click(screen.getByRole("button", { name: "یک جایگاه عقب‌تر" }));
   expect(hasUnsavedDrafts()).toBe(true);
   const list = screen.getByLabelText("انتخاب اسلاید");
@@ -272,14 +301,35 @@ it("keeps ordering and local announcement changes under the existing draft depar
 
 it("validates enabled content and focuses the broken field before any draft download", () => {
   render(<LandingContent />);
+  openPane("بنرها");
   const title = screen.getByLabelText("عنوان اسلاید");
   fireEvent.change(title, { target: { value: "" } });
+  fireEvent.click(within(screen.getByLabelText("انتخاب اسلاید")).getAllByRole("button")[1]!);
+  openPane("نوار اعلان");
   fireEvent.click(
     screen.getByRole("button", { name: "دانلود تنظیمات پیش‌نویس" }),
   );
   expect(title.getAttribute("aria-invalid")).toBe("true");
+  expect(screen.getByRole("region", { name: "بنرها" })).toBeTruthy();
   expect(document.activeElement).toBe(title);
   expect(screen.getByRole("alert").textContent).toContain("بررسی کنید");
+});
+
+it("reveals the affected section and selected card when exporting from another pane", () => {
+  render(<LandingContent />);
+  openPane("کلینیک‌ها");
+  const cards = within(screen.getByLabelText("انتخاب کارت نمونه")).getAllByRole("button");
+  fireEvent.click(cards[1]!);
+  const id = landingSample.sections.clinics.items[1]!.id;
+  fireEvent.change(screen.getByLabelText("نام مورد"), { target: { value: "" } });
+  openPane("محصولات");
+  openPane("نوار اعلان");
+  fireEvent.click(screen.getByRole("button", { name: "دانلود تنظیمات پیش‌نویس" }));
+  expect(screen.getByRole("region", { name: "کلینیک‌ها" })).toBeTruthy();
+  const field = screen.getByRole("textbox", { name: /^نام مورد/ });
+  expect(field.getAttribute("name")).toBe(`itemTitle-clinics-${id}`);
+  expect(field.getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(field);
 });
 
 it("validates versioned imports, unique slide IDs, URL safety, crop ranges and report bounds", () => {
@@ -338,14 +388,14 @@ it("edits all four section templates without treating a section-selection change
     return <LandingContent />;
   }
   render(<Protected />);
-  const selector = screen.getByLabelText("بخش صفحهٔ اصلی");
+  const labels = { products: "محصولات", clinics: "کلینیک‌ها", pharmacies: "داروخانه‌ها", medicines: "داروها" };
   for (const key of [
     "products",
     "clinics",
     "pharmacies",
     "medicines",
   ] as const) {
-    fireEvent.change(selector, { target: { value: key } });
+    openPane(labels[key]);
     expect((screen.getByLabelText("عنوان بخش") as HTMLInputElement).value).toBe(
       landingSample.sections[key].title,
     );
@@ -362,8 +412,8 @@ it("edits all four section templates without treating a section-selection change
   expect(
     screen.getByText(/در حالت واقعی، کارت‌ها باید از داده‌های سرور بیایند/),
   ).toBeTruthy();
-  fireEvent.change(selector, { target: { value: "products" } });
-  fireEvent.change(selector, { target: { value: "medicines" } });
+  openPane("محصولات");
+  openPane("داروها");
   expect((screen.getByLabelText("عنوان بخش") as HTMLInputElement).value).toBe(
     "اطلاعات دارویی",
   );
@@ -374,6 +424,7 @@ it("edits all four section templates without treating a section-selection change
 
 it("keeps the selected card during reorder, supports Persian sample prices, and confirms deletion", async () => {
   render(<LandingContent />);
+  openPane("محصولات");
   const title = landingSample.sections.products.items[0]!.title;
   fireEvent.click(
     screen.getByRole("button", { name: "مورد یک جایگاه عقب‌تر" }),

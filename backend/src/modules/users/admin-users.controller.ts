@@ -16,7 +16,7 @@ import { UsersService } from './users.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AdminUserListQueryDto } from '../../admin/dto/admin-query.dto';
 import { PasswordService } from '../auth/password.service';
 import { AdminPasswordRegisterDto, PasswordCredentialDto } from '../auth/dto/password.dto';
 
@@ -69,13 +69,8 @@ export class AdminUsersController {
   @Get()
   @ApiOperation({ summary: 'List users with search/filters (admin only)' })
   @ApiResponse({ status: 200, description: 'Paginated users' })
-  async findAll(
-    @Query() query: PaginationQueryDto,
-    @Query('search') search?: string,
-    @Query('role') role?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.usersService.findAllAdmin({ ...query, search, role, status });
+  async findAll(@Query() query: AdminUserListQueryDto) {
+    return this.usersService.findAllAdmin(query);
   }
 
   @Get(':id')

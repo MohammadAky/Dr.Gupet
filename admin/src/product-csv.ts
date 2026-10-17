@@ -44,7 +44,7 @@ export interface ProductCsvReview {
 }
 
 /** RFC 4180 records, including quoted newlines and doubled quotation marks. */
-function records(text: string): string[][] {
+export function parseCsvRecords(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [], cell = "", quoted = false, closed = false;
   for (let index = 0; index < text.length; index += 1) {
@@ -101,7 +101,7 @@ export function reviewProductCsv(source: string, edits: Record<number, Record<st
   if (new TextEncoder().encode(source).byteLength > PRODUCT_CSV_MAX_BYTES)
     return { rows: [], errors: ["حجم فایل باید حداکثر یک مگابایت باشد."] };
   let parsed: string[][];
-  try { parsed = records(source.replace(/^\uFEFF/, "")); }
+  try { parsed = parseCsvRecords(source.replace(/^\uFEFF/, "")); }
   catch (error) { return { rows: [], errors: [error instanceof Error ? error.message : "ساختار CSV معتبر نیست."] }; }
   if (!parsed.length) return { rows: [], errors: ["فایل CSV خالی است."] };
   const headers = parsed[0]!.map(value => headerAliases[value.trim()] ?? value.trim());

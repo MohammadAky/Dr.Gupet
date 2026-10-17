@@ -75,16 +75,20 @@ export function completeLandingSections(value: Sections): boolean {
 
 type LocalImage = { file: File; url: string; name: string };
 export function LandingSectionsEditor({
+  selected,
+  selectedItem,
+  onSelectItem: setSelectedItem,
   sections,
   onChange,
   onBusyChange,
 }: {
+  selected: SectionKey;
+  selectedItem: string;
+  onSelectItem: (id: string) => void;
   sections: Sections;
   onChange: (sections: Sections) => void;
   onBusyChange: (value: boolean) => void;
 }) {
-  const [selected, setSelected] = useState<SectionKey>("products");
-  const [selectedItem, setSelectedItem] = useState("");
   const [images, setImages] = useState<Record<string, LocalImage>>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -242,31 +246,12 @@ export function LandingSectionsEditor({
 
   return (
     <section className="manage-card landing-sections-editor">
-      <h2>بخش‌های پایین بنر</h2>
+      <h2>{sectionLabels[selected]}</h2>
       <p className="landing-help">
         ترتیب صفحه ثابت است: محصولات، کلینیک‌ها، داروخانه‌ها و داروها. نام بخش و
         کارت‌های نمونه را اینجا ویرایش کنید.
       </p>
       <div className="landing-form-grid">
-        <label className="landing-field">
-          بخش صفحهٔ اصلی
-          <select
-            data-draft-selector
-            value={selected}
-            onChange={(event) => {
-              setSelected(event.target.value as SectionKey);
-              setSelectedItem("");
-              setError("");
-              setNotice("");
-            }}
-          >
-            {sectionKeys.map((key) => (
-              <option key={key} value={key}>
-                {sectionLabels[key]}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="landing-field">
           عنوان بخش
           <input

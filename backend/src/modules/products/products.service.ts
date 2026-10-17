@@ -145,6 +145,7 @@ export class ProductsService {
         where,
         include: {
           brand: { select: { id: true, name: true } },
+          petType: { select: { id: true, name: true, slug: true } },
           images: {
             take: 2,
             orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -181,6 +182,7 @@ export class ProductsService {
         name: product.name,
         slug: product.slug,
         brand: product.brand,
+        petType: product.petType,
         image: product.images[0]?.url || null,
         hoverImage: product.images[1]?.url || null,
         minPrice,
