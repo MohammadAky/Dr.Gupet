@@ -366,23 +366,6 @@ export function LandingSectionsEditor({
               />
             </label>
             <label className="landing-field">
-              نشانی تصویر مورد
-              <input
-                dir="ltr"
-                aria-label="نشانی تصویر مورد"
-                name={`itemImage-${selected}-${item.id}`}
-                value={item.image}
-                placeholder="/brand/example.webp"
-                onChange={(event) => {
-                  releaseImage();
-                  updateItem({ image: event.target.value });
-                }}
-              />
-              <small>
-                فایل محلی در پوشهٔ brand؛ لینک خارجی در خروجی پذیرفته نمی‌شود.
-              </small>
-            </label>
-            <label className="landing-field">
               لینک مورد
               <input
                 dir="ltr"

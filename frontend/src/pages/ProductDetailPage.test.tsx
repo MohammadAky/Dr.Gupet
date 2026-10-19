@@ -10,6 +10,7 @@ import type { CartView, ProductDetail } from '../api/types';
 import { useAuth } from '../auth/auth-provider';
 import { ProductDetailPage } from './ProductDetailPage';
 import { signalCartAdded } from '../features/cart/cart-feedback';
+import { GUEST_CART_KEY, readGuestCart } from '../features/cart/guest-cart';
 
 vi.mock('../api/endpoints-shop', () => ({
   shopApi: {
@@ -106,6 +107,8 @@ describe('product detail private actions', () => {
   }
 
   beforeEach(() => {
+    localStorage.clear();
+    readGuestCart();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.resetAllMocks();
     container = document.createElement('div');
@@ -117,7 +120,10 @@ describe('product detail private actions', () => {
       typeof useAuth
     >);
     vi.mocked(shopApi.product).mockResolvedValue(detail);
-    vi.mocked(shopApi.products).mockResolvedValue({ data: [], meta: { page: 1, limit: 24, total: 0, totalPages: 0 } });
+    vi.mocked(shopApi.products).mockResolvedValue({
+      data: [],
+      meta: { page: 1, limit: 24, total: 0, totalPages: 0 },
+    });
     vi.mocked(shopApi.favorites).mockResolvedValue({ data: [] });
     vi.mocked(shopApi.addCartItem).mockResolvedValue(cartView);
     vi.mocked(shopApi.addFavorite).mockResolvedValue(undefined);
@@ -136,16 +142,45 @@ describe('product detail private actions', () => {
     await vi.waitFor(() => expect(container.querySelector('#qty')).not.toBeNull());
   }
 
-  it('keeps guest cart and favorite requests private', async () => {
+  it('saves a guest basket durably without making private cart or favorite requests', async () => {
     vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null } as ReturnType<
       typeof useAuth
     >);
     await showPage();
     expect(shopApi.favorites).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('برای افزودن به سبد خرید وارد شوید');
+    expect(container.textContent).toContain('مشاهدهٔ سبد خرید مهمان');
     await act(async () => submitForm());
+    expect(readGuestCart()).toEqual([
+      expect.objectContaining({ variantId: 11, quantity: 1, productName: detail.name }),
+    ]);
+    expect(signalCartAdded).toHaveBeenCalledWith(expect.objectContaining({ userId: null }));
     expect(shopApi.addCartItem).not.toHaveBeenCalled();
     expect(shopApi.addFavorite).not.toHaveBeenCalled();
+  });
+  it('blocks an authenticated addition if another tab persisted a guest handoff before its storage event renders', async () => {
+    await showPage();
+    localStorage.setItem(
+      GUEST_CART_KEY,
+      JSON.stringify({
+        version: 1,
+        transfer: null,
+        items: [
+          {
+            variantId: 11,
+            quantity: 2,
+            productId: 1,
+            productName: detail.name,
+            productSlug: detail.slug,
+            productImage: null,
+            weightGram: 1000,
+            unitPrice: 100_000,
+          },
+        ],
+      }),
+    );
+    await act(async () => submitForm());
+    expect(shopApi.addCartItem).not.toHaveBeenCalled();
+    expect(readGuestCart()[0]?.quantity).toBe(2);
   });
 
   it.each([
@@ -157,7 +192,9 @@ describe('product detail private actions', () => {
       vi.mocked(shopApi.product).mockResolvedValue(sample);
       await showPage();
       expect(container.querySelector('.sample-record-note')).toBeNull();
-      expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe('ناموجود');
+      expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe(
+        'ناموجود',
+      );
       expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(
         true,
       );
@@ -192,16 +229,22 @@ describe('product detail private actions', () => {
     await act(async () => pending.resolve(cartView));
     expect(container.textContent).toContain('به سبد خرید اضافه شد.');
     expect(signalCartAdded).toHaveBeenCalledTimes(1);
-    expect(signalCartAdded).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, keyboard: true }));
+    expect(signalCartAdded).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 7, keyboard: true }),
+    );
   });
 
   it('accepts typed Persian and Arabic quantities through the existing API maximum of twenty', async () => {
-    await showPage(); const qty = container.querySelector<HTMLInputElement>('#qty')!;
-    await changeInput(qty, '۲۰'); await act(async () => submitForm());
+    await showPage();
+    const qty = container.querySelector<HTMLInputElement>('#qty')!;
+    await changeInput(qty, '۲۰');
+    await act(async () => submitForm());
     expect(shopApi.addCartItem).toHaveBeenLastCalledWith(11, 20);
-    await changeInput(qty, '١١'); await act(async () => submitForm());
+    await changeInput(qty, '١١');
+    await act(async () => submitForm());
     expect(shopApi.addCartItem).toHaveBeenLastCalledWith(11, 11);
-    await changeInput(qty, '۲۱'); await act(async () => submitForm());
+    await changeInput(qty, '۲۱');
+    await act(async () => submitForm());
     expect(shopApi.addCartItem).toHaveBeenCalledTimes(2);
   });
 
@@ -213,6 +256,60 @@ describe('product detail private actions', () => {
     });
     await act(async () => submitForm());
     expect(shopApi.addCartItem).not.toHaveBeenCalled();
+  });
+
+  it('updates the purchase panel from the selected real variant and hides stale prices for unavailable stock', async () => {
+    await showPage();
+    const panel = container.querySelector<HTMLElement>('.product-detail__purchase')!;
+    expect(panel.getAttribute('aria-labelledby')).toBe('product-purchase-heading');
+    expect(panel.querySelector('.commerce-product-price')?.textContent).toContain('۱۰۰٬۰۰۰');
+    await act(async () => container.querySelector<HTMLInputElement>('input[value="12"]')!.click());
+    expect(panel.querySelector('.product-detail__availability')?.textContent).toBe('ناموجود');
+    expect(panel.querySelector('.commerce-product-price')).toBeNull();
+    expect(panel.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    expect(panel.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe(
+      'ناموجود',
+    );
+    await act(async () => submitForm());
+    expect(shopApi.addCartItem).not.toHaveBeenCalled();
+    await act(async () => container.querySelector<HTMLInputElement>('input[value="11"]')!.click());
+    expect(panel.querySelector('.commerce-product-price')?.textContent).toContain('۱۰۰٬۰۰۰');
+    await act(async () => submitForm());
+    expect(shopApi.addCartItem).toHaveBeenCalledWith(11, 1);
+  });
+
+  it('presents only API-provided description, ingredients and specifications with working section destinations', async () => {
+    vi.mocked(shopApi.product).mockResolvedValue({
+      ...detail,
+      description: 'توضیح واقعی محصول\nخط دوم',
+      ingredientsText: 'ترکیبات ثبت‌شده',
+      tags: [{ id: 8, name: 'بدون غلات', slug: 'grain-free', type: 'DIET' }],
+    });
+    await showPage();
+    expect(container.querySelector('#product-description')?.textContent).toContain(
+      'توضیح واقعی محصول\nخط دوم',
+    );
+    expect(container.querySelector('#product-ingredients')?.textContent).toContain(
+      'ترکیبات ثبت‌شده',
+    );
+    const specifications = container.querySelector('#product-specifications')!;
+    expect(specifications.textContent).toContain('بالغ');
+    expect(specifications.textContent).toContain('بدون غلات');
+    expect(specifications.textContent).toContain('سگ');
+    expect(specifications.textContent).toContain('برند');
+    for (const anchor of container.querySelectorAll<HTMLAnchorElement>(
+      '.product-detail__section-links a',
+    ))
+      expect(container.querySelector(anchor.hash)).not.toBeNull();
+    expect(container.querySelector('.product-detail__facts')?.textContent).toContain('همه سایزها');
+  });
+
+  it('omits empty descriptive sections instead of filling them with invented product content', async () => {
+    await showPage();
+    expect(container.querySelector('#product-description')).toBeNull();
+    expect(container.querySelector('#product-ingredients')).toBeNull();
+    expect(container.querySelectorAll('.product-detail__section-links a')).toHaveLength(1);
+    expect(container.querySelector('#product-specifications')).not.toBeNull();
   });
 
   it('ignores an old cart response after account switch and permits the new account request', async () => {

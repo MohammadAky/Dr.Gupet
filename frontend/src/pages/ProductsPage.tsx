@@ -1,318 +1,133 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type FormEvent, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { shopApi } from '../api/endpoints-shop';
 import { queryKeys } from '../api/query-keys';
 import { api } from '../api/endpoints';
-import { Pagination } from '../components/Pagination';
 import { ProductCardView } from '../components/ProductCardView';
-import { SearchableFilter } from '../components/SearchableFilter';
+import { CatalogFilters, type CatalogFilterSection } from '../components/CatalogFilters';
+import { Dialog } from '../components/ui';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { parseProductFilters, serializeProductFilters } from '../features/catalog/filters';
-import { TomanInput } from '../components/TomanInput';
-import { rawTomanInput } from '../lib/toman-input';
 import '../styles/content-pages.css';
 import '../styles/catalog-layout.css';
-import { publicRecordName } from '../lib/sample-records';
 
-/**
- * Catalog list. All filters live in the URL (convention §5.5), so the list is
- * shareable and the browser back button works.
- */
+const BATCH_SIZE = 24;
+const PHONE_QUERY = '(max-width: 900px)';
+function subscribeSize(callback: () => void) {
+  const media = window.matchMedia?.(PHONE_QUERY);
+  media?.addEventListener('change', callback);
+  return () => media?.removeEventListener('change', callback);
+}
+const phoneSnapshot = () => window.matchMedia?.(PHONE_QUERY).matches ?? false;
+
+/** Shareable filters with one continuous, progressively requested catalog. */
 export function ProductsPage() {
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => parseProductFilters(params), [params]);
-
-  const searchFormRef = useRef<HTMLFormElement>(null);
-  const priceFormRef = useRef<HTMLFormElement>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [priceError, setPriceError] = useState<string | null>(null);
-  const selectedTags = (filters.tagIds ?? '')
-    .split(',')
-    .filter((value) => /^\d+$/.test(value) && Number(value) > 0);
-  const activeFilterCount =
-    [
-      filters.petTypeId,
-      filters.brandId,
-      filters.lifeStage,
-      filters.sizeClass,
-      filters.inStock,
-      filters.minPrice !== undefined,
-      filters.maxPrice !== undefined,
-      filters.sort && filters.sort !== 'newest',
-    ].filter(Boolean).length + selectedTags.length;
-
+  const requestFilters = { ...filters, page: undefined, limit: BATCH_SIZE };
+  const isPhone = useSyncExternalStore(subscribeSize, phoneSnapshot, () => false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openedSection, setOpenedSection] = useState<CatalogFilterSection | null>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const activeCount = [filters.petTypeId, filters.brandId, filters.categorySlug, filters.lifeStage,
+    filters.sizeClass, filters.inStock, filters.minPrice !== undefined,
+    filters.maxPrice !== undefined].filter(Boolean).length + (filters.tagIds ?? '').split(',').filter(Boolean).length;
   const petTypes = useQuery({ queryKey: queryKeys.petTypes, queryFn: () => api.petTypes() });
   const brands = useQuery({ queryKey: queryKeys.brands, queryFn: () => shopApi.brands() });
   const dietTags = useQuery({ queryKey: queryKeys.tags('DIET'), queryFn: () => api.tags('DIET') });
-
-  const products = useQuery({
-    queryKey: queryKeys.products({ ...filters }),
-    queryFn: () => shopApi.products(filters),
-    placeholderData: keepPreviousData,
+  const products = useInfiniteQuery({
+    queryKey: queryKeys.productsInfinite(requestFilters),
+    queryFn: ({ pageParam }) => shopApi.products({ ...requestFilters, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: last => last.meta && last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
+    retry: false,
   });
-
+  const cards = useMemo(() => {
+    const unique = new Set<number>();
+    return (products.data?.pages.flatMap(page => page.data) ?? []).filter(card => {
+      if (unique.has(card.id)) return false;
+      unique.add(card.id); return true;
+    });
+  }, [products.data]);
+  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = products;
+  useEffect(() => {
+    if (!sentinel.current || !hasNextPage || isFetching || isFetchNextPageError ||
+        typeof IntersectionObserver === 'undefined') return;
+    let requested = false;
+    const observer = new IntersectionObserver(entries => {
+      if (!requested && entries.some(entry => entry.isIntersecting)) {
+        requested = true; void fetchNextPage();
+      }
+    }, { rootMargin: '180px 0px' });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
   function patch(next: Parameters<typeof serializeProductFilters>[1]) {
     setParams(serializeProductFilters(params, next));
   }
-
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const search = String(new FormData(event.currentTarget).get('q') ?? '').trim();
-    patch({ q: search || undefined });
+  function clearFilters() { setParams(new URLSearchParams()); }
+  function openDrawer(section: CatalogFilterSection | null) {
+    setOpenedSection(section); setDrawerOpen(true);
   }
-
-  function submitPrices(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parse = (value: string) => {
-      const digits = rawTomanInput(value.trim());
-      if (!digits || !/^\d+$/.test(digits)) return undefined;
-      const normalized = Number(digits);
-      return Number.isFinite(normalized) && normalized >= 0 ? normalized : undefined;
-    };
-    const values = new FormData(event.currentTarget);
-    const rawMin = String(values.get('minPrice') ?? '').trim();
-    const rawMax = String(values.get('maxPrice') ?? '').trim();
-    const minPrice = parse(rawMin);
-    const maxPrice = parse(rawMax);
-    if (
-      (rawMin && !Number.isSafeInteger(minPrice)) ||
-      (rawMax && !Number.isSafeInteger(maxPrice)) ||
-      (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice)
-    ) {
-      setPriceError('قیمت باید عدد صحیح و نامنفی باشد و حداقل از حداکثر بیشتر نباشد.');
-      return;
-    }
-    setPriceError(null);
-    patch({ minPrice, maxPrice });
-  }
-
-  function clearFilters() {
-    setParams(new URLSearchParams());
-    setPriceError(null);
-    searchFormRef.current?.reset();
-    priceFormRef.current?.reset();
-  }
-
-  return (
-    <section className="catalog-page">
-      <nav className="catalog-breadcrumb" aria-label="مسیر صفحه">
-        <span>فروشگاه دکتر گوپت</span>
-        <span aria-hidden="true">/</span>
-        <h1>محصولات</h1>
-      </nav>
-
-      <div className="catalog-layout">
-        <aside className="catalog-sidebar" aria-label="جستجو و فیلتر محصولات">
-          <form className="catalog-search" ref={searchFormRef} onSubmit={submitSearch}>
-            <label className="sr-only" htmlFor="q">
-              جستجو
-            </label>
-            <input
-              id="q"
-              name="q"
-              placeholder="جستجوی محصول"
-              key={filters.q ?? ''}
-              defaultValue={filters.q ?? ''}
-            />
-            <button type="submit" className="filter-apply">
-              جستجو
-            </button>
-          </form>
-
-          <button
-            type="button"
-            className="catalog-filter-toggle"
-            aria-controls="catalog-filter-panel"
-            aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((open) => !open)}
-          >
-            <span>
-              فیلتر و مرتب‌سازی
-              {activeFilterCount > 0 ? ` · ${activeFilterCount.toLocaleString('fa-IR')} مورد` : ''}
-            </span>
-            <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
-          </button>
-          <div
-            id="catalog-filter-panel"
-            className={`filters filter-panel${filtersOpen ? '' : ' filters--collapsed'}`}
-          >
-            <div className="filter-panel__grid">
-              <SearchableFilter
-                label="نوع حیوان"
-                value={String(filters.petTypeId ?? '')}
-                options={[
-                  { value: '', label: 'همهٔ حیوانات' },
-                  ...(petTypes.data ?? []).map((type) => ({
-                    value: String(type.id),
-                    label: type.name,
-                  })),
-                ]}
-                onSelect={(value) => patch({ petTypeId: value ? Number(value) : undefined })}
-              />
-              <SearchableFilter
-                label="برند"
-                value={String(filters.brandId ?? '')}
-                options={[
-                  { value: '', label: 'همهٔ برندها' },
-                  ...(brands.data ?? []).map((brand) => ({
-                    value: String(brand.id),
-                    label: publicRecordName(brand),
-                  })),
-                ]}
-                onSelect={(value) => patch({ brandId: value ? Number(value) : undefined })}
-              />
-              <SearchableFilter
-                label="سن"
-                value={filters.lifeStage ?? ''}
-                options={[
-                  { value: '', label: 'همهٔ سن‌ها' },
-                  { value: 'PUPPY_KITTEN', label: 'توله/بچه گربه' },
-                  { value: 'ADULT', label: 'بالغ' },
-                  { value: 'SENIOR', label: 'سالمند' },
-                ]}
-                onSelect={(value) => patch({ lifeStage: value || undefined })}
-              />
-              <SearchableFilter
-                label="سایز"
-                value={filters.sizeClass ?? ''}
-                options={[
-                  { value: '', label: 'همهٔ سایزها' },
-                  { value: 'SMALL', label: 'کوچک' },
-                  { value: 'MEDIUM', label: 'متوسط' },
-                  { value: 'LARGE', label: 'بزرگ' },
-                ]}
-                onSelect={(value) => patch({ sizeClass: value || undefined })}
-              />
-              <SearchableFilter
-                label="مرتب‌سازی"
-                value={filters.sort ?? 'newest'}
-                options={[
-                  { value: 'newest', label: 'جدیدترین' },
-                  { value: 'price_asc', label: 'ارزان‌ترین' },
-                  { value: 'price_desc', label: 'گران‌ترین' },
-                ]}
-                onSelect={(value) => patch({ sort: value })}
-              />
-            </div>
-
-            {(petTypes.error || brands.error) && (
-              <ErrorState
-                error="دریافت برخی گزینه‌های فیلتر ممکن نشد."
-                onRetry={() => {
-                  void petTypes.refetch();
-                  void brands.refetch();
-                }}
-              />
-            )}
-            <fieldset
-              className="catalog-diet-tags"
-              disabled={dietTags.isPending || dietTags.isError}
-            >
-              <legend>ویژگی‌های رژیمی</legend>
-              {dietTags.isPending && <LoadingState text="در حال دریافت ویژگی‌ها…" />}
-              {dietTags.data?.map((tag) => (
-                <label key={tag.id} className="filter-check">
-                  <input
-                    type="checkbox"
-                    checked={selectedTags.includes(String(tag.id))}
-                    onChange={(event) => {
-                      const next = event.target.checked
-                        ? [...selectedTags, String(tag.id)]
-                        : selectedTags.filter((id) => id !== String(tag.id));
-                      patch({ tagIds: next.join(',') || undefined });
-                    }}
-                  />
-                  {tag.name}
-                </label>
-              ))}
-              {dietTags.data?.length === 0 && <p>ویژگی رژیمی در دسترس نیست.</p>}
-            </fieldset>
-            {dietTags.error && (
-              <ErrorState error={dietTags.error} onRetry={() => void dietTags.refetch()} />
-            )}
-
-            <label className="filter-check">
-              <input
-                type="checkbox"
-                checked={filters.inStock === true}
-                onChange={(event) => patch({ inStock: event.target.checked })}
-              />
-              فقط موجود
-            </label>
-
-            <form className="price-filter" ref={priceFormRef} onSubmit={submitPrices}>
-              <label htmlFor="minPrice">از قیمت</label>
-              <TomanInput
-                id="minPrice"
-                name="minPrice"
-
-                aria-invalid={priceError ? true : undefined}
-                aria-describedby={priceError ? 'price-filter-error' : undefined}
-
-                key={`min-${filters.minPrice ?? ''}`}
-                defaultValue={filters.minPrice ?? ''}
-              />
-              <label htmlFor="maxPrice">تا قیمت</label>
-              <TomanInput
-                id="maxPrice"
-                name="maxPrice"
-
-                aria-invalid={priceError ? true : undefined}
-                aria-describedby={priceError ? 'price-filter-error' : undefined}
-
-                key={`max-${filters.maxPrice ?? ''}`}
-                defaultValue={filters.maxPrice ?? ''}
-              />
-              <button type="submit" className="filter-apply">
-                اعمال قیمت
-              </button>
-            </form>
-            {priceError && (
-              <p id="price-filter-error" role="alert" className="field__error">
-                {priceError}
-              </p>
-            )}
-
-            <button type="button" className="filter-clear" onClick={clearFilters}>
-              پاک‌کردن فیلترها
-            </button>
-          </div>
-        </aside>
-
-        <div className="catalog-results" aria-label="نتایج محصولات">
-          {products.isLoading && <LoadingState layout="cards" />}
-          {products.data?.meta && (
-            <p className="directory-results" role="status">
-              {products.data.meta.total.toLocaleString('fa-IR')} محصول
-              {products.isFetching ? ' · در حال به‌روزرسانی…' : ''}
-            </p>
-          )}
-          {products.error && (
-            <ErrorState error={products.error} onRetry={() => void products.refetch()} />
-          )}
-          {products.data && products.data.data.length === 0 && (
-            <EmptyState
-              text="محصولی با این فیلترها پیدا نشد."
-              action={
-                <button type="button" onClick={clearFilters}>
-                  پاک‌کردن فیلترها
-                </button>
-              }
-            />
-          )}
-          {products.data && products.data.data.length > 0 && (
-            <>
-              <div className="product-grid">
-                {products.data.data.map((card) => (
-                  <ProductCardView key={card.id} card={card} />
-                ))}
-              </div>
-              <Pagination meta={products.data.meta} busy={products.isFetching} />
-            </>
-          )}
+  const filterPanel = <CatalogFilters filters={filters} onPatch={patch} onClear={clearFilters}
+    activeCount={activeCount} openedSection={openedSection} onOpenSection={setOpenedSection}
+    petTypes={petTypes.data ?? []} brands={brands.data ?? []} dietTags={dietTags.data ?? []}
+    referencesPending={petTypes.isPending || brands.isPending || dietTags.isPending}
+    referencesError={petTypes.isError || brands.isError || dietTags.isError}
+    onRetry={() => { void petTypes.refetch(); void brands.refetch(); void dietTags.refetch(); }} />;
+  return <section className="catalog-page">
+    <nav className="catalog-breadcrumb" aria-label="مسیر صفحه">
+      <span>فروشگاه دکتر گوپت</span><span aria-hidden="true">/</span><h1>محصولات</h1>
+    </nav>
+    {filters.q && <p className="catalog-search-context">نتایج جستجوی «{filters.q}»
+      <button type="button" onClick={() => patch({ q: undefined })}>حذف جستجو</button>
+    </p>}
+    {isPhone && <div className="catalog-mobile-tools">
+      <div className="catalog-chip-rail" aria-label="فیلتر و مرتب‌سازی">
+        <button type="button" onClick={() => openDrawer('sort')}>مرتب‌سازی <span aria-hidden="true">⇅</span></button>
+        <button type="button" onClick={() => openDrawer(null)}>فیلترها{activeCount ? ' · ' + activeCount.toLocaleString('fa-IR') : ''} <span aria-hidden="true">☷</span></button>
+        <button type="button" onClick={() => openDrawer('price')}>محدودهٔ قیمت</button>
+        <button type="button" onClick={() => openDrawer('diet')}>نیازهای غذایی</button>
+      </div>
+      <div className="catalog-chip-rail" aria-label="فیلترهای پرکاربرد حیوانات">
+        <button type="button" aria-pressed={filters.inStock === true} onClick={() => patch({ inStock: !filters.inStock })}>فقط موجود</button>
+        {petTypes.data?.map(type => <button type="button" key={type.id} aria-pressed={filters.petTypeId === type.id}
+          onClick={() => patch({ petTypeId: filters.petTypeId === type.id ? undefined : type.id })}>{type.name}</button>)}
+        <button type="button" aria-pressed={filters.lifeStage === 'PUPPY_KITTEN'} onClick={() => patch({ lifeStage: filters.lifeStage === 'PUPPY_KITTEN' ? undefined : 'PUPPY_KITTEN' })}>توله و بچه گربه</button>
+        <button type="button" aria-pressed={filters.lifeStage === 'ADULT'} onClick={() => patch({ lifeStage: filters.lifeStage === 'ADULT' ? undefined : 'ADULT' })}>بالغ</button>
+        <button type="button" onClick={() => openDrawer('brand')}>برند</button>
+      </div>
+    </div>}
+    <div className="catalog-layout">
+      {!isPhone && <aside className="catalog-sidebar" aria-label="فیلتر محصولات">{filterPanel}</aside>}
+      <div className="catalog-results" aria-label="نتایج محصولات">
+        <div className="catalog-results__heading">
+          <p className="directory-results" role="status">{products.data?.pages[0]?.meta
+            ? products.data.pages[0].meta.total.toLocaleString('fa-IR') + ' محصول' : 'محصولات فروشگاه'}</p>
+          {!isPhone && <span className="catalog-sort-label">{filters.sort === 'price_asc' ? 'ارزان‌ترین' : filters.sort === 'price_desc' ? 'گران‌ترین' : 'جدیدترین'}</span>}
+        </div>
+        {products.isPending && <LoadingState layout="cards" />}
+        {products.error && !products.data && <ErrorState error={products.error} onRetry={() => void products.refetch()} />}
+        {products.isRefetchError && !products.isFetchNextPageError && products.data && <div role="alert" className="catalog-refresh-error">
+          <p>تازه‌سازی محصولات انجام نشد؛ قیمت و موجودی نمایش‌داده‌شده ممکن است تغییر کرده باشند.</p>
+          <button type="button" onClick={() => void products.refetch()}>تلاش دوباره برای تازه‌سازی</button>
+        </div>}
+        {products.isSuccess && cards.length === 0 && <EmptyState text="محصولی با این فیلترها پیدا نشد."
+          action={<button type="button" onClick={clearFilters}>پاک‌کردن فیلترها</button>} />}
+        {cards.length > 0 && <div className="product-grid">{cards.map(card => <ProductCardView key={card.id} card={card} />)}</div>}
+        <div ref={sentinel} className="catalog-load-more" aria-live="polite">
+          {products.isFetchingNextPage && <LoadingState text="در حال دریافت محصولات بیشتر…" />}
+          {products.isFetchNextPageError && <p role="alert">دریافت ادامهٔ محصولات ممکن نشد؛ محصولات قبلی حفظ شده‌اند.</p>}
+          {products.hasNextPage && <button type="button" className="filter-clear" disabled={products.isFetching}
+            onClick={() => void products.fetchNextPage()}>{products.isFetchNextPageError ? 'تلاش دوباره برای ادامه' : 'نمایش محصولات بیشتر'}</button>}
+          {!products.hasNextPage && cards.length > 0 && <p>همهٔ محصولات نمایش داده شدند.</p>}
         </div>
       </div>
-    </section>
-  );
+    </div>
+    <Dialog open={isPhone && drawerOpen} title="فیلتر محصولات" variant="drawer" onClose={() => setDrawerOpen(false)}>
+      {filterPanel}
+      <button type="button" className="ui-button ui-button--primary catalog-drawer-apply" onClick={() => setDrawerOpen(false)}>مشاهدهٔ نتایج</button>
+    </Dialog>
+  </section>;
 }

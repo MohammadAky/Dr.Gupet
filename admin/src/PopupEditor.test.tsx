@@ -18,7 +18,7 @@ function submit() { fireEvent.submit(screen.getByLabelText("عنوان").closest
 beforeEach(() => {
   request.mockImplementation((path: string, options?: { method?: string }) => {
     if (path === "/admin/storefront/popup") return Promise.resolve(options?.method === "PUT" ? {} : initial);
-    if (path === "/upload/image") return Promise.resolve({ url: "/uploads/popup.webp" });
+    if (path === "/upload/image") return Promise.resolve({ url: "https://api.example.test/uploads/popup.webp" });
     throw new Error(`Unexpected request ${path}`);
   });
   Object.defineProperty(URL, "createObjectURL", { configurable: true, writable: true, value: vi.fn(() => "blob:popup-preview") });
@@ -34,6 +34,8 @@ it("loads shared settings disabled and previews only first-party content", async
   expect(preview.textContent).toContain(initial.body);
   expect(preview.querySelector("img")?.getAttribute("src")).toBe(initial.image);
   expect(hasUnsavedDrafts()).toBe(false);
+  expect(screen.getByLabelText("وضعیت انتشار پاپ‌آپ").textContent).toBe("در سایت: غیرفعال");
+  expect(screen.queryByLabelText("نشانی تصویر")).toBeNull();
   expect(request.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
 });
 it("saves normalized full content once and clears the dirty form only after success", async () => {
@@ -43,6 +45,7 @@ it("saves normalized full content once and clears the dirty form only after succ
   fireEvent.click(screen.getByLabelText("نمایش پاپ‌آپ"));
   fireEvent.change(screen.getByLabelText("عنوان"), { target: { value: "  پیشنهاد تازه  " } });
   expect(hasUnsavedDrafts()).toBe(true);
+  expect(screen.getByLabelText("وضعیت انتشار پاپ‌آپ").textContent).toBe("در سایت: غیرفعال");
   submit(); submit();
   expect(request.mock.calls.filter(([, options]) => options?.method === "PUT")).toHaveLength(1);
   expect(request).toHaveBeenCalledWith("/admin/storefront/popup", { method: "PUT", body: { ...initial, enabled: true, title: "پیشنهاد تازه" } });
@@ -51,6 +54,7 @@ it("saves normalized full content once and clears the dirty form only after succ
   await act(async () => save.resolve({}));
   expect(hasUnsavedDrafts()).toBe(false);
   expect(screen.getByRole("status").textContent).toContain("پاپ‌آپ ذخیره شد");
+  expect(screen.getByLabelText("وضعیت انتشار پاپ‌آپ").textContent).toBe("در سایت: فعال");
 });
 it("retains the draft after a failed save and supports retry", async () => {
   await ready();
@@ -65,34 +69,55 @@ it("retains the draft after a failed save and supports retry", async () => {
 });
 it("rejects remote, traversal, SVG and overlong image paths without loading or saving them", async () => {
   for (const path of ["https://tracker.example/pixel.png", "//tracker.example/a.png", "/uploads/../private/a.png", "/brand/a.svg", "/uploads/a.png?track=1", "/uploads/" + "a".repeat(501) + ".png"]) expect(isPopupImagePath(path)).toBe(false);
-  await ready();
-  const imageInput = screen.getByLabelText("نشانی تصویر");
-  fireEvent.change(imageInput, { target: { value: "https://tracker.example/pixel.png" } });
-  expect(screen.getByLabelText("پیش‌نمایش پاپ‌آپ").querySelector("img")).toBeNull();
-  submit();
-  expect(imageInput.getAttribute("aria-invalid")).toBe("true");
+  request.mockResolvedValueOnce({ ...initial, image: "https://tracker.example/pixel.png" });
+  render(<PopupEditor />);
+  await screen.findByRole("alert");
+  expect(screen.queryByLabelText("پیش‌نمایش پاپ‌آپ")).toBeNull();
   expect(request.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
 });
-it("requires title and text before enabling a popup, but permits an empty disabled draft", async () => {
+it("requires some content when enabled but permits an empty disabled draft", async () => {
   await ready();
   const title = screen.getByLabelText("عنوان");
   const body = screen.getByLabelText("متن");
   fireEvent.change(title, { target: { value: "  " } });
   fireEvent.change(body, { target: { value: "  " } });
+  fireEvent.click(screen.getByRole("button", { name: "حذف تصویر" }));
   fireEvent.click(screen.getByLabelText("نمایش پاپ‌آپ"));
   submit();
   expect(title.getAttribute("aria-invalid")).toBe("true");
-  expect(body.getAttribute("aria-invalid")).toBe("true");
   expect(request.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
   fireEvent.click(screen.getByLabelText("نمایش پاپ‌آپ"));
   fireEvent.submit(title.closest("form")!);
   await screen.findByText("پاپ‌آپ ذخیره شد.");
-  expect(request).toHaveBeenLastCalledWith("/admin/storefront/popup", { method: "PUT", body: { ...initial, title: "", body: "" } });
+  expect(request).toHaveBeenLastCalledWith("/admin/storefront/popup", { method: "PUT", body: { ...initial, title: "", body: "", image: "" } });
+});
+it.each([
+  { title: "", body: "", image: initial.image },
+  { title: "عنوان تنها", body: "", image: "" },
+  { title: "", body: "متن تنها", image: "" },
+])("sends optional text exactly without inserting a placeholder: %j", async content => {
+  request.mockResolvedValueOnce({ enabled: false, ...content });
+  await ready();
+  expect(screen.getByLabelText("پیش‌نمایش پاپ‌آپ").textContent).not.toContain("عنوان پاپ‌آپ");
+  fireEvent.click(screen.getByLabelText("نمایش پاپ‌آپ")); submit();
+  await screen.findByText("پاپ‌آپ ذخیره شد.");
+  expect(request).toHaveBeenLastCalledWith("/admin/storefront/popup", { method: "PUT", body: { enabled: true, ...content } });
+});
+it("retains an image-only draft and saved inactive state when the current server rejects publishing", async () => {
+  request.mockResolvedValueOnce({ ...initial, title: "", body: "" });
+  await ready();
+  request.mockRejectedValueOnce(new Error("عنوان و متن الزامی است"));
+  fireEvent.click(screen.getByLabelText("نمایش پاپ‌آپ")); submit();
+  await screen.findByRole("alert");
+  expect(hasUnsavedDrafts()).toBe(true);
+  expect(screen.getByLabelText("وضعیت انتشار پاپ‌آپ").textContent).toBe("در سایت: غیرفعال");
+  expect(screen.queryByText("پاپ‌آپ ذخیره شد.")).toBeNull();
+  expect(screen.getByLabelText("پیش‌نمایش پاپ‌آپ").querySelector("img")).toBeTruthy();
 });
 it("uploads a selected image only when saving, and reuses it if the content save fails", async () => {
   let firstSave = true;
   request.mockImplementation((path: string, options?: { method?: string }) => {
-    if (path === "/upload/image") return Promise.resolve({ url: "/uploads/popup.webp" });
+    if (path === "/upload/image") return Promise.resolve({ url: "https://api.example.test/uploads/popup.webp" });
     if (options?.method === "PUT" && firstSave) { firstSave = false; return Promise.reject(new Error("موقتاً در دسترس نیست")); }
     return Promise.resolve(options?.method === "PUT" ? {} : initial);
   });
@@ -103,7 +128,7 @@ it("uploads a selected image only when saving, and reuses it if the content save
   expect(request.mock.calls.some(([path]) => path === "/upload/image")).toBe(false);
   submit(); await screen.findByRole("alert");
   expect(request.mock.calls.filter(([path]) => path === "/upload/image")).toHaveLength(1);
-  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:popup-preview");
+  await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:popup-preview"));
   expect(hasUnsavedDrafts()).toBe(true);
   submit(); await screen.findByText("پاپ‌آپ ذخیره شد.");
   expect(request.mock.calls.filter(([path]) => path === "/upload/image")).toHaveLength(1);

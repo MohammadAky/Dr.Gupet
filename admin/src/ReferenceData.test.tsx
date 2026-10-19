@@ -6,9 +6,55 @@ import { hasUnsavedDrafts, useDraftProtection } from "./management";
 const { request } = vi.hoisted(() => ({ request: vi.fn() }));
 vi.mock("./auth", () => ({ useAuth: () => ({ request }) }));
 
-afterEach(() => { cleanup(); request.mockReset(); });
+afterEach(() => { cleanup(); request.mockReset(); vi.restoreAllMocks(); });
 const paths = ["/admin/brands", "/admin/categories", "/admin/pet-types", "/admin/breeds", "/admin/tags"];
 const pet = { id: 3, name: "گربه", isActive: true };
+
+it("replaces a reference image through upload, retains it after save failure and never accepts a typed URL", async () => {
+  const brand = { id: 8, name: "برند تصویری", isActive: true, logo: "/uploads/old.webp" };
+  let fail = true;
+  request.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path === "/upload/image") return Promise.resolve({ url: "https://api.example.test/uploads/new.webp" });
+    if (options?.method === "PATCH") {
+      if (fail) { fail = false; return Promise.reject(new Error("ذخیره انجام نشد")); }
+      return Promise.resolve({});
+    }
+    return Promise.resolve(path === "/admin/brands" ? [brand] : []);
+  });
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, writable: true, value: vi.fn(() => "blob:reference") });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, writable: true, value: vi.fn() });
+  render(<ReferenceData />);
+  fireEvent.click(await screen.findByRole("button", { name: /برند تصویری/ }));
+  expect(screen.queryByLabelText("نشانی تصویر")).toBeNull();
+  expect(screen.getByAltText("پیش‌نمایش تصویر").getAttribute("src")).toContain("/uploads/old.webp");
+  fireEvent.change(screen.getByLabelText("تصویر"), { target: { files: [new File(["image"], "new.png", { type: "image/png" })] } });
+  expect(screen.getByAltText("پیش‌نمایش تصویر").getAttribute("src")).toBe("blob:reference");
+  expect(request.mock.calls.some(([path]) => path === "/upload/image")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "ذخیرهٔ تغییرات" }));
+  await screen.findByText("ذخیره انجام نشد");
+  expect(request.mock.calls.filter(([path]) => path === "/upload/image")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "ذخیرهٔ تغییرات" }));
+  await screen.findByText("تغییرات ذخیره شد.");
+  expect(request.mock.calls.filter(([path]) => path === "/upload/image")).toHaveLength(1);
+  expect(request).toHaveBeenCalledWith("/admin/brands/8", { method: "PATCH", body: { name: brand.name, country: null, description: null, logo: "/uploads/new.webp", isActive: true } });
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:reference");
+});
+
+it("preserves an existing reference image on ordinary edits and allows explicit removal", async () => {
+  const brand = { id: 8, name: "برند تصویری", isActive: true, logo: "/uploads/old.webp" };
+  request.mockImplementation((path: string, options?: { method?: string }) => Promise.resolve(options?.method ? {} : path === "/admin/brands" ? [brand] : []));
+  function Protected() { useDraftProtection(); return <ReferenceData />; }
+  render(<Protected />);
+  fireEvent.click(await screen.findByRole("button", { name: /برند تصویری/ }));
+  fireEvent.click(screen.getByRole("button", { name: "ذخیرهٔ تغییرات" }));
+  await screen.findByText("تغییرات ذخیره شد.");
+  expect(request).toHaveBeenCalledWith("/admin/brands/8", { method: "PATCH", body: { name: brand.name, country: null, description: null, logo: brand.logo, isActive: true } });
+  fireEvent.click(screen.getByRole("button", { name: "حذف تصویر" }));
+  expect(hasUnsavedDrafts()).toBe(true);
+  expect(screen.queryByAltText("پیش‌نمایش تصویر")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "ذخیرهٔ تغییرات" }));
+  await waitFor(() => expect(request).toHaveBeenCalledWith("/admin/brands/8", { method: "PATCH", body: { name: brand.name, country: null, description: null, logo: null, isActive: true } }));
+});
 
 it("opens a standalone reference workspace only after all five authenticated lists arrive", async () => {
   let finish!: (value: unknown) => void;

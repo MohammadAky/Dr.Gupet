@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { sanitizeInternalRedirect } from '../../lib/security';
 import type { AuthStatus } from '../../auth/auth-provider';
 
 type NavIconName = 'home' | 'products' | 'favorites' | 'account';
@@ -45,6 +46,8 @@ function NavIcon({ name }: { name: NavIconName }) {
 }
 
 export function MobileBottomNav({ status }: { status: AuthStatus }) {
+  const location = useLocation();
+  const loginHref = `/login?${new URLSearchParams({ next: sanitizeInternalRedirect(location.pathname + location.search + location.hash) })}`;
   return (
     <nav className="mobile-bottom-nav" aria-label="دسترسی سریع موبایل">
       <NavLink to="/" end>
@@ -59,7 +62,7 @@ export function MobileBottomNav({ status }: { status: AuthStatus }) {
         <NavIcon name="favorites" />
         <span>علاقه‌مندی‌ها</span>
       </NavLink>
-      <NavLink to={status === 'authed' ? '/profile' : '/login'}>
+      <NavLink to={status === 'authed' ? '/profile' : loginHref}>
         <NavIcon name="account" />
         <span>{status === 'authed' ? 'حساب من' : 'ورود'}</span>
       </NavLink>

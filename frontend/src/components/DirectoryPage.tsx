@@ -1,4 +1,5 @@
 import { GlassSelect } from './GlassSelect';
+import { DirectoryFilters } from './DirectoryFilters';
 import { SafeImage } from './SafeImage';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
@@ -75,15 +76,17 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
   }
 
   return (
-    <section className={`directory-page${clinics ? ' clinic-directory' : ''}`}>
+    <section className={`directory-page directory-compact${clinics ? ' clinic-directory' : ''}`}>
       <div className="directory-page__heading">
         <span className="eyebrow">راهنمای مراکز</span>
         <h1>{title}</h1>
         {!clinics && <p>قیمت و موجودی دارو ارائه نمی‌شود.</p>}
       </div>
-      <form className="filter-panel directory-page__filters" onSubmit={submit}>
-        <div className="filter-panel__grid">
-          <SearchableFilter
+      <DirectoryFilters title={`فیلتر ${title}`} onSubmit={submit}
+        activeCount={[filters.province, filters.city, filters.is24h, !clinics && pharmacyFilters.onDuty !== undefined].filter(Boolean).length}
+        onClear={() => { setCity(''); setProvince(''); setIs24h(false); setOnDuty('all'); setParams(new URLSearchParams()); }}
+        sections={[
+          { id: 'province', label: 'استان', summary: province || undefined, content: (          <SearchableFilter
             label="استان"
             value={province}
             onInputChange={setProvince}
@@ -93,53 +96,33 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
             }}
             options={provinces.map((name) => ({ value: name, label: name }))}
             placeholder="انتخاب استان"
-          />
-          <SearchableFilter
+          />) },
+          { id: 'city', label: 'شهر', summary: city || undefined, content: (          <SearchableFilter
             label="شهر"
             value={city}
             onInputChange={setCity}
             onSelect={setCity}
             options={citySuggestions(province).map((name) => ({ value: name, label: name }))}
             placeholder="انتخاب شهر"
-          />
-        </div>
-        <div className="filter-panel__actions">
-          <label className="filter-check">
+          />) },
+          { id: 'hours', label: 'ساعات فعالیت', summary: is24h ? '۲۴ ساعته' : undefined, content: (          <label className="filter-check">
             <input
               type="checkbox"
               checked={is24h}
               onChange={(event) => setIs24h(event.target.checked)}
             />{' '}
             فقط ۲۴ ساعته
-          </label>
-          {!clinics && (
-            <label className="directory-duty-filter" htmlFor="directory-duty">
+          </label>) },
+          ...(!clinics ? [{ id: 'duty', label: 'وضعیت کشیک', summary: onDuty === 'all' ? undefined : onDuty === 'true' ? 'کشیک' : 'غیرکشیک', content: (            <label className="directory-duty-filter" htmlFor="directory-duty">
               وضعیت کشیک
               <GlassSelect id="directory-duty" aria-label="وضعیت کشیک" value={onDuty} onChange={(event) => setOnDuty(event.target.value)}>
                 <option value="all">همه</option>
                 <option value="true">کشیک</option>
                 <option value="false">غیرکشیک</option>
               </GlassSelect>
-            </label>
-          )}
-          <button type="submit" className="filter-apply">
-            نمایش نتایج
-          </button>
-          <button
-            type="button"
-            className="filter-clear"
-            onClick={() => {
-              setCity('');
-              setProvince('');
-              setIs24h(false);
-              setOnDuty('all');
-              setParams(new URLSearchParams());
-            }}
-          >
-            پاک‌کردن فیلترها
-          </button>
-        </div>
-      </form>
+            </label>) }] : []),
+        ]}>
+
       {data?.meta && (
         <p className="directory-results" role="status">
           {data.meta.total.toLocaleString('fa-IR')} {clinics ? 'کلینیک' : 'داروخانه'} پیدا شد
@@ -226,6 +209,7 @@ function DirectoryContent({ kind }: { kind: 'pharmacies' | 'clinics' }) {
           <Pagination meta={data.meta} />
         </>
       )}
+      </DirectoryFilters>
     </section>
   );
 }

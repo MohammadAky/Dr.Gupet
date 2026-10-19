@@ -1,8 +1,9 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "./api/client";
 import { useAuth } from "./auth";
 import { confirmAction, markFormSaved, validateRequiredFields } from "./management";
-import { safeImageUrl, type CatalogTag, type NamedRef } from "./catalog-model";
+import { safeImageUrl, validateImage, type CatalogTag, type NamedRef } from "./catalog-model";
+import { uploadedImagePath } from "./uploaded-image";
 
 export type ReferenceKind =
   "brands" | "categories" | "pet-types" | "breeds" | "tags";
@@ -47,10 +48,16 @@ export function CatalogReferencesManager({
   const [country, setCountry] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const mounted = useRef(false);
   const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
 
   const items =
     kind === "pet-types"
@@ -65,6 +72,7 @@ export function CatalogReferencesManager({
   const label =
     definitions.find((item) => item.kind === kind)?.label || "داده‌های مرجع";
   const selected = items.find((item) => item.id === selectedId);
+  const previewSource = imageFile ? imagePreview : image.trim() ? safeImageUrl(image) : null;
 
   function reset() {
     setSelectedId(null);
@@ -75,12 +83,14 @@ export function CatalogReferencesManager({
     setCountry("");
     setDescription("");
     setImage("");
+    setImageFile(null); setImagePreview("");
     setIsActive(true);
     setError("");
     setNotice("");
   }
 
   function select(item: NamedRef | CatalogTag) {
+    setImageFile(null); setImagePreview("");
     setSelectedId(item.id);
     setName(item.name);
     setPetTypeId(item.petTypeId ? String(item.petTypeId) : "");
@@ -141,13 +151,22 @@ export function CatalogReferencesManager({
     setError("");
     setNotice("");
     try {
+      let savedImage = image.trim();
+      if (imageFile && (kind === "brands" || kind === "categories")) {
+        const formData = new FormData(); formData.append("file", imageFile);
+        const uploaded = await request<{ url: string }>("/upload/image", { method: "POST", formData });
+        if (!mounted.current) return;
+        const path = uploadedImagePath(uploaded?.url);
+        if (!path) throw new Error("تصویر بارگذاری‌شده معتبر نیست.");
+        savedImage = path; setImage(savedImage); setImageFile(null); setImagePreview("");
+      }
       let body: Record<string, unknown> = { name: name.trim() };
       if (kind === "brands") {
         body = {
           ...body,
           country: country.trim() || null,
           description: description.trim() || null,
-          logo: image.trim() || null,
+          logo: savedImage || null,
           isActive,
         };
       } else if (kind === "categories") {
@@ -155,7 +174,7 @@ export function CatalogReferencesManager({
           ...body,
           petTypeId: parsedPetType || null,
           parentId: parsedParent || null,
-          image: image.trim() || null,
+          image: savedImage || null,
           isActive,
         };
       } else if (kind === "breeds") {
@@ -404,18 +423,24 @@ export function CatalogReferencesManager({
                 </label>
               </>
             )}
-            {(kind === "brands" || kind === "categories") && (
-              <label className="catalog-field catalog-field--wide">
-                نشانی تصویر
+            {(kind === "brands" || kind === "categories") && <div className="catalog-field catalog-field--wide">
+              <label>
+                تصویر
                 <input
-                  dir="ltr"
-                  value={image}
-                  onChange={(event) => setImage(event.target.value)}
+                  type="file" accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null; event.target.value = "";
+                    if (!file) return;
+                    const problem = validateImage(file);
+                    if (problem || !file.size) { setError(problem || "تصویر خالی است."); return; }
+                    setError(""); setImageFile(file); setImagePreview(URL.createObjectURL(file));
+                  }}
                   disabled={busy}
-                  placeholder="/uploads/image.webp یا https://…"
                 />
               </label>
-            )}
+              {previewSource && <img src={previewSource} alt="پیش‌نمایش تصویر" style={{ maxWidth: 180, maxHeight: 140, objectFit: "contain" }} />}
+              {(imageFile || image) && <button type="button" disabled={busy} data-draft-keep onClick={(event) => { const form = event.currentTarget.closest("form"); if (form) form.dataset.dirty = "true"; setImage(""); setImageFile(null); setImagePreview(""); }}>حذف تصویر</button>}
+            </div>}
             {kind !== "tags" && kind !== "breeds" && (
               <label className="catalog-switch">
                 <input

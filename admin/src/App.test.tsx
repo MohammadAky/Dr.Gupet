@@ -232,6 +232,7 @@ function adminResponses() {
     if (url.endsWith("/auth/admin/otp/request")) return Promise.resolve(response({ expiresIn: 120 }));
     if (url.endsWith("/auth/admin/otp/verify")) return Promise.resolve(response({ accessToken: "a", refreshToken: "r" }));
     if (url.endsWith("/admin/me")) return Promise.resolve(response({ id: 1, role: "ADMIN", firstName: "مدیر" }));
+    if (url.endsWith("/admin/storefront/popup")) return Promise.resolve(response({ enabled: false, title: "", body: "", image: "" }));
     if (url.includes("/admin/dashboard")) return Promise.resolve(response(dashboard));
     if (url.includes("/admin/reports/sales")) return Promise.resolve(response(sales));
     if (url.includes("/admin/reports/users")) return Promise.resolve(response({ totals: { users: 5, admins: 2, customers: 3 } }));
@@ -270,7 +271,7 @@ it("traps mobile drawer focus, hides the workspace, and restores the menu trigge
   expect(workspace.hasAttribute("inert")).toBe(true);
   expect(sidebar.hasAttribute("inert")).toBe(false);
   fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-  expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "داده‌های مرجع" }));
+  expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "پاپ‌آپ" }));
   fireEvent.keyDown(document, { key: "Tab" });
   expect(document.activeElement).toBe(close);
 
@@ -314,6 +315,34 @@ it("opens the authenticated landing editor and protects its actual edits on sect
   fireEvent.click(within(discard).getByRole("button", { name: "کنار گذاشتن تغییرها" }));
   await screen.findByRole("heading", { name: "سفارش‌ها" });
   expect(window.location.hash).toBe("#orders");
+});
+
+it("opens the popup workspace directly after authentication and protects edits on navigation", async () => {
+  mobileViewport(false); const fetchMock = adminResponses(); vi.stubGlobal("scrollTo", vi.fn());
+  window.history.replaceState(null, "", "/#popup?token=ignored");
+  await loginAdmin("پاپ‌آپ سایت");
+  await screen.findByRole("button", { name: "ذخیره پاپ‌آپ" });
+  expect(window.location.hash).toBe("#popup");
+  expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/admin/storefront/popup"))).toHaveLength(1);
+  fireEvent.change(screen.getByLabelText("عنوان"), { target: { value: "پیش‌نویس" } });
+  fireEvent.click(screen.getByRole("button", { name: "محتوای صفحهٔ اصلی" }));
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" })).getByRole("button", { name: "بازگشت" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(window.location.hash).toBe("#popup");
+  expect((screen.getByLabelText("عنوان") as HTMLInputElement).value).toBe("پیش‌نویس");
+});
+
+it("guards the landing shortcut to the actual server-backed popup editor", async () => {
+  mobileViewport(false); adminResponses(); vi.stubGlobal("scrollTo", vi.fn());
+  window.history.replaceState(null, "", "/#landing");
+  await loginAdmin("محتوای صفحهٔ اصلی");
+  fireEvent.change(screen.getByLabelText("متن اعلان"), { target: { value: "تغییر اعلان" } });
+  fireEvent.click(screen.getByRole("link", { name: "مدیریت پاپ‌آپ" }));
+  const dialog = await screen.findByRole("dialog", { name: "کنار گذاشتن تغییرها" });
+  expect(window.location.hash).toBe("#landing");
+  fireEvent.click(within(dialog).getByRole("button", { name: "کنار گذاشتن تغییرها" }));
+  await screen.findByRole("heading", { name: "پاپ‌آپ سایت" });
+  expect(window.location.hash).toBe("#popup");
 });
 
 it("opens references directly after administrator authentication and guards departure from its draft", async () => {

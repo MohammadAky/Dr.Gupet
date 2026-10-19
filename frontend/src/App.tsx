@@ -15,6 +15,8 @@ import { RouteLoading } from './components/RouteLoading';
 import { CartAddFeedback } from './components/CartAddFeedback';
 import { VisitPopup } from './components/VisitPopup';
 import { BackToTop } from './components/BackToTop';
+import { GuestCartTransfer, cartCountWithGuest } from './components/GuestCartTransfer';
+import { useGuestCart } from './features/cart/guest-cart';
 import { landingSample, safeLandingLink } from './features/landing/content';
 
 export function Shell() {
@@ -63,7 +65,13 @@ export function Shell() {
     queryFn: () => shopApi.cart(),
     enabled: status === 'authed',
   });
-  const cartCount = status === 'authed' ? (cart.data?.items.length ?? 0) : 0;
+  const guestItems = useGuestCart();
+  const cartCount =
+    status === 'authed'
+      ? cartCountWithGuest(cart.data)
+      : status === 'guest'
+        ? guestItems.reduce((sum, item) => sum + item.quantity, 0)
+        : 0;
 
   async function handleLogout() {
     const revocation = logout();
@@ -96,16 +104,12 @@ export function Shell() {
       <a className="skip-link" href="#main-content">
         رفتن به محتوای اصلی
       </a>
-      {(location.pathname !== '/' || landingSample.announcement.enabled) && (
+      {landingSample.announcement.enabled && (
         <div className="announcement">
-          {location.pathname === '/' ? (
-            landingSample.announcement.href && safeLandingLink(landingSample.announcement.href) ? (
-              <a href={landingSample.announcement.href}>{landingSample.announcement.text}</a>
-            ) : (
-              landingSample.announcement.text
-            )
+          {landingSample.announcement.href && safeLandingLink(landingSample.announcement.href) ? (
+            <a href={landingSample.announcement.href}>{landingSample.announcement.text}</a>
           ) : (
-            'دکتر گوپت، همراه شما برای انتخاب آگاهانهٔ محصولات حیوانات خانگی'
+            landingSample.announcement.text
           )}
         </div>
       )}
@@ -121,6 +125,7 @@ export function Shell() {
         onMenuClose={() => setMenuOpen(false)}
         onLogout={() => void handleLogout()}
       />
+      <GuestCartTransfer />
       <main
         ref={mainRef}
         tabIndex={-1}

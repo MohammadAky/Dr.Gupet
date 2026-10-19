@@ -13,7 +13,8 @@ export function CartAddFeedback() {
   const { pathname } = useLocation();
   const tileRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (status !== 'authed' || !user) return;
+    if (status === 'loading' || (status === 'authed' && !user)) return;
+    const actorId = status === 'authed' ? user!.id : null;
     const tile = tileRef.current;
     if (!tile) return;
     let flight: Animation | undefined;
@@ -27,7 +28,7 @@ export function CartAddFeedback() {
     };
     const onAdded = (event: Event) => {
       const detail = (event as CustomEvent<CartAddedFeedback>).detail;
-      if (!detail || detail.userId !== user.id) return;
+      if (!detail || detail.userId !== actorId) return;
       cleanup();
       if (detail.keyboard || window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden) return;
       target = document.querySelector<HTMLElement>('.cart-link');

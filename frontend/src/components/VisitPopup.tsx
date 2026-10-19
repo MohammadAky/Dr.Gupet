@@ -29,6 +29,7 @@ export function VisitPopup() {
   const [visitSeen, setVisitSeen] = useState(seenInVisit);
   const seen = useRef(visitSeen);
   const [open, setOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const eligible = pathname === '/' && Boolean(consent) && !visitSeen;
   const popup = useQuery({ queryKey: ['storefront', 'popup'], queryFn: storefrontApi.popup, enabled: eligible, retry: false, staleTime: 60_000 });
   const content = validPopup(popup.data) ? popup.data : null;
@@ -63,11 +64,13 @@ export function VisitPopup() {
   }, [eligible, content]);
 
   if (!content) return null;
-  return <Dialog open={open && pathname === '/'} title={content.title} onClose={() => setOpen(false)}>
-    <div className="visit-popup">
-      {content.image && <SafeImage src={content.image} alt="" width="800" height="480" />}
-      <p>{content.body}</p>
-      <button className="ui-button ui-button--primary" type="button" onClick={() => setOpen(false)}>متوجه شدم</button>
+  const imageOnly = !content.title.trim() && !content.body.trim();
+  return <Dialog open={open && pathname === '/'} title={content.title.trim() || 'پیام فروشگاه'} hideTitle={!content.title.trim()} onClose={() => setOpen(false)}>
+    <div className={`visit-popup${imageOnly ? ' visit-popup--image-only' : ''}`}>
+      {content.image && <SafeImage src={content.image} alt={imageOnly ? 'پیام تصویری فروشگاه' : ''} width="800" height="480" onError={() => setImageFailed(true)} />}
+      {imageOnly && imageFailed && <p role="status">تصویر پیام بارگذاری نشد.</p>}
+      {content.body.trim() && <p>{content.body}</p>}
+      {(!imageOnly || imageFailed) && <button className="ui-button ui-button--primary" type="button" onClick={() => setOpen(false)}>{imageOnly ? 'بستن' : 'متوجه شدم'}</button>}
     </div>
   </Dialog>;
 }

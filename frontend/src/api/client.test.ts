@@ -12,6 +12,29 @@ afterEach(() => {
 });
 
 describe('API deployment URL resolution', () => {
+  it('does not dispatch a request whose initiating actor has expired', async () => {
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+    await expect(requestData('/cart/items', { method: 'POST', isCurrent: () => false })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh or retry an old actor after its response arrives', async () => {
+    let current = true;
+    const refresh = vi.fn(); setAuthBridge({ getAccessToken: () => 'old-actor', refresh });
+    const fetchMock = vi.fn().mockImplementation(async () => { current = false; return new Response('{}', { status: 401 }); });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(requestData('/cart/items', { method: 'POST', isCurrent: () => current })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(refresh).not.toHaveBeenCalled(); expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry a write if its actor changes during refresh', async () => {
+    let current = true;
+    const refresh = vi.fn().mockImplementation(async () => { current = false; return true; });
+    setAuthBridge({ getAccessToken: () => 'actor', refresh });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 401 })); vi.stubGlobal('fetch', fetchMock);
+    await expect(requestData('/cart/items', { method: 'POST', isCurrent: () => current })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(refresh).toHaveBeenCalledOnce(); expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it('resolves a root-relative API on the current origin with encoded queries and Bearer auth', async () => {
     env.API_BASE_URL = '/api/v1';
     vi.stubGlobal('window', { location: { origin: 'http://127.0.0.1:8080' } });

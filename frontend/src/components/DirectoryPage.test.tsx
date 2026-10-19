@@ -95,7 +95,7 @@ describe('clinic directory presentation preserves real information', () => {
     expect(shopApi.pharmacies).not.toHaveBeenCalled();
     await act(async () => {
       const button = Array.from(container.querySelectorAll('button')).find(
-        (item) => item.textContent === 'پاک‌کردن فیلترها',
+        (item) => item.textContent?.startsWith('پاک‌کردن فیلترها'),
       );
       button?.click();
     });
@@ -182,6 +182,7 @@ describe('clinic directory presentation preserves real information', () => {
   it('submits typed directory filters without remounting or losing the focused input', async () => {
     await show('/clinics');
     await vi.waitFor(() => expect(shopApi.clinics).toHaveBeenCalled());
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'شهر')?.click());
     const city = container.querySelectorAll<HTMLInputElement>('input[role="combobox"]')[1]!;
     await act(async () => city.focus());
     await act(async () => {

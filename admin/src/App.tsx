@@ -10,6 +10,7 @@ import { Operations } from "./Operations";
 import { Reports } from "./Reports";
 import { LandingContent } from "./LandingContent";
 import { ReferenceData } from "./ReferenceData";
+import { PopupEditor } from "./PopupEditor";
 import { type DashboardData } from "./dashboard-data";
 import { ThemeToggle } from "./ThemeToggle";
 import { PasswordInput } from "./PasswordInput";
@@ -852,6 +853,7 @@ function Workspace() {
           : section === "reports" ? <Reports />
           : section === "landing" ? <LandingContent />
           : section === "references" ? <ReferenceData />
+          : section === "popup" ? <PopupEditor />
           : <Operations key={section} initialTab={section === "audit" ? "audit" : section === "settings" ? "settings" : "payments"} />}
       </main>
     </div>

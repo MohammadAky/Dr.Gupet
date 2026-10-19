@@ -8,6 +8,7 @@ import { shopApi, type Page } from '../../api/endpoints-shop';
 import type { Medicine, Pharmacy, ProductCard } from '../../api/types';
 import { Header } from './Header';
 import { Shell } from '../../App';
+import { landingSample } from '../../features/landing/content';
 
 vi.mock('../../auth/auth-provider', () => ({
   useAuth: () => ({ status: 'guest', user: null, logout: vi.fn() }),
@@ -154,6 +155,21 @@ describe('mobile header controls', () => {
     expect(menu?.getAttribute('aria-expanded')).toBe('false');
     expect(search?.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('.mobile-search')?.hasAttribute('hidden')).toBe(false);
+  });
+  it('carries the exact current route to login from the desktop account link', async () => {
+    await act(async () => root.render(<MemoryRouter initialEntries={['/clinics?province=تهران#results']}><Harness /></MemoryRouter>));
+    const login = container.querySelector<HTMLAnchorElement>('.header-account-link')!;
+    const destination = new URL(new URL(login.href).searchParams.get('next')!, 'https://drgupet.invalid');
+    expect(destination.pathname).toBe('/clinics');
+    expect(destination.searchParams.get('province')).toBe('تهران');
+    expect(destination.hash).toBe('#results');
+  });
+
+  it.each(['/products', '/clinics', '/login'])('uses the same configurable announcement on %s', async path => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Shell /></MemoryRouter></QueryClientProvider>));
+    expect(container.querySelector('.announcement')?.textContent).toBe(landingSample.announcement.text);
+    client.clear();
   });
 
   it('preserves page input on query changes and makes keyboard route changes immediate', async () => {

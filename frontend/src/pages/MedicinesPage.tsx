@@ -7,6 +7,7 @@ import { api } from '../api/endpoints';
 import { queryKeys } from '../api/query-keys';
 import { Pagination } from '../components/Pagination';
 import { SearchableFilter } from '../components/SearchableFilter';
+import { DirectoryFilters } from '../components/DirectoryFilters';
 import { EmptyState, ErrorState, LoadingState } from '../components/states';
 import { isSampleReference, publicRecordName } from '../lib/sample-records';
 
@@ -67,24 +68,26 @@ export function MedicinesPage() {
   }
 
   return (
-    <section className="medicine-directory">
+    <section className="medicine-directory directory-compact">
       <div className="directory-page__heading">
         <span className="eyebrow">راهنمای سلامت</span>
         <h1>اطلاعات داروها</h1>
         <p>صرفاً اطلاعاتی؛ پیش از مصرف با دامپزشک مشورت کنید.</p>
       </div>
 
-      <form className="filter-panel" onSubmit={submit}>
-        <div className="filter-panel__grid">
-          <SearchableFilter
+      <DirectoryFilters title="فیلتر داروها" onSubmit={submit} submitLabel="جستجو"
+        activeCount={[q, petTypeId, prescriptionOnly].filter(Boolean).length}
+        onClear={() => { setSearch(''); setParams(new URLSearchParams()); }}
+        sections={[
+          { id: 'search', label: 'جستجوی دارو', summary: q || undefined, content: (          <SearchableFilter
             label="نام دارو یا مادهٔ مؤثره"
             value={search}
             options={medicineOptions}
             onInputChange={setSearch}
             onSelect={setSearch}
             placeholder="جستجوی دارو"
-          />
-          <SearchableFilter
+          />) },
+          { id: 'animal', label: 'نوع حیوان', summary: petTypes.data?.find(type => type.id === petTypeId)?.name, content: (          <SearchableFilter
             label="نوع حیوان"
             value={String(petTypeId ?? '')}
             options={[
@@ -101,9 +104,8 @@ export function MedicinesPage() {
               next.delete('page');
               setParams(next);
             }}
-          />
-        </div>
-        <label className="filter-check">
+          />) },
+          { id: 'prescription', label: 'نسخه', summary: prescriptionOnly ? 'نیازمند نسخه' : undefined, content: (        <label className="filter-check">
           <input
             type="checkbox"
             checked={prescriptionOnly}
@@ -116,11 +118,9 @@ export function MedicinesPage() {
             }}
           />
           نیازمند نسخه
-        </label>
-        <button type="submit" className="filter-apply">
-          جستجو
-        </button>
-      </form>
+        </label>) },
+        ]}>
+
 
       {medicines.isLoading && <LoadingState layout="cards" />}
       {medicines.error && (
@@ -151,6 +151,7 @@ export function MedicinesPage() {
           <Pagination meta={medicines.data.meta} />
         </>
       )}
+      </DirectoryFilters>
     </section>
   );
 }

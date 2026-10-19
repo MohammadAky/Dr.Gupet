@@ -71,6 +71,11 @@ it('waits for the success signal, flies a decorative image, then pulses the bask
   vi.advanceTimersByTime(1400);
   expect(animations.every(item => item.animation.cancel.mock.calls.length === 1)).toBe(true);
 });
+it('accepts a confirmed guest write and ignores feedback from an authenticated account', async () => {
+  session.status = 'guest'; await render();
+  signal({ userId: 42 }); expect(animations).toHaveLength(0);
+  signal({ userId: null }); expect(animations).toHaveLength(1); expect(tile().hidden).toBe(false);
+});
 
 it.each(['keyboard', 'reduced-motion', 'hidden-document', 'wrong-account', 'no-basket', 'invisible-basket'] as const)('is quiet for %s', mode => {
   if (mode === 'reduced-motion') reducedMotion = true;

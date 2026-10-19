@@ -8,6 +8,7 @@ import { shopApi } from '../api/endpoints-shop';
 import type { ProductCard, ProductDetail } from '../api/types';
 import { rankRelatedProducts, RelatedProducts } from './RelatedProducts';
 vi.mock('../api/endpoints-shop', () => ({ shopApi: { products: vi.fn() } }));
+vi.mock('../auth/auth-provider', () => ({ useAuth: () => ({ status: 'guest', user: null }) }));
 const current: ProductDetail = {
   id: 1, name: 'غذای گربه', slug: 'cat-food', isActive: true, lifeStage: 'ADULT', sizeClass: 'SMALL', neuterSuitability: 'ANY',
   brand: { id: 1, name: 'برند', slug: 'brand' }, category: { id: 2, name: 'غذا', slug: 'food' }, petType: { id: 3, name: 'گربه', slug: 'cat' },

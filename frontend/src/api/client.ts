@@ -17,6 +17,8 @@ export interface RequestOptions {
   formData?: FormData;
   /** Attach `Authorization: Bearer` (default true). */
   auth?: boolean;
+  /** Cancel a multi-step operation when its initiating identity is no longer current. */
+  isCurrent?: () => boolean;
 }
 
 /** Bridge to the session — registered by <AuthProvider> to avoid a circular import. */
@@ -77,6 +79,7 @@ async function doRequest<T>(
   path: string,
   options: RequestOptions,
 ): Promise<{ data: T; meta?: PageInfo }> {
+  assertCurrent(options);
   const { method = 'GET', body, query, formData, auth = true } = options;
   const headers: Record<string, string> = { Accept: 'application/json' };
 
@@ -99,10 +102,12 @@ async function doRequest<T>(
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
     const res = await fetch(buildUrl(path, query), { ...init, signal: controller.signal });
+    assertCurrent(options);
     if (!res.ok) throw new ApiError(await toFailure(res));
 
     if (res.status === 204) return { data: undefined as T };
     const json = (await res.json().catch(() => null)) as Envelope<T> | null;
+    assertCurrent(options);
     if (!json || json.success !== true || !('data' in json)) {
       throw new ApiError({
         success: false,
@@ -131,13 +136,21 @@ export async function request<T>(
   try {
     return await doRequest<T>(path, options);
   } catch (error) {
+    assertCurrent(options);
     const needsAuth = options.auth !== false;
     const is401 = error instanceof ApiError && error.statusCode === 401;
     if (!is401 || !needsAuth || !bridge) throw error;
 
     const ok = await refreshOnce();
+    assertCurrent(options);
     if (!ok) throw error;
     return doRequest<T>(path, options);
+  }
+}
+
+function assertCurrent(options: RequestOptions): void {
+  if (options.isCurrent && !options.isCurrent()) {
+    throw new DOMException('The initiating session is no longer active', 'AbortError');
   }
 }
 

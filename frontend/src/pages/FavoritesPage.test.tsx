@@ -10,21 +10,36 @@ import type { ProductCard } from '../api/types';
 import { FavoritesPage } from './FavoritesPage';
 
 const authState = vi.hoisted(() => ({ userId: 1, status: 'authed' }));
-vi.mock('../auth/auth-provider', () => ({ useAuth: () => ({ status: authState.status, user: { id: authState.userId } }) }));
-vi.mock('../api/endpoints-shop', () => ({ shopApi: { favorites: vi.fn(), removeFavorite: vi.fn(), addFavorite: vi.fn() } }));
+vi.mock('../auth/auth-provider', () => ({
+  useAuth: () => ({ status: authState.status, user: { id: authState.userId } }),
+}));
+vi.mock('../api/endpoints-shop', () => ({
+  shopApi: { favorites: vi.fn(), removeFavorite: vi.fn(), addFavorite: vi.fn() },
+}));
 
 const card: ProductCard = {
-  id: 7, name: 'غذای محبوب', slug: 'favorite-food', brand: { id: 2, name: 'برند' },
-  image: null, minPrice: 100_000, inStock: true, lifeStage: 'ALL', sizeClass: 'ALL',
+  id: 7,
+  name: 'غذای محبوب',
+  slug: 'favorite-food',
+  brand: { id: 2, name: 'برند' },
+  image: null,
+  minPrice: 100_000,
+  inStock: true,
+  lifeStage: 'ALL',
+  sizeClass: 'ALL',
 };
 const page = (data: ProductCard[]) => ({
-  data, meta: { page: 2, limit: 20, total: data.length, totalPages: 2 },
+  data,
+  meta: { page: 2, limit: 20, total: data.length, totalPages: 2 },
 });
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((accept, fail) => { resolve = accept; reject = fail; });
+  const promise = new Promise<T>((accept, fail) => {
+    resolve = accept;
+    reject = fail;
+  });
   return { promise, resolve, reject };
 }
 
@@ -36,15 +51,23 @@ describe('favorites removal', () => {
 
   async function renderPage(waitForItems = true) {
     await act(async () => {
-      root.render(<QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={['/favorites?page=2']}><FavoritesPage /></MemoryRouter>
-      </QueryClientProvider>);
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={['/favorites?page=2']}>
+            <FavoritesPage />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
-    if (waitForItems) await vi.waitFor(() => expect(container.querySelector('.product-card button')).not.toBeNull());
+    if (waitForItems)
+      await vi.waitFor(() =>
+        expect(container.querySelector('.product-card button[aria-label^="حذف "]')).not.toBeNull(),
+      );
   }
 
   beforeEach(() => {
+    vi.resetAllMocks();
     authState.userId = 1;
     authState.status = 'authed';
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -53,7 +76,12 @@ describe('favorites removal', () => {
     document.body.append(container);
     root = createRoot(container);
     mounted = true;
-    client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } });
+    client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    });
     vi.mocked(shopApi.favorites).mockResolvedValue(page([card]));
   });
 
@@ -71,8 +99,13 @@ describe('favorites removal', () => {
     vi.mocked(shopApi.removeFavorite).mockReturnValue(pending.promise);
     await renderPage();
     expect(shopApi.favorites).toHaveBeenCalledWith(2);
-    const remove = container.querySelector<HTMLButtonElement>('.product-card button')!;
-    await act(async () => { remove.click(); remove.click(); });
+    const remove = container.querySelector<HTMLButtonElement>(
+      '.product-card button[aria-label^="حذف "]',
+    )!;
+    await act(async () => {
+      remove.click();
+      remove.click();
+    });
     expect(shopApi.removeFavorite).toHaveBeenCalledTimes(1);
     expect(shopApi.removeFavorite).toHaveBeenCalledWith(7);
     expect(remove.disabled).toBe(true);
@@ -83,25 +116,49 @@ describe('favorites removal', () => {
   });
 
   it('invalidates the same favorites cache and shows success after a server removal', async () => {
-    vi.mocked(shopApi.favorites).mockResolvedValueOnce(page([card])).mockResolvedValueOnce(page([]));
+    vi.mocked(shopApi.favorites)
+      .mockResolvedValueOnce(page([card]))
+      .mockResolvedValueOnce(page([]));
     vi.mocked(shopApi.removeFavorite).mockResolvedValue(undefined);
     await renderPage();
-    await act(async () => container.querySelector<HTMLButtonElement>('.product-card button')?.click());
-    await vi.waitFor(() => expect(container.querySelector('[role="status"]')?.textContent).toBe('محصول از علاقه‌مندی‌ها حذف شد.'));
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('.product-card button[aria-label^="حذف "]')
+        ?.click(),
+    );
+    await vi.waitFor(() =>
+      expect(container.querySelector('[role="status"]')?.textContent).toBe(
+        'محصول از علاقه‌مندی‌ها حذف شد.',
+      ),
+    );
     expect(shopApi.favorites).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain('بازگشت به صفحهٔ اول');
   });
 
   it('restores a removed favorite through the server and waits before clearing Undo', async () => {
-    vi.mocked(shopApi.favorites).mockResolvedValueOnce(page([card])).mockResolvedValueOnce(page([])).mockResolvedValueOnce(page([card]));
+    vi.mocked(shopApi.favorites)
+      .mockResolvedValueOnce(page([card]))
+      .mockResolvedValueOnce(page([]))
+      .mockResolvedValueOnce(page([card]));
     vi.mocked(shopApi.removeFavorite).mockResolvedValue(undefined);
-    const restore = deferred<void>(); vi.mocked(shopApi.addFavorite).mockReturnValue(restore.promise);
+    const restore = deferred<void>();
+    vi.mocked(shopApi.addFavorite).mockReturnValue(restore.promise);
     await renderPage();
-    await act(async () => container.querySelector<HTMLButtonElement>('.product-card button')!.click());
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('.product-card button[aria-label^="حذف "]')!
+        .click(),
+    );
     await vi.waitFor(() => expect(container.textContent).toContain('بازگردانی'));
-    const undo = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'بازگردانی')!;
-    await act(async () => { undo.click(); undo.click(); });
-    expect(shopApi.addFavorite).toHaveBeenCalledExactlyOnceWith(7); expect(undo.disabled).toBe(true);
+    const undo = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'بازگردانی',
+    )!;
+    await act(async () => {
+      undo.click();
+      undo.click();
+    });
+    expect(shopApi.addFavorite).toHaveBeenCalledExactlyOnceWith(7);
+    expect(undo.disabled).toBe(true);
     await act(async () => restore.resolve(undefined));
     await vi.waitFor(() => expect(container.querySelector('.product-card')).not.toBeNull());
     expect(container.textContent).not.toContain('بازگردانی');
@@ -111,7 +168,11 @@ describe('favorites removal', () => {
     const pending = deferred<void>();
     vi.mocked(shopApi.removeFavorite).mockReturnValue(pending.promise);
     await renderPage();
-    await act(async () => container.querySelector<HTMLButtonElement>('.product-card button')?.click());
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('.product-card button[aria-label^="حذف "]')
+        ?.click(),
+    );
     const invalidate = vi.spyOn(client, 'invalidateQueries');
     await act(async () => root.unmount());
     mounted = false;
@@ -122,18 +183,35 @@ describe('favorites removal', () => {
 
   it('blocks removal from previous-page placeholders until the requested page is ready', async () => {
     const next = deferred<ReturnType<typeof page>>();
-    vi.mocked(shopApi.favorites).mockResolvedValueOnce(page([card])).mockReturnValueOnce(next.promise);
+    vi.mocked(shopApi.favorites)
+      .mockResolvedValueOnce(page([card]))
+      .mockReturnValueOnce(next.promise);
     await renderPage();
-    const previous = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'قبلی')!;
+    const previous = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent?.trim() === 'قبلی',
+    )!;
     await act(async () => previous.click());
-    const staleRemove = container.querySelector<HTMLButtonElement>('.product-card button')!;
+    const staleRemove = container.querySelector<HTMLButtonElement>(
+      '.product-card button[aria-label^="حذف "]',
+    )!;
     expect(staleRemove.disabled).toBe(true);
     await act(async () => staleRemove.click());
     expect(shopApi.removeFavorite).not.toHaveBeenCalled();
     const nextCard = { ...card, id: 8, name: 'انتخاب تازه' };
-    await act(async () => next.resolve({ data: [nextCard], meta: { page: 1, limit: 20, total: 2, totalPages: 2 } }));
-    await vi.waitFor(() => expect(container.querySelector<HTMLButtonElement>('.product-card button')?.disabled).toBe(false));
-    expect(container.querySelector('.product-card button')?.getAttribute('aria-label')).toContain('انتخاب تازه');
+    await act(async () =>
+      next.resolve({ data: [nextCard], meta: { page: 1, limit: 20, total: 2, totalPages: 2 } }),
+    );
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector<HTMLButtonElement>('.product-card button[aria-label^="حذف "]')
+          ?.disabled,
+      ).toBe(false),
+    );
+    expect(
+      container
+        .querySelector('.product-card button[aria-label^="حذف "]')
+        ?.getAttribute('aria-label'),
+    ).toContain('انتخاب تازه');
   });
 
   it('does not fetch or remove private favorites for a guest', async () => {

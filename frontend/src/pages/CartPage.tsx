@@ -23,6 +23,8 @@ import { ShippingProgress } from '../components/ShippingProgress';
 import { EmptyCartIllustration } from '../components/EmptyCartIllustration';
 import { QuantityField, parseQuantityInput } from '../components/QuantityField';
 import { readCheckoutIntent, writeCheckoutIntent } from '../features/checkout/intent';
+import { useGuestCart, useGuestTransferCheckpoint } from '../features/cart/guest-cart';
+import { GuestCartPage } from './GuestCartPage';
 
 /**
  * Cart (F8): the server view is always authoritative; totals are never
@@ -31,6 +33,8 @@ import { readCheckoutIntent, writeCheckoutIntent } from '../features/checkout/in
 export function CartPage() {
   const { status, user } = useAuth();
   const isAuthenticated = status === 'authed';
+  const guestItems = useGuestCart();
+  const guestTransfer = useGuestTransferCheckpoint();
   const identity = isAuthenticated ? user : null;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -71,7 +75,7 @@ export function CartPage() {
   const cart = useQuery({
     queryKey: queryKeys.cart,
     queryFn: () => shopApi.cart(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && guestItems.length === 0 && guestTransfer === null,
   });
   const view = cart.data;
   const fingerprint = cartFingerprint(view);
@@ -149,8 +153,13 @@ export function CartPage() {
     removedId?: number,
     failureInDialog = false,
   ) {
-    if (cartWriteRef.current || !identityRef.current || queryClient.isFetching({ queryKey: queryKeys.cart }) > 0) {
-      if (failureInDialog) throw new Error('سبد در حال به‌روزرسانی است. پس از پایان دوباره تلاش کنید.');
+    if (
+      cartWriteRef.current ||
+      !identityRef.current ||
+      queryClient.isFetching({ queryKey: queryKeys.cart }) > 0
+    ) {
+      if (failureInDialog)
+        throw new Error('سبد در حال به‌روزرسانی است. پس از پایان دوباره تلاش کنید.');
       return;
     }
     const requestIdentity = identityRef.current;
@@ -204,21 +213,10 @@ export function CartPage() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <section className="account-page account-commerce-page">
-        <header className="account-heading">
-          <div>
-            <h1 ref={headingRef} tabIndex={-1}>
-              سبد خرید
-            </h1>
-          </div>
-        </header>
-        <p>
-          برای مشاهدهٔ سبد خرید <Link to="/login?next=/cart">ورود کنید</Link>.
-        </p>
-      </section>
-    );
+    return status === 'loading' ? <LoadingState layout="rows" /> : <GuestCartPage />;
   }
+  if (guestItems.length > 0 || guestTransfer !== null)
+    return <GuestCartPage transferring actorId={identity?.id} />;
 
   if (cart.isLoading || cart.error)
     return (
@@ -480,7 +478,9 @@ export function CartPage() {
         confirmLabel="حذف همهٔ اقلام"
         pending={cartWritePending}
         onClose={() => setClearOpen(false)}
-        onConfirm={() => runCartWrite(() => clearCart.mutateAsync(), 'سبد خرید خالی شد.', undefined, true)}
+        onConfirm={() =>
+          runCartWrite(() => clearCart.mutateAsync(), 'سبد خرید خالی شد.', undefined, true)
+        }
       />
     </section>
   );
@@ -519,7 +519,13 @@ function CartQuantity({
   const valid = parsed !== null;
   function commit(value = parsed) {
     if (locked) return;
-    if (!valid || typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > MAX_CART_ITEM_QTY) {
+    if (
+      !valid ||
+      typeof value !== 'number' ||
+      !Number.isSafeInteger(value) ||
+      value < 1 ||
+      value > MAX_CART_ITEM_QTY
+    ) {
       setError(`تعداد باید عدد صحیح بین ۱ تا ${MAX_CART_ITEM_QTY.toLocaleString('fa-IR')} باشد.`);
       return;
     }
@@ -531,30 +537,30 @@ function CartQuantity({
   }
   return (
     <div className="commerce-quantity">
-        <QuantityField
-          id={`quantity-${id}`}
-          max={MAX_CART_ITEM_QTY}
-          ariaLabel={`تعداد ${name}`}
-          value={draft}
-          disabled={locked}
-          invalid={error ? true : undefined}
-          describedBy={error ? `quantity-error-${id}` : undefined}
-          onChange={(value) => {
-            setDraft(value);
-            setError('');
-            onDirty(id, value !== String(quantity));
-          }}
-          onBlur={(event) => {
-            if (!event.currentTarget.closest('.commerce-quantity')?.contains(event.relatedTarget))
-              commit();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              commit();
-            }
-          }}
-        />
+      <QuantityField
+        id={`quantity-${id}`}
+        max={MAX_CART_ITEM_QTY}
+        ariaLabel={`تعداد ${name}`}
+        value={draft}
+        disabled={locked}
+        invalid={error ? true : undefined}
+        describedBy={error ? `quantity-error-${id}` : undefined}
+        onChange={(value) => {
+          setDraft(value);
+          setError('');
+          onDirty(id, value !== String(quantity));
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.closest('.commerce-quantity')?.contains(event.relatedTarget))
+            commit();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          }
+        }}
+      />
       {draft !== String(quantity) && (
         <div className="commerce-quantity__actions">
           <button type="button" disabled={locked} onClick={() => commit()}>

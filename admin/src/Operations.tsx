@@ -1,5 +1,4 @@
 import { TomanInput } from './TomanInput';
-import { PopupEditor } from './PopupEditor';
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useAuth } from "./auth";
 import {
@@ -586,7 +585,7 @@ export function Operations({
           hidden={tab !== item}
         >
           {tab === item && (
-            item === "payments" ? <Payments /> : item === "audit" ? <AuditLogs /> : <><Settings /><PopupEditor /></>
+            item === "payments" ? <Payments /> : item === "audit" ? <AuditLogs /> : <Settings />
           )}
         </div>
       ))}

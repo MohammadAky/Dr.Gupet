@@ -4,6 +4,7 @@
   --forest-deep: #0c240e;
   --forest-soft: #315237;
   --gold: #d49f28;
+  --accent-ink: #315237;
   --gold-soft: #f6e9c7;
   --cream: #fcf9f1;
   --sand: #f3eee2;
@@ -37,6 +38,7 @@
 
 /* The theme only stores the visual choice. Authentication and consent stay untouched. */
 :root[data-theme='dark'] {
+  --accent-ink: #e4c67f;
   color-scheme: dark;
   --cream: #0e1811;
   --sand: #17251a;

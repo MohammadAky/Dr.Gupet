@@ -1,170 +1,68 @@
-/* Compact catalog: filters lead on the right in RTL; one disclosure on phones. */
-.app-main.content-page:has(> .catalog-page) {
-  margin-block-start: 20px;
-  padding-block-start: 0;
-}
-.catalog-page .catalog-breadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
-  margin-block-end: 20px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.catalog-page .catalog-breadcrumb h1 {
-  margin: 0;
-  font-size: clamp(1.25rem, 2vw, 1.5rem);
-  font-weight: 700;
-  line-height: 1.5;
-  color: var(--ink);
-}
-.catalog-layout {
-  display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-  align-items: start;
-  gap: 24px;
-}
-.catalog-sidebar,
-.catalog-results {
-  min-width: 0;
-}
-.catalog-page .catalog-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 14px;
-  padding: 14px;
-  border-radius: 20px;
-}
-.catalog-page .catalog-search input {
-  min-width: 0;
-  width: 100%;
-}
-.catalog-page .catalog-search .filter-apply {
-  padding-inline: 12px;
-}
-.catalog-page .filters.filter-panel {
-  margin: 0;
-  padding: 18px;
-  gap: 18px;
-  border-radius: 20px;
-}
-.catalog-page .filter-panel__grid {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-.catalog-page .filters .catalog-diet-tags {
-  gap: 10px;
-  padding: 8px 0 0;
-  border: 0;
-  border-block-start: 1px solid var(--line);
-  border-radius: 0;
-}
-.catalog-page .catalog-diet-tags legend {
-  padding-inline: 0 8px;
-}
-.catalog-page .filter-check {
-  min-height: 32px;
-}
-.catalog-page .filters .price-filter {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  padding: 14px 0 0;
-  border: 0;
-  border-block-start: 1px solid var(--line);
-  border-radius: 0;
-  gap: 10px 8px;
-}
-.catalog-page .price-filter label {
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-.catalog-page .price-filter input {
-  width: 100%;
-  min-width: 0;
-}
-.catalog-page .price-filter .filter-apply {
-  grid-column: 1 / -1;
-}
-.catalog-page .filter-clear {
-  width: 100%;
-}
-.catalog-results > .directory-results {
-  margin-block: 0 14px;
-  font-size: 0.85rem;
-}
-.catalog-results .product-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.catalog-results .product-card {
-  margin-block-end: 0;
-}
-.catalog-results .product-card__media {
-  height: auto;
-  aspect-ratio: 1;
-  min-height: 0;
-}
-@media (min-width: 901px) {
-  .catalog-page .catalog-filter-toggle {
-    display: none;
-  }
-  .catalog-page .filters--collapsed {
-    display: grid;
-  }
-}
-@media (min-width: 901px) and (max-width: 1120px) {
-  .catalog-layout {
-    grid-template-columns: 240px minmax(0, 1fr);
-    gap: 18px;
-  }
-  .catalog-results .product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 900px) {
-  .catalog-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-  }
-  .catalog-page .catalog-breadcrumb {
-    margin-block-end: 14px;
-  }
-  .content-page .catalog-page .catalog-filter-toggle {
-    display: flex;
-    width: 100%;
-    min-height: 48px;
-    align-items: center;
-    justify-content: space-between;
-    margin: 0;
-    padding: 10px 16px;
-    border: 1px solid var(--glass-control-edge);
-    border-radius: 16px;
-    color: var(--ink);
-    text-align: right;
-  }
-  .catalog-page .filters.filter-panel {
-    margin-block-start: 12px;
-  }
-  .content-page .catalog-page .filters--collapsed {
-    display: none;
-  }
-  .catalog-page .filter-panel__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .catalog-page .catalog-search {
-    margin-block-end: 12px;
-  }
-}
-@media (max-width: 520px) {
-  .catalog-page .filter-panel__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .catalog-results .product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .catalog-page .filters.filter-panel {
-    padding: 16px;
-  }
-}
+/* The approved glass material remains authoritative; this file owns geometry only. */
+.app-main.content-page:has(> .catalog-page) { margin-block-start: 16px; padding-block-start: 0; }
+.catalog-breadcrumb { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-block-end: 16px; color: var(--muted); font-size: .85rem; }
+.catalog-page .catalog-breadcrumb h1 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.5; color: var(--ink); }
+.catalog-layout { display: grid; grid-template-columns: minmax(210px, 240px) minmax(0, 1fr); align-items: start; gap: 20px; }
+.catalog-sidebar, .catalog-results { min-width: 0; }
+.catalog-sidebar { position: sticky; top: calc(var(--app-header-height, 160px) + 14px); max-height: calc(100dvh - var(--app-header-height, 160px) - 28px); overflow-y: auto; scrollbar-width: thin; border-radius: 20px; }
+.catalog-filter-panel.filter-panel { margin: 0; padding: 16px; gap: 0; border-radius: 20px; }
+.catalog-filter-panel__heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block-end: 12px; }
+.catalog-filter-panel__heading h2 { margin: 0; font-size: 1rem; }
+.catalog-filter-panel__heading button { padding: 6px; font-size: .7rem; min-height: 36px; }
+.catalog-filter-section { border-block-start: 1px solid var(--line); min-width: 0; }
+.catalog-filter-panel .catalog-filter-section__trigger { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 54px; padding: 12px 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: start; color: var(--ink); font-size: .86rem; font-weight: 650; }
+.catalog-filter-section__trigger span { display: grid; gap: 3px; }
+.catalog-filter-section__trigger small { font-size: .68rem; font-weight: 400; color: var(--muted); }
+.catalog-filter-section__trigger svg { flex: none; transition: transform 180ms ease; }
+.catalog-filter-section__trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+.catalog-filter-section__body { padding-block-end: 14px; }
+.catalog-filter-section__body[hidden] { display: none; }
+.catalog-filter-options { display: grid; gap: 2px; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
+.catalog-filter-options label, .catalog-stock-filter { display: flex; align-items: center; gap: 9px; min-height: 44px; color: var(--ink); font-size: .82rem; cursor: pointer; }
+.catalog-filter-options input, .catalog-stock-filter input { width: 17px; height: 17px; flex: none; accent-color: var(--accent-ink); }
+.catalog-stock-filter { border-block-start: 1px solid var(--line); padding-block-start: 12px; }
+.catalog-filter-panel .price-filter { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; margin: 0; padding: 0; border: 0; background: transparent; }
+.catalog-filter-panel .price-filter input { width: 100%; min-width: 0; }
+.catalog-filter-panel .price-filter label { font-size: .75rem; color: var(--muted); }
+.catalog-filter-panel .price-filter button { grid-column: 1 / -1; }
+.catalog-reference-status { font-size: .75rem; color: var(--muted); }
+.catalog-results__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; margin-block-end: 12px; color: var(--muted); font-size: .8rem; }
+.catalog-results__heading .directory-results { margin: 0; }
+.catalog-results .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.catalog-results .product-card { margin-block-end: 0; min-width: 0; }
+.catalog-results .product-card__media { height: auto; aspect-ratio: 1; min-height: 0; }
+.catalog-load-more { display: grid; justify-items: center; gap: 12px; padding-block: 28px; color: var(--muted); font-size: .8rem; }
+.catalog-search-context { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .85rem; margin-block: 0 16px; }
+.catalog-search-context button { font-size: .75rem; min-height: 36px; }
+.catalog-chip-rail { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-snap-type: x proximity; padding: 2px 1px 8px; }
+.catalog-chip-rail::-webkit-scrollbar { display: none; }
+.catalog-chip-rail button { flex: none; scroll-snap-align: start; white-space: nowrap; min-height: 40px; padding: 8px 13px; border: 1px solid var(--glass-control-edge); border-radius: 999px; color: var(--ink); background: linear-gradient(135deg, var(--glass-highlight), transparent), var(--glass-control); box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 10px rgb(0 0 0 / 4%); font-size: .76rem; }
+.catalog-chip-rail [aria-pressed='true'] { border-color: var(--accent-ink); background: rgb(212 159 40 / 18%); }
+.catalog-mobile-tools { min-width: 0; display: grid; gap: 5px; margin-block-end: 10px; }
+.ui-dialog:has(.catalog-filter-panel) .ui-dialog__panel { color: var(--ink); background: linear-gradient(135deg, var(--glass-highlight), transparent 55%), var(--glass-surface); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: blur(18px) saturate(1.15); backdrop-filter: blur(18px) saturate(1.15); }
+.ui-dialog:has(.catalog-filter-panel) .ui-dialog__head h2 { color: var(--ink); }
+.ui-dialog:has(.catalog-filter-panel) .ui-dialog__body { display: grid; gap: 16px; }
+.ui-dialog:has(.catalog-filter-panel) .catalog-filter-panel { background: transparent; box-shadow: none; border: 0; padding: 0; }
+.catalog-drawer-apply { width: 100%; }
+@media (max-width: 1100px) and (min-width: 901px) { .catalog-layout { grid-template-columns: 200px minmax(0, 1fr); gap: 14px; } .catalog-results .product-grid { gap: 10px; } }
+@media (max-width: 900px) { .catalog-layout { grid-template-columns: minmax(0, 1fr); } .catalog-results .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .catalog-breadcrumb { margin-block-end: 12px; font-size: .75rem; } .catalog-page .catalog-breadcrumb h1 { font-size: 1.05rem; } }
+@media (prefers-reduced-motion: reduce) { .catalog-filter-section__trigger svg { transition: none; } }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .catalog-chip-rail button { background: var(--glass-solid); box-shadow: none; } }
+
+/* Dialog portals inherit tokens but are intentionally outside app-shell selectors. */
+.ui-dialog:has(.catalog-filter-panel) :is(button, input:not([type='checkbox']):not([type='radio'])) { color: var(--ink); background: var(--glass-control); border: 1px solid var(--glass-control-edge); border-radius: 12px; min-height: 44px; box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 10px rgb(0 0 0 / 4%); }
+.ui-dialog:has(.catalog-filter-panel) .catalog-filter-section__trigger { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.ui-dialog:has(.catalog-filter-panel) :is(.filter-apply, .catalog-drawer-apply) { background: rgb(212 159 40 / 17%); border-color: var(--accent-ink); }
+.ui-dialog:has(.catalog-filter-panel) .price-filter input { padding: 10px; }
+.ui-dialog:has(.catalog-filter-panel) .ui-dialog__close { width: 44px; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .ui-dialog:has(.catalog-filter-panel) .ui-dialog__panel { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+.catalog-filter-panel .catalog-filter-section { margin: 0; }
+.catalog-filter-panel__heading button, .catalog-chip-rail button, .catalog-search-context button { min-height: 44px; }
+.catalog-refresh-error { display: grid; gap: 8px; padding: 14px; margin-block-end: 14px; border: 1px solid var(--gold); border-radius: 16px; font-size: .85rem; color: var(--ink); }
+.catalog-refresh-error p { margin: 0; }
+/* Keep one glass surface; section labels float without nested fills or rules. */
+.catalog-filter-panel .catalog-filter-section, .catalog-filter-panel .catalog-stock-filter { border: 0; }
+:root .app-shell .content-page .catalog-filter-panel .catalog-filter-section__trigger,
+.ui-dialog:has(.catalog-filter-panel) .catalog-filter-section__trigger { background: transparent; box-shadow: none; border: 0; }
+:root .app-shell .content-page .catalog-filter-panel .catalog-filter-section__trigger:hover,
+.ui-dialog:has(.catalog-filter-panel) .catalog-filter-section__trigger:hover { background: transparent; box-shadow: none; color: var(--accent-ink); }

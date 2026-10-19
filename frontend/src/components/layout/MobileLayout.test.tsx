@@ -41,6 +41,11 @@ it('renders the current Persian copyright year and retains separate store/help g
   expect(container.querySelectorAll('.footer-links a')).toHaveLength(6);
   expect(container.querySelector('img')?.getAttribute('src')).toBe('/brand/logo.webp');
 });
+it('returns login to the current filtered route and fragment from mobile navigation', async () => {
+  await act(async () => root.render(<MemoryRouter initialEntries={['/products?brandId=7#details']}><MobileBottomNav status="guest" /></MemoryRouter>));
+  const login = container.querySelector<HTMLAnchorElement>('a[href^="/login?"]')!;
+  expect(new URL(login.href).searchParams.get('next')).toBe('/products?brandId=7#details');
+});
 it('uses the next Persian year after Tehran Nowruz rather than a fixed copyright year', async () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2027-03-21T10:00:00Z'));
   await act(async () => root.render(<MemoryRouter><Footer /></MemoryRouter>));

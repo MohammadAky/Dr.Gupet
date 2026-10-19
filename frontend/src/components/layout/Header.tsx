@@ -6,6 +6,7 @@ import type { Clinic, Medicine, Pharmacy, ProductCard } from '../../api/types';
 import type { AuthStatus } from '../../auth/auth-provider';
 import { formatAmount } from '../../lib/format';
 import { isSampleReference, publicRecordName } from '../../lib/sample-records';
+import { sanitizeInternalRedirect } from '../../lib/security';
 
 type SearchSource = 'desktop' | 'mobile';
 type SuggestionGroup = 'products' | 'medicines' | 'pharmacies' | 'clinics';
@@ -244,6 +245,7 @@ export function Header({
 }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const loginHref = `/login?${new URLSearchParams({ next: sanitizeInternalRedirect(location.pathname + location.search + location.hash) })}`;
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef<HTMLInputElement>(null);
   const generationRef = useRef(0);
@@ -464,7 +466,7 @@ export function Header({
               </button>
             </>
           ) : (
-            <Link className="header-account-link" to="/login" aria-label="ورود">
+            <Link className="header-account-link" to={loginHref} aria-label="ورود">
               <Icon name="user" />
               <span className="header-label">ورود</span>
             </Link>

@@ -19,6 +19,13 @@ beforeEach(() => {
   });
 });
 
+it("keeps the independent popup editor out of financial settings", async () => {
+  render(<Operations initialTab="settings" />);
+  await screen.findByRole("heading", { name: "تنظیمات فروشگاه" });
+  expect(screen.queryByRole("heading", { name: "پاپ‌آپ سایت" })).toBeNull();
+  expect(requestMock.mock.calls.some(([path]) => path === "/admin/storefront/popup")).toBe(false);
+});
+
 it("protects unsaved settings from key and keyboard tab changes, then clears the draft after one normalized save", async () => {
   let complete: ((value: unknown) => void) | undefined;
   requestMock.mockImplementation((path: string, options?: { method?: string }) => {

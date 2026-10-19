@@ -121,15 +121,24 @@ it('explains unavailable animal categories when the API returns no references', 
   expect(container.querySelectorAll('.landing-species__row a')).toHaveLength(0);
   expect(container.textContent).toContain('دسته‌بندی حیوانات فعلاً در دسترس نیست.');
 });
-it('applies dietary tags to the API query and resets pagination', async () => {
+it('applies dietary tags through the expanded filter and starts the first catalog batch', async () => {
   await show(<ProductsPage />, '/products?page=3');
-  const input = container.querySelector<HTMLInputElement>('.catalog-diet-tags input')!;
+  expect(shopApi.products).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 24 }));
+  const trigger = [
+    ...container.querySelectorAll<HTMLButtonElement>('.catalog-filter-section__trigger'),
+  ].find((button) => button.textContent?.trim() === 'نیازهای غذایی')!;
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  await act(async () => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  const region = document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  expect(region.hidden).toBe(false);
+  const input = region.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
   await act(async () => input.click());
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
   expect(shopApi.products).toHaveBeenLastCalledWith(
-    expect.objectContaining({ tagIds: '21', page: 1 }),
+    expect.objectContaining({ tagIds: '21', page: 1, limit: 24 }),
   );
   expect(input.checked).toBe(true);
 });

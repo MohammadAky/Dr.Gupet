@@ -455,6 +455,7 @@ export function LandingContent() {
           <p>نوار اعلان، بنر و محتوای همهٔ بخش‌های صفحهٔ اصلی.</p>
         </div>
         <span className="landing-draft-status">پیش‌نویس؛ منتشر نشده</span>
+        <a className="landing-draft-status" href="#popup">مدیریت پاپ‌آپ</a>
       </header>
       <aside className="landing-integration-note">
         <strong>انتشار از پنل هنوز به سرور متصل نیست</strong>

@@ -1,0 +1,19 @@
+/* Readable text floats above the approved glass; tint and reflection stay intact. */
+:root:not([data-theme='dark']) .app-shell .content-page :is(.filter-panel, .commerce-glass, .account-shopping-summary, .account-checkout-summary, .account-checkout-addresses) {
+  color: var(--ink);
+}
+:root:not([data-theme='dark']) .app-shell .content-page :is(label, legend, .filter-check, .product-detail__eyebrow, .product-detail__spec-link, .commerce-disclosure summary) { color: var(--forest-soft); }
+:root .app-shell .content-page :is(.account-shopping-summary, .account-checkout-summary, .account-checkout-addresses) { overflow-wrap: anywhere; }
+:root .app-shell .content-page :is(.account-shopping-summary, .account-checkout-summary) :is(h2, p, dl) { max-width: 100%; }
+:root .app-shell .content-page :is(.account-coupon-form, .account-checkout-coupon) > p { margin-block: 12px; line-height: 1.9; }
+:root .app-shell .content-page button:disabled,
+.ui-dialog button:disabled { opacity: 1; color: var(--muted); cursor: not-allowed; }
+:root .app-shell .content-page button:disabled { background-color: var(--glass-control); border-color: var(--line); box-shadow: none; }
+.commerce-checkout-layout .account-checkout-addresses { position: relative; }
+:root .app-shell .content-page .commerce-checkout-layout .account-checkout-addresses legend {
+  float: right; width: 100%; max-width: 100%; margin: 0 0 16px; padding: 0; line-height: 1.9;
+}
+.commerce-checkout-layout .account-checkout-addresses > :not(legend) { clear: both; }
+.commerce-checkout-layout .account-checkout-addresses:has(legend) { padding-block-start: 24px; }
+.ui-dialog:has(.catalog-filter-panel, .directory-filter-panel) :is(label, legend, .filter-apply) { color: var(--ink); }
+@media (max-width: 540px) { .commerce-checkout-layout .account-checkout-addresses:has(legend) { padding-block-start: 18px; } }

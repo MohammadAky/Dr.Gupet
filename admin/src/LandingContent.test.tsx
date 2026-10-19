@@ -124,9 +124,7 @@ it("locks the parent draft during card-image decoding and releases its local pre
       document.querySelector(".landing-item-preview img")?.getAttribute("src"),
     ).toBe("blob:local-card"),
   );
-  expect(
-    (screen.getByLabelText("نشانی تصویر مورد") as HTMLInputElement).value,
-  ).toMatch(/^\/brand\/landing-products-.*\.png$/);
+  expect(screen.queryByLabelText("نشانی تصویر مورد")).toBeNull();
   expect(
     screen.getByRole("button", { name: "دانلود تصویر اصلی مورد" }),
   ).toBeTruthy();

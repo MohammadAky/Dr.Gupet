@@ -78,6 +78,7 @@ describe('cart coupon and write consistency', () => {
   let client: QueryClient;
 
   beforeEach(() => {
+    localStorage.clear();
     clearCheckoutIntent();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.resetAllMocks();
@@ -134,7 +135,7 @@ describe('cart coupon and write consistency', () => {
     await renderCart();
     expect(shopApi.cart).not.toHaveBeenCalled();
     expect(shopApi.validateCoupon).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('برای مشاهدهٔ سبد خرید');
+    expect(container.textContent).toContain('سبد خرید شما خالی است.');
   });
 
   it('discards a late coupon success after editing the code', async () => {
@@ -265,7 +266,9 @@ describe('cart coupon and write consistency', () => {
     }
     await changeInput(input, '۲');
     expect(input.value).toBe('2');
-    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })),
+    );
     expect(shopApi.updateCartItem).toHaveBeenCalledWith(1, 2);
   });
 
@@ -274,12 +277,21 @@ describe('cart coupon and write consistency', () => {
     const input = container.querySelector<HTMLInputElement>('#quantity-1')!;
     await changeInput(input, '2');
     const cancel = button(container, 'بازگرداندن تعداد');
-    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: cancel })));
+    await act(async () =>
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: cancel })),
+    );
     expect(shopApi.updateCartItem).not.toHaveBeenCalled();
     await act(async () => cancel.click());
     expect(input.value).toBe('1');
     await changeInput(input, '3');
-    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: button(container, 'تکمیل خرید') })));
+    await act(async () =>
+      input.dispatchEvent(
+        new FocusEvent('focusout', {
+          bubbles: true,
+          relatedTarget: button(container, 'تکمیل خرید'),
+        }),
+      ),
+    );
     expect(shopApi.updateCartItem).toHaveBeenCalledWith(1, 3);
   });
 
@@ -289,10 +301,14 @@ describe('cart coupon and write consistency', () => {
     expect(progress.getAttribute('aria-valuenow')).toBe('7');
     expect(progress.closest('.commerce-journey')).not.toBeNull();
     expect(progress.closest('.account-shopping-summary')).toBeNull();
-    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe('commerce-shipping');
+    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe(
+      'commerce-shipping',
+    );
     await submitCoupon('SAVE');
     expect(progress.getAttribute('aria-valuenow')).toBe('7');
-    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain('سبد خرید');
+    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain(
+      'سبد خرید',
+    );
   });
 
   it('shows original decorative basket artwork and shopping links for an empty cart', async () => {
@@ -302,8 +318,12 @@ describe('cart coupon and write consistency', () => {
     expect(container.querySelector('.account-empty-cart img')).toBeNull();
     expect(container.querySelector('.account-empty-cart a[href="/products"]')).not.toBeNull();
     expect(container.querySelector('.account-empty-cart a[href="/favorites"]')).not.toBeNull();
-    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('0');
-    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe('commerce-shipping');
+    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe(
+      '0',
+    );
+    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe(
+      'commerce-shipping',
+    );
   });
 
   it('transfers only coupon text when continuing to checkout', async () => {
@@ -342,18 +362,35 @@ describe('cart coupon and write consistency', () => {
     let rejectFirst!: (error: Error) => void;
     let resolveRetry!: (value: CartView) => void;
     vi.mocked(shopApi.clearCart)
-      .mockReturnValueOnce(new Promise((_, reject) => { rejectFirst = reject; }))
-      .mockReturnValueOnce(new Promise((resolve) => { resolveRetry = resolve; }));
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirst = reject;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRetry = resolve;
+        }),
+      );
     await renderCart();
     await act(async () => button(container, 'خالی‌کردن سبد').click());
-    await act(async () => { button(document.body, 'حذف همهٔ اقلام').click(); button(document.body, 'حذف همهٔ اقلام').click(); });
+    await act(async () => {
+      button(document.body, 'حذف همهٔ اقلام').click();
+      button(document.body, 'حذف همهٔ اقلام').click();
+    });
     expect(shopApi.clearCart).toHaveBeenCalledTimes(1);
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     expect(button(document.body, 'حذف همهٔ اقلام').disabled).toBe(true);
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await act(async () =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    );
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     await act(async () => rejectFirst(new Error('خالی‌کردن انجام نشد')));
-    await vi.waitFor(() => expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toBe('خالی‌کردن انجام نشد'));
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toBe(
+        'خالی‌کردن انجام نشد',
+      ),
+    );
     expect(button(document.body, 'حذف همهٔ اقلام').disabled).toBe(false);
     await act(async () => button(document.body, 'حذف همهٔ اقلام').click());
     vi.mocked(shopApi.cart).mockResolvedValue({ items: [], itemsTotal: 0 });

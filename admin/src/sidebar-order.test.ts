@@ -13,6 +13,8 @@ describe("account-scoped sidebar ordering", () => {
     expect(normalizeSidebarOrder([])).toEqual(defaultSidebarOrder);
     const previousReleaseOrder = defaultSidebarOrder.filter(id => id !== "references");
     expect(normalizeSidebarOrder(previousReleaseOrder)).toEqual([...previousReleaseOrder, "references"]);
+    const beforePopup = defaultSidebarOrder.filter(id => id !== "popup").reverse();
+    expect(normalizeSidebarOrder(beforePopup)).toEqual([...beforePopup, "popup"]);
   });
   it("uses separate account keys and stores only the section order without account details", () => {
     const first = moveSidebarItem(defaultSidebarOrder, "orders", 0);

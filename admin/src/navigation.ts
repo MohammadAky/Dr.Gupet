@@ -11,6 +11,7 @@ export const adminSections = [
   "settings",
   "landing",
   "references",
+  "popup",
 ] as const;
 export type AdminSection = (typeof adminSections)[number];
 export function parseAdminLocation(hash: string) {

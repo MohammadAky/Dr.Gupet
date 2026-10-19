@@ -14,6 +14,8 @@ import { cartFingerprint, shippingEstimate } from '../features/cart/cart-state';
 import { writePendingOrder } from '../features/checkout/pending-order';
 import { formatToman } from '../lib/format';
 import { errorText } from '../lib/labels';
+import { GuestCartTransferGate } from '../components/GuestCartTransfer';
+import { readGuestCart, readGuestTransfer } from '../features/cart/guest-cart';
 import {
   clearCheckoutIntent,
   readCheckoutIntent,
@@ -28,7 +30,11 @@ export function CheckoutPage() {
   const { status, user } = useAuth();
   const userId = status === 'authed' ? (user?.id ?? null) : null;
   // A new account gets a fresh checkout draft and new async request guards.
-  return <CheckoutSession key={userId ?? 'guest'} userId={userId} />;
+  return (
+    <GuestCartTransferGate>
+      <CheckoutSession key={userId ?? 'guest'} userId={userId} />
+    </GuestCartTransferGate>
+  );
 }
 
 function CheckoutSession({ userId }: { userId: number | null }) {
@@ -188,6 +194,8 @@ function CheckoutSession({ userId }: { userId: number | null }) {
         | { kind: 'retry'; orderId: number; userId: number; epoch: number },
     ) => {
       requireSameUser(action.userId, action.epoch);
+      if (readGuestCart().length > 0 || readGuestTransfer() !== null)
+        throw new Error('ابتدا انتقال سبد مهمان را تکمیل کنید.');
       let orderId: number;
       if (action.kind === 'create') {
         const order = await shopApi.createOrder(action.payload);
@@ -264,6 +272,8 @@ function CheckoutSession({ userId }: { userId: number | null }) {
     // The ref closes the gap before React has rendered the pending mutation state.
     if (
       userId === null ||
+      readGuestCart().length > 0 ||
+      readGuestTransfer() !== null ||
       selectedAddress === null ||
       submitLocked.current ||
       cannotSubmit ||
@@ -289,7 +299,15 @@ function CheckoutSession({ userId }: { userId: number | null }) {
   }
 
   function retryPayment() {
-    if (userId === null || createdOrderId === null || submitting || submitLocked.current) return;
+    if (
+      userId === null ||
+      createdOrderId === null ||
+      submitting ||
+      submitLocked.current ||
+      readGuestCart().length > 0 ||
+      readGuestTransfer() !== null
+    )
+      return;
     submitLocked.current = true;
     setSubmittingForUser(userId);
     setFailure(null);
@@ -328,113 +346,127 @@ function CheckoutSession({ userId }: { userId: number | null }) {
 
       <form className="account-checkout-form commerce-checkout-layout" onSubmit={submit}>
         <div className="commerce-checkout-main">
-        <fieldset className="account-checkout-addresses">
-          <legend>آدرس تحویل</legend>
-          {addressList.length === 0 && <p>آدرسی ثبت نکرده‌اید.</p>}
-          {addressList.map((address) => (
-            <label
-              key={address.id}
-              className="account-address-option"
-              data-selected={selectedAddress === address.id}
-            >
-              <input
-                type="radio"
-                name="address"
-                value={address.id}
-                checked={selectedAddress === address.id}
-                onChange={() => setAddressId(address.id)}
-              />
-              <span>
-                <strong>
-                  {address.title}
-                  {address.isDefault ? ' (پیش‌فرض)' : ''}
-                </strong>
+          <fieldset className="account-checkout-addresses">
+            <legend>آدرس تحویل</legend>
+            {addressList.length === 0 && <p>آدرسی ثبت نکرده‌اید.</p>}
+            {addressList.map((address) => (
+              <label
+                key={address.id}
+                className="account-address-option"
+                data-selected={selectedAddress === address.id}
+              >
+                <input
+                  type="radio"
+                  name="address"
+                  value={address.id}
+                  checked={selectedAddress === address.id}
+                  onChange={() => setAddressId(address.id)}
+                />
                 <span>
-                  {address.receiverName}، {address.city}
+                  <strong>
+                    {address.title}
+                    {address.isDefault ? ' (پیش‌فرض)' : ''}
+                  </strong>
+                  <span>
+                    {address.receiverName}، {address.city}
+                  </span>
+                  <span className="account-subtle">{address.fullAddress}</span>
                 </span>
-                <span className="account-subtle">{address.fullAddress}</span>
-              </span>
-            </label>
-          ))}
-          <Link className="commerce-add-address" to="/addresses/new?next=%2Fcheckout">
-            افزودن آدرس جدید
-          </Link>
-        </fieldset>
-
-        <details
-          className="account-checkout-coupon commerce-disclosure"
-          open={initialIntent.couponCode !== '' || undefined}
-        >
-          <summary>کد تخفیف (اختیاری)</summary>
-          <fieldset>
-            <legend>کد تخفیف</legend>
-            <input
-              id="checkout-coupon"
-              aria-label="کد تخفیف"
-              dir="ltr"
-              value={couponCode}
-              onChange={(event) => {
-                couponCodeRef.current = event.target.value;
-                validationSequence.current += 1;
-                setCouponCode(event.target.value);
-                setPreview(null);
-                setValidationRequest(null);
-                setFailure(null);
-              }}
-              placeholder="کد تخفیف را وارد کنید"
-            />
-            <button
-              type="button"
-              disabled={!couponCode.trim() || validating || cart.isFetching}
-              onClick={() => void validateCoupon()}
-            >
-              {validating ? 'در حال بررسی…' : 'بررسی کد'}
-            </button>
-            {validPreview && (
-              <p role="status">تخفیف {formatToman(validPreview.discountAmount)} اعمال شد.</p>
-            )}
-            {couponNeedsValidation && !validating && (
-              <p>برای استفاده از کد، ابتدا آن را بررسی کنید.</p>
-            )}
+              </label>
+            ))}
+            <Link className="commerce-add-address" to="/addresses/new?next=%2Fcheckout">
+              افزودن آدرس جدید
+            </Link>
           </fieldset>
-        </details>
 
-        <details
-          className="account-checkout-note commerce-disclosure"
-          open={initialIntent.note !== '' || undefined}
-        >
-          <summary>یادداشت سفارش (اختیاری)</summary>
-          <label htmlFor="note">یادداشت سفارش (اختیاری)</label>
-          <textarea
-            id="note"
-            rows={3}
-            maxLength={500}
-            value={note}
-            onChange={(event) => setNote(event.target.value.slice(0, 500))}
-          />
-        </details>
+          <details
+            className="account-checkout-coupon commerce-disclosure"
+            open={initialIntent.couponCode !== '' || undefined}
+          >
+            <summary>کد تخفیف (اختیاری)</summary>
+            <fieldset>
+              <legend>کد تخفیف</legend>
+              <input
+                id="checkout-coupon"
+                aria-label="کد تخفیف"
+                dir="ltr"
+                value={couponCode}
+                onChange={(event) => {
+                  couponCodeRef.current = event.target.value;
+                  validationSequence.current += 1;
+                  setCouponCode(event.target.value);
+                  setPreview(null);
+                  setValidationRequest(null);
+                  setFailure(null);
+                }}
+                placeholder="کد تخفیف را وارد کنید"
+              />
+              <button
+                type="button"
+                disabled={!couponCode.trim() || validating || cart.isFetching}
+                onClick={() => void validateCoupon()}
+              >
+                {validating ? 'در حال بررسی…' : 'بررسی کد'}
+              </button>
+              {validPreview && (
+                <p role="status">تخفیف {formatToman(validPreview.discountAmount)} اعمال شد.</p>
+              )}
+              {couponNeedsValidation && !validating && (
+                <p>برای استفاده از کد، ابتدا آن را بررسی کنید.</p>
+              )}
+            </fieldset>
+          </details>
+
+          <details
+            className="account-checkout-note commerce-disclosure"
+            open={initialIntent.note !== '' || undefined}
+          >
+            <summary>یادداشت سفارش (اختیاری)</summary>
+            <label htmlFor="note">یادداشت سفارش (اختیاری)</label>
+            <textarea
+              id="note"
+              rows={3}
+              maxLength={500}
+              value={note}
+              onChange={(event) => setNote(event.target.value.slice(0, 500))}
+            />
+          </details>
         </div>
         <aside className="account-checkout-summary" aria-labelledby="checkout-summary-title">
           <h2 id="checkout-summary-title">خلاصه سفارش</h2>
-          {createdOrderId === null ? <>
-            <dl className="account-totals">
-              <dt>جمع کالاها</dt><dd dir="ltr">{formatToman(itemsTotal)}</dd>
-              <dt>تخفیف</dt><dd dir="ltr">{formatToman(discount)}</dd>
-              <dt>{shipping.source === 'server' ? 'ارسال (برآورد سامانه)' : 'ارسال (برآورد اولیه)'}</dt>
-              <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
-              <dt>قابل پرداخت (تخمینی)</dt><dd dir="ltr">{formatToman(payableEstimate)}</dd>
-            </dl>
-            <p>مبلغ قطعی هنگام ثبت سفارش محاسبه و در رسید ثبت می‌شود.</p>
-            <button className="account-submit" type="submit" disabled={cannotSubmit}>
-              {submitOrder.isPending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و پرداخت'}
-            </button>
-          </> : <>
-            <p role="status">سفارش ثبت شده است؛ پرداخت هنوز تأیید نشده است.</p>
-            <Link to={`/orders/${createdOrderId}`}>مشاهدهٔ سفارش و مبلغ قطعی</Link>
-            <button className="account-submit" type="button" disabled={userId === null || submitting || mutationPending} onClick={retryPayment}>
-              تلاش دوباره برای پرداخت همین سفارش
-            </button>
-          </>}
+          {createdOrderId === null ? (
+            <>
+              <dl className="account-totals">
+                <dt>جمع کالاها</dt>
+                <dd dir="ltr">{formatToman(itemsTotal)}</dd>
+                <dt>تخفیف</dt>
+                <dd dir="ltr">{formatToman(discount)}</dd>
+                <dt>
+                  {shipping.source === 'server' ? 'ارسال (برآورد سامانه)' : 'ارسال (برآورد اولیه)'}
+                </dt>
+                <dd dir="ltr">{shipping.cost === 0 ? 'رایگان' : formatToman(shipping.cost)}</dd>
+                <dt>قابل پرداخت (تخمینی)</dt>
+                <dd dir="ltr">{formatToman(payableEstimate)}</dd>
+              </dl>
+              <p>مبلغ قطعی هنگام ثبت سفارش محاسبه و در رسید ثبت می‌شود.</p>
+              <button className="account-submit" type="submit" disabled={cannotSubmit}>
+                {submitOrder.isPending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و پرداخت'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p role="status">سفارش ثبت شده است؛ پرداخت هنوز تأیید نشده است.</p>
+              <Link to={`/orders/${createdOrderId}`}>مشاهدهٔ سفارش و مبلغ قطعی</Link>
+              <button
+                className="account-submit"
+                type="button"
+                disabled={userId === null || submitting || mutationPending}
+                onClick={retryPayment}
+              >
+                تلاش دوباره برای پرداخت همین سفارش
+              </button>
+            </>
+          )}
         </aside>
       </form>
     </section>

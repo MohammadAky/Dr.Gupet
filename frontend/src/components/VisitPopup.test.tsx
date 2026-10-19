@@ -125,6 +125,21 @@ it('closes with Escape, traps focus while open, and restores focus to its previo
   expect(document.body.style.overflow).not.toBe('hidden');
 });
 
+it('keeps a failed image dismissible without losing text or replaying the visit', async () => {
+    saveConsent('accepted'); await render();
+    const image = dialog()!.querySelector<HTMLImageElement>('.visit-popup img')!;
+    await act(async () => image.dispatchEvent(new Event('error')));
+    const fallback = dialog()!.querySelector<HTMLElement>('.safe-image-fallback')!;
+    expect(fallback).not.toBeNull();
+    // Actual mobile replacement dimensions are checked in browser review.
+    expect(fallback.getAttribute('aria-hidden')).toBe('true');
+    expect(dialog()?.textContent).toContain(content.title);
+    expect(dialog()?.textContent).toContain(content.body);
+    await act(async () => dialog()!.querySelector<HTMLButtonElement>('.visit-popup button')!.click());
+    expect(dialog()).toBeNull(); await render({ show: false }); await render();
+    expect(dialog()).toBeNull(); expect(storefrontApi.popup).toHaveBeenCalledOnce();
+});
+
 it('stays dismissed after a remount and a new application/query-client instance in the same tab visit', async () => {
   saveConsent('accepted'); await render();
   await act(async () => dialog()!.querySelector<HTMLButtonElement>('.visit-popup button')!.click());
@@ -158,8 +173,7 @@ it.each(['writes', 'reads-and-writes'] as const)('keeps one-visit memory when se
 
 it.each([
   { ...content, enabled: false },
-  { ...content, title: '' },
-  { ...content, body: ' ' },
+  { ...content, title: '', body: ' ', image: '' },
   { ...content, title: 'a'.repeat(91) },
   { ...content, body: 'a'.repeat(801) },
   { ...content, image: 'https://tracking.example/pixel.png' },
@@ -172,6 +186,39 @@ it.each([
   saveConsent('accepted'); await render();
   expect(dialog()).toBeNull(); expect(document.querySelector('.visit-popup img')).toBeNull();
   expect(sessionStorage.getItem(VISIT_KEY)).toBeNull();
+});
+
+it.each([
+  { title: '', body: '', image: content.image },
+  { title: '', body: content.body, image: '' },
+  { title: content.title, body: '', image: '' },
+])('supports optional title and body while keeping an accessible, dismissible dialog %#', async partial => {
+  popupRequest.mockResolvedValue({ enabled: true, ...partial });
+  saveConsent('denied'); await render();
+  const panel = dialog()!;
+  expect(panel).not.toBeNull();
+  const heading = document.getElementById(panel.getAttribute('aria-labelledby')!);
+  expect(heading?.textContent).toBe(partial.title || 'پیام فروشگاه');
+  expect(heading?.classList.contains('sr-only')).toBe(!partial.title);
+  expect(panel.querySelector('.visit-popup p')?.textContent ?? '').toBe(partial.body);
+  if (!partial.title && !partial.body) {
+    expect(panel.querySelector('.visit-popup img')).not.toBeNull();
+    expect(panel.querySelector('.visit-popup button')).toBeNull();
+  }
+  await act(async () => panel.querySelector<HTMLButtonElement>('[aria-label="بستن پنجره"]')!.click());
+  expect(dialog()).toBeNull();
+  await render({ show: false }); await render(); expect(dialog()).toBeNull();
+});
+
+it('explains a failed image-only announcement and keeps an explicit dismiss action', async () => {
+  popupRequest.mockResolvedValue({ enabled: true, title: '', body: '', image: content.image });
+  saveConsent('denied'); await render();
+  const img = dialog()!.querySelector<HTMLImageElement>('img')!;
+  expect(img.alt).toBe('پیام تصویری فروشگاه');
+  await act(async () => img.dispatchEvent(new Event('error')));
+  expect(dialog()?.querySelector('[role=status]')?.textContent).toBe('تصویر پیام بارگذاری نشد.');
+  await act(async () => dialog()!.querySelector<HTMLButtonElement>('.visit-popup button')!.click());
+  expect(dialog()).toBeNull();
 });
 
 it('quietly ignores a failed public request without marking the visit seen', async () => {

@@ -1,10 +1,20 @@
-import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface DialogProps {
   open: boolean;
   title: string;
+  hideTitle?: boolean;
   description?: string;
   onClose: () => void;
   children: ReactNode;
@@ -12,21 +22,168 @@ export interface DialogProps {
   dismissible?: boolean;
 }
 
-const focusable =
-  'a[href], button, input, select, textarea, [contenteditable="true"], [tabindex]';
+const focusable = 'a[href], button, input, select, textarea, [contenteditable="true"], [tabindex]';
 
 function isTabStop(node: HTMLElement) {
-  if (node.tabIndex < 0 || node.matches(':disabled, input[type="hidden"]') || node.closest('[hidden], [inert]')) return false;
+  if (
+    node.tabIndex < 0 ||
+    node.matches(':disabled, input[type="hidden"]') ||
+    node.closest('[hidden], [inert]')
+  )
+    return false;
   for (let ancestor: HTMLElement | null = node; ancestor; ancestor = ancestor.parentElement) {
     const style = getComputedStyle(ancestor);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      style.visibility === 'collapse'
+    )
+      return false;
   }
   return true;
+}
+
+interface ModalLayer {
+  container: HTMLDivElement;
+  panel: HTMLDivElement;
+  closeButton: HTMLButtonElement | null;
+  previousFocus: HTMLElement | null;
+  lastFocus: HTMLElement | null;
+  dismissible(): boolean;
+  close(): void;
+}
+
+// All Dialog portals share one background lock and one keyboard/focus owner.
+const modalStack: ModalLayer[] = [];
+let modalLock: {
+  root: HTMLElement | null;
+  inert: boolean;
+  overflow: string;
+  previousFocus: HTMLElement | null;
+} | null = null;
+const topModal = () => modalStack[modalStack.length - 1];
+
+function updateModalLayers() {
+  modalStack.forEach((layer, index) => {
+    const top = layer === topModal();
+    layer.container.inert = !top;
+    layer.container.toggleAttribute('inert', !top);
+    if (top) layer.container.removeAttribute('aria-hidden');
+    else layer.container.setAttribute('aria-hidden', 'true');
+    layer.panel.setAttribute('aria-modal', String(top));
+    layer.container.style.zIndex = String(100 + index);
+  });
+}
+
+function focusModal(layer: ModalLayer, preferred: HTMLElement | null = null) {
+  const candidate = preferred ?? layer.lastFocus;
+  if (
+    candidate?.isConnected &&
+    layer.panel.contains(candidate) &&
+    (candidate === layer.panel || isTabStop(candidate))
+  ) {
+    candidate.focus({ preventScroll: true });
+  } else if (layer.dismissible() && layer.closeButton && isTabStop(layer.closeButton)) {
+    layer.closeButton.focus({ preventScroll: true });
+  } else layer.panel.focus({ preventScroll: true });
+}
+
+function modalFocus(event: FocusEvent) {
+  const layer = topModal();
+  if (!layer || !(event.target instanceof HTMLElement)) return;
+  if (layer.panel.contains(event.target)) layer.lastFocus = event.target;
+  else focusModal(layer);
+}
+
+function modalKeydown(event: globalThis.KeyboardEvent) {
+  const layer = topModal();
+  if (!layer || event.defaultPrevented) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    if (layer.dismissible()) layer.close();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const nodes = Array.from(layer.panel.querySelectorAll<HTMLElement>(focusable)).filter(isTabStop);
+  const first = nodes[0],
+    last = nodes[nodes.length - 1];
+  if (!first || !last) {
+    event.preventDefault();
+    layer.panel.focus();
+  } else if (
+    !layer.panel.contains(document.activeElement) ||
+    document.activeElement === layer.panel
+  ) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function registerModal(layer: ModalLayer) {
+  if (!modalStack.length) {
+    const root = document.getElementById('root');
+    modalLock = {
+      root,
+      inert: root?.inert ?? false,
+      overflow: document.body.style.overflow,
+      previousFocus: layer.previousFocus,
+    };
+    if (root) root.inert = true;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', modalKeydown);
+    document.addEventListener('focusin', modalFocus);
+  }
+  modalStack.push(layer);
+  layer.container.inert = false;
+  layer.container.removeAttribute('inert');
+  layer.container.removeAttribute('aria-hidden');
+  // Move focus before hiding the old layer from the accessibility tree.
+  focusModal(layer);
+  updateModalLayers();
+  return () => {
+    const index = modalStack.indexOf(layer);
+    if (index === -1) return;
+    const wasTop = layer === topModal();
+    modalStack.splice(index, 1);
+    updateModalLayers();
+    const remaining = topModal();
+    if (remaining) {
+      if (wasTop) focusModal(remaining, layer.previousFocus);
+      return;
+    }
+    document.removeEventListener('keydown', modalKeydown);
+    document.removeEventListener('focusin', modalFocus);
+    const lock = modalLock;
+    modalLock = null;
+    if (!lock) return;
+    document.body.style.overflow = lock.overflow;
+    if (lock.root) lock.root.inert = lock.inert;
+    if (
+      lock.previousFocus?.isConnected &&
+      !lock.previousFocus.closest('[inert]') &&
+      !lock.previousFocus.matches(':disabled')
+    )
+      lock.previousFocus.focus();
+    else {
+      const heading = document.querySelector<HTMLElement>('main h1');
+      if (heading && !heading.closest('[inert]')) {
+        heading.tabIndex = -1;
+        heading.focus();
+      }
+    }
+  };
 }
 
 export function Dialog({
   open,
   title,
+  hideTitle = false,
   description,
   onClose,
   children,
@@ -35,70 +192,48 @@ export function Dialog({
 }: DialogProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const closeCallback = useRef(onClose);
   const canDismiss = useRef(dismissible);
+  const layerRef = useRef<ModalLayer | null>(null);
   useLayoutEffect(() => {
     closeCallback.current = onClose;
     canDismiss.current = dismissible;
   }, [onClose, dismissible]);
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open || !containerRef.current || !panelRef.current) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    const appRoot = document.getElementById('root');
-    const previousInert = appRoot?.inert ?? false;
-    if (appRoot) appRoot.inert = true;
-    document.body.style.overflow = 'hidden';
-    if (panelRef.current) panelRef.current.dataset.motion = previous?.matches(':focus-visible') ? 'instant' : 'enter';
-    if (canDismiss.current) closeRef.current?.focus();
-    else panelRef.current?.focus();
-    function keydown(event: globalThis.KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (canDismiss.current) closeCallback.current();
-        return;
-      }
-      if (event.key !== 'Tab' || !panelRef.current) return;
-      const nodes = Array.from(panelRef.current.querySelectorAll<HTMLElement>(focusable))
-        .filter(isTabStop);
-      if (!nodes.length) {
-        event.preventDefault();
-        panelRef.current.focus();
-        return;
-      }
-      const first = nodes[0];
-      const last = nodes[nodes.length - 1];
-      if (!panelRef.current.contains(document.activeElement) || document.activeElement === panelRef.current) {
-        event.preventDefault();
-        (event.shiftKey ? last : first)?.focus();
-      } else if (event.shiftKey && document.activeElement === first && last) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last && first) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener('keydown', keydown);
+    panelRef.current.dataset.motion = previous?.matches(':focus-visible') ? 'instant' : 'enter';
+    const layer: ModalLayer = {
+      container: containerRef.current,
+      panel: panelRef.current,
+      closeButton: closeRef.current,
+      previousFocus: previous,
+      lastFocus: null,
+      dismissible: () => canDismiss.current,
+      close: () => closeCallback.current(),
+    };
+    layerRef.current = layer;
+    const unregister = registerModal(layer);
     return () => {
-      document.removeEventListener('keydown', keydown);
-      document.body.style.overflow = previousOverflow;
-      if (appRoot) appRoot.inert = previousInert;
-      if (previous?.isConnected) previous.focus();
-      else {
-        const heading = document.querySelector<HTMLElement>('main h1');
-        if (heading) { heading.tabIndex = -1; heading.focus(); }
-      }
+      unregister();
+      layerRef.current = null;
     };
   }, [open]);
 
   if (!open) return null;
   return createPortal(
-    <div className={`ui-dialog ui-dialog--${variant}`}>
-      <div className="ui-dialog__backdrop" aria-hidden="true" onClick={() => { if (dismissible) onClose(); }} />
+    <div ref={containerRef} className={`ui-dialog ui-dialog--${variant}`}>
+      <div
+        className="ui-dialog__backdrop"
+        aria-hidden="true"
+        onClick={() => {
+          if (dismissible && topModal() === layerRef.current) onClose();
+        }}
+      />
       <div
         ref={panelRef}
         className="ui-dialog__panel"
@@ -110,7 +245,9 @@ export function Dialog({
       >
         <div className="ui-dialog__head">
           <div>
-            <h2 id={titleId}>{title}</h2>
+            <h2 id={titleId} className={hideTitle ? 'sr-only' : undefined}>
+              {title}
+            </h2>
             {description && <p id={descriptionId}>{description}</p>}
           </div>
           <button
@@ -119,7 +256,9 @@ export function Dialog({
             className="ui-dialog__close"
             aria-label="بستن پنجره"
             disabled={!dismissible}
-            onClick={onClose}
+            onClick={() => {
+              if (dismissible && topModal() === layerRef.current) onClose();
+            }}
           >
             ×
           </button>

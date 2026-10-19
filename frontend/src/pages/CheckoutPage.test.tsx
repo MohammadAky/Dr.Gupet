@@ -12,6 +12,7 @@ import { FREE_SHIPPING_THRESHOLD, SHIPPING_FLAT_COST } from '../lib/constants';
 import { formatToman } from '../lib/format';
 import { clearPendingOrder, readPendingOrder } from '../features/checkout/pending-order';
 import { CheckoutPage } from './CheckoutPage';
+import { GUEST_CART_KEY, readGuestCart } from '../features/cart/guest-cart';
 import {
   clearCheckoutIntent,
   readCheckoutIntent,
@@ -156,6 +157,8 @@ describe('checkout server estimates and order safeguards', () => {
   }
 
   beforeEach(() => {
+    localStorage.removeItem(GUEST_CART_KEY);
+    readGuestCart();
     clearCheckoutIntent();
     authState.userId = 1;
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -184,8 +187,38 @@ describe('checkout server estimates and order safeguards', () => {
     clearPendingOrder();
     clearCheckoutIntent();
     container.remove();
+    localStorage.removeItem(GUEST_CART_KEY);
+    readGuestCart();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('blocks order creation if a guest draft appeared in storage before the cross-tab event rerenders checkout', async () => {
+    await renderCheckout();
+    expect(submitButton().disabled).toBe(false);
+    localStorage.setItem(
+      GUEST_CART_KEY,
+      JSON.stringify({
+        version: 1,
+        transfer: null,
+        items: [
+          {
+            variantId: 2,
+            quantity: 2,
+            productId: 1,
+            productName: 'غذای سگ',
+            productSlug: 'dog-food',
+            productImage: null,
+            weightGram: 1000,
+            unitPrice: 100_000,
+          },
+        ],
+      }),
+    );
+    await act(async () => submitForm());
+    expect(shopApi.createOrder).not.toHaveBeenCalled();
+    expect(shopApi.startPayment).not.toHaveBeenCalled();
+    expect(readGuestCart()[0]?.quantity).toBe(2);
   });
 
   it('restores the same-session address/note and revalidates transferred coupon against the current cart', async () => {
@@ -386,17 +419,29 @@ describe('checkout server estimates and order safeguards', () => {
     >);
     vi.mocked(shopApi.startPayment).mockRejectedValue(new Error('gateway offline'));
     await renderCheckout();
-    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain('تحویل');
-    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe('commerce-shipping');
+    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain(
+      'تحویل',
+    );
+    expect(container.querySelector('.commerce-journey')?.firstElementChild?.className).toBe(
+      'commerce-shipping',
+    );
     expect(container.querySelector('.account-checkout-summary .commerce-shipping')).toBeNull();
     expect(submitButton().closest('.account-checkout-summary')).not.toBeNull();
-    expect(container.querySelector('.commerce-checkout-main .account-checkout-addresses')).not.toBeNull();
-    expect(container.querySelector('.commerce-checkout-main .account-checkout-coupon')).not.toBeNull();
-    expect(container.querySelector('.commerce-checkout-main .account-checkout-note')).not.toBeNull();
+    expect(
+      container.querySelector('.commerce-checkout-main .account-checkout-addresses'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('.commerce-checkout-main .account-checkout-coupon'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('.commerce-checkout-main .account-checkout-note'),
+    ).not.toBeNull();
     await act(async () => submitForm());
     expect(shopApi.createOrder).toHaveBeenCalledTimes(1);
     expect(shopApi.startPayment).toHaveBeenCalledWith(44);
-    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain('پرداخت');
+    expect(container.querySelector('.commerce-steps [aria-current="step"]')?.textContent).toContain(
+      'پرداخت',
+    );
     expect(container.querySelector('.commerce-shipping')).toBeNull();
     expect(container.textContent).toContain('پرداخت هنوز تأیید نشده است');
     expect(container.querySelector('button[type="submit"]')).toBeNull();

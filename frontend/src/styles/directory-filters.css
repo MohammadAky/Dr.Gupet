@@ -1,0 +1,40 @@
+/* Directory geometry follows the compact catalog; shared glass tokens own material. */
+.app-main.content-page:has(.directory-compact) { margin-block-start: 0; padding-block-start: 18px; }
+.directory-compact .directory-page__heading { margin-block: 0 18px; padding: 0; }
+.directory-compact .directory-page__heading h1 { margin: 0; font-size: 1.25rem; line-height: 1.6; }
+.directory-compact .directory-page__heading .eyebrow { font-size: .75rem; margin-block-end: 4px; }
+.directory-compact .directory-page__heading p { font-size: .8rem; margin-block: 5px 0; }
+.directory-filter-layout { display: grid; grid-template-columns: minmax(210px, 240px) minmax(0, 1fr); align-items: start; gap: 20px; }
+.directory-filter-sidebar, .directory-filter-results { min-width: 0; }
+.directory-filter-sidebar { position: sticky; top: calc(var(--app-header-height, 160px) + 14px); max-height: calc(100dvh - var(--app-header-height, 160px) - 28px); overflow-y: auto; scrollbar-width: thin; border-radius: 20px; }
+.directory-filter-panel.filter-panel { margin: 0; padding: 16px; gap: 4px; border-radius: 20px; }
+.directory-filter-panel__heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block-end: 8px; }
+.directory-filter-panel__heading h2 { margin: 0; font-size: 1rem; }
+.directory-filter-panel__heading button { font-size: .7rem; min-height: 44px; padding: 6px; }
+.directory-filter-section { margin: 0; min-width: 0; }
+.directory-filter-panel .directory-filter-section__trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 52px; padding: 10px 2px; text-align: start; color: var(--ink); font: inherit; font-size: .86rem; font-weight: 650; }
+:root .app-shell .content-page .directory-filter-panel .directory-filter-section__trigger,
+.ui-dialog:has(.directory-filter-panel) .directory-filter-section__trigger { background: transparent; box-shadow: none; border: 0; border-radius: 0; }
+.directory-filter-section__trigger span { display: grid; gap: 3px; }
+.directory-filter-section__trigger small { font-size: .7rem; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.directory-filter-section__trigger svg { flex: none; transition: transform 180ms ease; }
+.directory-filter-section__trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+.directory-filter-section__body { padding-block: 4px 14px; }
+.directory-filter-section__body[hidden] { display: none; }
+.directory-filter-panel .filter-check { margin: 0; min-height: 44px; }
+.directory-filter-panel .directory-duty-filter { display: grid; gap: 8px; width: 100%; }
+.directory-filter-panel .directory-duty-filter > .glass-select { inline-size: 100%; min-width: 0; }
+.directory-filter-results > .directory-results { margin-block: 0 14px; font-size: .8rem; }
+.directory-filter-chips { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-snap-type: x proximity; margin-block-end: 12px; padding: 2px 1px 8px; }
+.directory-filter-chips::-webkit-scrollbar { display: none; }
+.directory-filter-chips button { flex: none; scroll-snap-align: start; white-space: nowrap; min-height: 44px; padding: 8px 13px; border: 1px solid var(--glass-control-edge); border-radius: 999px; color: var(--ink); background: linear-gradient(135deg, var(--glass-highlight), transparent), var(--glass-control); box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 10px rgb(0 0 0 / 4%); font: inherit; font-size: .76rem; }
+.ui-dialog:has(.directory-filter-panel) .ui-dialog__panel { color: var(--ink); background: linear-gradient(135deg, var(--glass-highlight), transparent 55%), var(--glass-surface); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: blur(18px) saturate(1.15); backdrop-filter: blur(18px) saturate(1.15); }
+.ui-dialog:has(.directory-filter-panel) .ui-dialog__head h2 { color: var(--ink); }
+.ui-dialog:has(.directory-filter-panel) .directory-filter-panel { background: transparent; box-shadow: none; border: 0; padding: 0; }
+.ui-dialog:has(.directory-filter-panel) :is(button, input:not([type='checkbox']):not([type='radio'])) { color: var(--ink); background: var(--glass-control); border: 1px solid var(--glass-control-edge); border-radius: 12px; min-height: 44px; box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 10px rgb(0 0 0 / 4%); }
+.ui-dialog:has(.directory-filter-panel) .directory-filter-section__trigger { background: transparent; box-shadow: none; border: 0; border-radius: 0; }
+.ui-dialog:has(.directory-filter-panel) .filter-apply { background: rgb(212 159 40 / 17%); border-color: var(--gold); }
+.ui-dialog:has(.directory-filter-panel) .ui-dialog__close { width: 44px; }
+@media (max-width: 900px) { .directory-filter-layout { grid-template-columns: minmax(0, 1fr); } .directory-compact .directory-page__heading h1 { font-size: 1.1rem; } }
+@media (prefers-reduced-motion: reduce) { .directory-filter-section__trigger svg { transition: none; } }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .directory-filter-chips button, .ui-dialog:has(.directory-filter-panel) .ui-dialog__panel { background: var(--glass-solid); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; } }

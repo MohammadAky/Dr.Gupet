@@ -1,5 +1,6 @@
 import '../styles/content-pages.css';
 import '../styles/product-detail-experience.css';
+import '../styles/product-detail-layout.css';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { useAuth } from '../auth/auth-provider';
 import { ErrorState, LoadingState } from '../components/states';
 import { MAX_CART_ITEM_QTY } from '../lib/constants';
 import { formatToman, formatWeight } from '../lib/format';
-import { errorText } from '../lib/labels';
+import { errorText, LIFE_STAGE_FA, SIZE_CLASS_FA, NEUTER_FA } from '../lib/labels';
 import { safeImageUrl } from '../lib/image-url';
 import { API_BASE_URL } from '../lib/env';
 import { SafeImage } from '../components/SafeImage';
@@ -19,6 +20,13 @@ import { ProductGallery } from '../components/ProductGallery';
 import { QuantityField } from '../components/QuantityField';
 import { signalCartAdded } from '../features/cart/cart-feedback';
 import { RelatedProducts } from '../components/RelatedProducts';
+import {
+  addGuestCartItem,
+  readGuestCart,
+  readGuestTransfer,
+  useGuestCart,
+  useGuestTransferCheckpoint,
+} from '../features/cart/guest-cart';
 
 /** Product detail: variant selection, add-to-cart and favorite toggle (F5/F7/F8 behaviour). */
 export function ProductDetailPage() {
@@ -26,6 +34,9 @@ export function ProductDetailPage() {
   const { status, user } = useAuth();
   const isAuthenticated = status === 'authed';
   const identity = isAuthenticated ? (user?.id ?? null) : null;
+  const guestItems = useGuestCart();
+  const guestTransfer = useGuestTransferCheckpoint();
+  const handoffPending = isAuthenticated && (guestItems.length > 0 || guestTransfer !== null);
   const queryClient = useQueryClient();
 
   const product = useQuery({
@@ -135,17 +146,35 @@ export function ProductDetailPage() {
     if (
       !mountedRef.current ||
       addInFlightRef.current ||
-      identityRef.current === null ||
+      status === 'loading' ||
+      handoffPending ||
       (product.data && isSampleProduct(product.data)) ||
       !activeVariant?.inStock ||
       !validQuantity
     )
       return;
-    const requestIdentity = identityRef.current;
     const requestSlug = slugRef.current;
     const generation = generationRef.current;
     const feedbackKeyboard = addWasKeyboardRef.current;
-    const feedbackSource = event.currentTarget.closest('.product-detail')?.querySelector<HTMLElement>('.product-detail__gallery') ?? null;
+    const feedbackSource =
+      event.currentTarget
+        .closest('.product-detail')
+        ?.querySelector<HTMLElement>('.product-detail__gallery') ?? null;
+    if (status === 'guest' && identityRef.current === null && product.data && activeVariant) {
+      try {
+        addGuestCartItem(product.data, activeVariant, quantity);
+        setMessageKind('success');
+        setMessage('به سبد خرید اضافه شد.');
+        signalCartAdded({ userId: null, keyboard: feedbackKeyboard, source: feedbackSource });
+      } catch (problem) {
+        setMessageKind('error');
+        setMessage(errorText(problem));
+      }
+      return;
+    }
+    if (identityRef.current === null || readGuestCart().length > 0 || readGuestTransfer() !== null)
+      return;
+    const requestIdentity = identityRef.current;
     addInFlightRef.current = true;
     setAddPending(true);
     setMessage(null);
@@ -155,7 +184,11 @@ export function ProductDetailPage() {
         if (!responseIsCurrent(requestIdentity, requestSlug, generation)) return;
         setMessageKind('success');
         setMessage('به سبد خرید اضافه شد.');
-        signalCartAdded({ userId: requestIdentity, keyboard: feedbackKeyboard, source: feedbackSource });
+        signalCartAdded({
+          userId: requestIdentity,
+          keyboard: feedbackKeyboard,
+          source: feedbackSource,
+        });
         void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       })
       .catch((error: unknown) => {
@@ -239,74 +272,123 @@ export function ProductDetailPage() {
     .filter((image) => image.safeUrl);
   const selectedImage = images.find((image) => image.id === selectedImageId) ?? images[0];
   const imageUrl = selectedImage?.safeUrl;
+  const sample = isSampleProduct(detail);
+  const available = !sample && activeVariant?.inStock === true;
+  const facts = [
+    ['نوع حیوان', detail.petType.name],
+    ['سن', LIFE_STAGE_FA[detail.lifeStage]],
+    ['جثه', SIZE_CLASS_FA[detail.sizeClass]],
+  ];
 
   return (
     <article className="product-detail">
       <nav className="product-detail__breadcrumb" aria-label="مسیر">
-        <Link to="/">خانه</Link> / <Link to="/products">محصولات</Link> / {publicRecordName(detail)}
+        <Link to="/">فروشگاه دکتر گوپت</Link> / <Link to="/products">محصولات</Link> /{' '}
+        <Link to={`/products?categorySlug=${encodeURIComponent(detail.category.slug)}`}>
+          {publicRecordName(detail.category)}
+        </Link>
       </nav>
       <div className="product-detail__main">
-        <ProductGallery images={images} selectedId={selectedImageId} name={publicRecordName(detail)}
-          onSelect={setSelectedImageId} onOpen={() => setGalleryOpen(true)} />
+        <ProductGallery
+          images={images}
+          selectedId={selectedImageId}
+          name={publicRecordName(detail)}
+          onSelect={setSelectedImageId}
+          onOpen={() => setGalleryOpen(true)}
+        />
         <div className="product-detail__info">
-          <p className="product-detail__eyebrow">
-            {publicRecordName(detail.brand)} / {publicRecordName(detail.category)}
-          </p>
+          <Link className="product-detail__eyebrow" to={`/products?brandId=${detail.brand.id}`}>
+            {publicRecordName(detail.brand)}
+          </Link>
           <h1>{publicRecordName(detail)}</h1>
-          <p>
-            {detail.petType.name} · {publicRecordName(detail.brand)} · {publicRecordName(detail.category)}
+          <dl className="product-detail__facts" aria-label="ویژگی‌های اصلی محصول">
+            {facts.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <fieldset className="commerce-variants">
+            <legend>وزن بسته</legend>
+            {detail.variants.map((variant) => (
+              <label key={variant.id}>
+                <input
+                  type="radio"
+                  name="variant"
+                  value={variant.id}
+                  checked={activeVariant?.id === variant.id}
+                  onChange={() => setVariantId(variant.id)}
+                />
+                <span>
+                  <strong>{formatWeight(variant.weightGram)}</strong>
+                  {!sample && variant.inStock && <span>{formatToman(variant.price)}</span>}
+                </span>
+                <span className="commerce-variant-stock">
+                  {!sample && variant.inStock
+                    ? variant.lowStock
+                      ? 'موجودی محدود'
+                      : 'موجود'
+                    : 'ناموجود'}
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <a className="product-detail__spec-link" href="#product-specifications">
+            مشاهدهٔ مشخصات
+          </a>
+        </div>
+        <aside
+          className="product-detail__purchase commerce-glass"
+          aria-labelledby="product-purchase-heading"
+        >
+          <h2 id="product-purchase-heading">خرید محصول</h2>
+          <p className="product-detail__availability" data-available={available}>
+            {available ? (activeVariant?.lowStock ? 'موجودی محدود' : 'موجود') : 'ناموجود'}
           </p>
-          <form onSubmit={submitAddToCart}>
-            {activeVariant && (
+          {activeVariant && (
+            <p className="product-detail__selected-weight">
+              {formatWeight(activeVariant.weightGram)}
+            </p>
+          )}
+          <form onSubmit={submitAddToCart} aria-label="خرید محصول">
+            {available && activeVariant && (
               <div className="commerce-product-price">
-                <strong>{formatToman(activeVariant.price)}</strong>
                 {activeVariant.compareAtPrice &&
                 activeVariant.compareAtPrice > activeVariant.price ? (
                   <del aria-label="قیمت پیشین">{formatToman(activeVariant.compareAtPrice)}</del>
                 ) : null}
+                <strong>{formatToman(activeVariant.price)}</strong>
               </div>
             )}
-            <fieldset className="commerce-variants">
-              <legend>وزن</legend>
-              {detail.variants.map((variant) => (
-                <label key={variant.id}>
-                  <input
-                    type="radio"
-                    name="variant"
-                    value={variant.id}
-                    checked={activeVariant?.id === variant.id}
-                    onChange={() => setVariantId(variant.id)}
-                  />
-                  <span>
-                    <strong>{formatWeight(variant.weightGram)}</strong>
-                    <span>{formatToman(variant.price)}</span>
-                  </span>
-                  <span className="commerce-variant-stock">
-                    {!isSampleProduct(detail) && variant.inStock ? (variant.lowStock ? 'موجودی محدود' : 'موجود') : 'ناموجود'}
-                  </span>
-                </label>
-              ))}
-            </fieldset>
+            <div className="product-detail__buy-row">
+              <QuantityField
+                id="qty"
+                value={quantityInput}
+                onChange={setQuantityInput}
+                max={MAX_CART_ITEM_QTY}
+                disabled={addPending}
+              />
 
-            <QuantityField id="qty" value={quantityInput} onChange={setQuantityInput} max={MAX_CART_ITEM_QTY} disabled={addPending} />
-
-            <button
-              type="submit"
-              onClick={event => { addWasKeyboardRef.current = event.detail === 0; }}
-              disabled={
-                isSampleProduct(detail) ||
-                identity === null ||
-                !activeVariant?.inStock ||
-                !validQuantity ||
-                addPending
-              }
-            >
-              {isSampleProduct(detail) ? 'ناموجود' : addPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
-            </button>
+              <button
+                type="submit"
+                onClick={(event) => {
+                  addWasKeyboardRef.current = event.detail === 0;
+                }}
+                disabled={
+                  isSampleProduct(detail) ||
+                  status === 'loading' ||
+                  handoffPending ||
+                  !activeVariant?.inStock ||
+                  !validQuantity ||
+                  addPending
+                }
+              >
+                {!available ? 'ناموجود' : addPending ? 'در حال افزودن…' : 'افزودن به سبد خرید'}
+              </button>
+            </div>
             {identity === null && !isSampleProduct(detail) && (
-              <Link to={`/login?next=${encodeURIComponent(`/products/${detail.slug}`)}`}>
-                برای افزودن به سبد خرید وارد شوید
-              </Link>
+              <Link to="/cart">مشاهدهٔ سبد خرید مهمان</Link>
             )}
 
             {identity !== null ? (
@@ -345,31 +427,80 @@ export function ProductDetailPage() {
               )}
             </p>
           )}
-        </div>
+        </aside>
       </div>
 
-      <section className="product-detail__description">
-        {!isSampleProduct(detail) && detail.description && <><h2>توضیحات</h2><p>{detail.description}</p></>}
-        {!isSampleProduct(detail) && detail.ingredientsText && (
-          <>
-            <h2>ترکیبات</h2>
-            <p>{detail.ingredientsText}</p>
-          </>
-        )}
+      <nav className="product-detail__section-links" aria-label="بخش‌های محصول">
+        {!sample && detail.description && <a href="#product-description">توضیحات</a>}
+        <a href="#product-specifications">مشخصات</a>
+        {!sample && detail.ingredientsText && <a href="#product-ingredients">ترکیبات</a>}
+      </nav>
+      {!sample && detail.description && (
+        <section
+          id="product-description"
+          className="product-detail__section commerce-glass"
+          aria-labelledby="product-description-heading"
+        >
+          <h2 id="product-description-heading">توضیحات</h2>
+          <p>{detail.description}</p>
+        </section>
+      )}
+      <section
+        id="product-specifications"
+        className="product-detail__section commerce-glass"
+        aria-labelledby="product-specifications-heading"
+      >
+        <h2 id="product-specifications-heading">مشخصات</h2>
+        <dl className="product-detail__specifications">
+          <div>
+            <dt>برند</dt>
+            <dd>{publicRecordName(detail.brand)}</dd>
+          </div>
+          <div>
+            <dt>دسته‌بندی</dt>
+            <dd>{publicRecordName(detail.category)}</dd>
+          </div>
+          {facts.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+          <div>
+            <dt>عقیم‌بودن</dt>
+            <dd>{NEUTER_FA[detail.neuterSuitability]}</dd>
+          </div>
+          <div>
+            <dt>وزن بسته‌ها</dt>
+            <dd>
+              {detail.variants.map((variant) => formatWeight(variant.weightGram)).join('، ') || '—'}
+            </dd>
+          </div>
+        </dl>
         {detail.tags.length > 0 && (
           <>
-            <h2>برچسب‌ها</h2>
-            <ul>
+            <h3>ویژگی‌های غذایی</h3>
+            <ul className="product-detail__tags">
               {detail.tags.map((tag) => (
                 <li key={tag.id}>{tag.name}</li>
               ))}
             </ul>
           </>
         )}
-        <p>
-          <Link to="/recommendations">محصولات مناسب پت من</Link>
-        </p>
+        <Link className="product-detail__recommendation" to="/recommendations">
+          محصولات مناسب پت من
+        </Link>
       </section>
+      {!sample && detail.ingredientsText && (
+        <section
+          id="product-ingredients"
+          className="product-detail__section commerce-glass"
+          aria-labelledby="product-ingredients-heading"
+        >
+          <h2 id="product-ingredients-heading">ترکیبات</h2>
+          <p>{detail.ingredientsText}</p>
+        </section>
+      )}
       <RelatedProducts product={detail} />
       <Dialog
         open={galleryOpen}
@@ -378,7 +509,11 @@ export function ProductDetailPage() {
         onClose={() => setGalleryOpen(false)}
       >
         <div className="commerce-gallery-viewer">
-          <SafeImage src={imageUrl ?? undefined} alt={publicRecordName(detail)} referrerPolicy="no-referrer" />
+          <SafeImage
+            src={imageUrl ?? undefined}
+            alt={publicRecordName(detail)}
+            referrerPolicy="no-referrer"
+          />
           {images.length > 1 && (
             <nav aria-label="تصاویر محصول">
               <button

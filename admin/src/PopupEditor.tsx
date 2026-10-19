@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "./auth";
 import { errorMessage, markFormSaved, Notice, showFieldErrors } from "./management";
 import "./popup-editor.css";
+import { uploadedImagePath } from "./uploaded-image";
 
 export type PopupContent = { enabled: boolean; title: string; body: string; image: string };
 const emptyPopup: PopupContent = { enabled: false, title: "", body: "", image: "" };
@@ -30,6 +31,7 @@ export function PopupEditor() {
   const mounted = useRef(false);
   const pending = useRef(false);
   const [content, setContent] = useState<PopupContent>(emptyPopup);
+  const [savedContent, setSavedContent] = useState<PopupContent>(emptyPopup);
   const [loaded, setLoaded] = useState(false);
   const [revision, setRevision] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -47,7 +49,7 @@ export function PopupEditor() {
       try {
         const result = readPopup(await request<unknown>("/admin/storefront/popup"));
         if (!active) return;
-        setContent(result); setLoaded(true); setError("");
+        setContent(result); setSavedContent(result); setLoaded(true); setError("");
       } catch (problem) {
         if (active) setError(errorMessage(problem));
       }
@@ -77,9 +79,10 @@ export function PopupEditor() {
     const element = event.currentTarget;
     const payload = { ...content, title: content.title.trim(), body: content.body.trim(), image: content.image.trim() };
     const errors: Record<string, string> = {};
-    if (payload.title.length > 90 || (payload.enabled && !payload.title)) errors.popupTitle = "عنوان را وارد کنید؛ حداکثر ۹۰ نویسه.";
-    if (payload.body.length > 800 || (payload.enabled && !payload.body)) errors.popupBody = "متن را وارد کنید؛ حداکثر ۸۰۰ نویسه.";
-    if (!localImage && !isPopupImagePath(payload.image)) errors.popupImage = "تصویر را از سایت انتخاب یا بارگذاری کنید.";
+    if (payload.title.length > 90) errors.popupTitle = "عنوان باید حداکثر ۹۰ نویسه باشد.";
+    if (payload.body.length > 800) errors.popupBody = "متن باید حداکثر ۸۰۰ نویسه باشد.";
+    if (payload.enabled && !payload.title && !payload.body && !payload.image && !localImage) errors.popupTitle = "تصویر، عنوان یا متن اضافه کنید.";
+    if (!localImage && !isPopupImagePath(payload.image)) { setError("تصویر معتبر نیست؛ تصویر دیگری بارگذاری کنید."); return; }
     showFieldErrors(element, errors);
     if (Object.keys(errors).length) return;
     pending.current = true; setSaving(true); setError(""); setMessage("");
@@ -88,13 +91,14 @@ export function PopupEditor() {
         const formData = new FormData(); formData.append("file", localImage.file);
         const uploaded = await request<{ url: string }>("/upload/image", { method: "POST", formData });
         if (!mounted.current) return;
-        if (typeof uploaded?.url !== "string" || !uploaded.url || !isPopupImagePath(uploaded.url)) throw new Error("نشانی تصویر دریافتی معتبر نیست.");
-        payload.image = uploaded.url;
-        setContent(current => ({ ...current, image: uploaded.url })); setLocalImage(null);
+        const path = uploadedImagePath(uploaded?.url);
+        if (!path) throw new Error("نشانی تصویر دریافتی معتبر نیست.");
+        payload.image = path;
+        setContent(current => ({ ...current, image: path })); setLocalImage(null);
       }
       await request("/admin/storefront/popup", { method: "PUT", body: payload });
       if (!mounted.current) return;
-      setContent(payload); markFormSaved(element); setMessage("پاپ‌آپ ذخیره شد.");
+      setContent(payload); setSavedContent(payload); markFormSaved(element); setMessage("پاپ‌آپ ذخیره شد.");
     } catch (problem) {
       if (mounted.current) setError(errorMessage(problem));
     } finally {
@@ -103,7 +107,9 @@ export function PopupEditor() {
   }
   const previewImage = localImage?.url ?? (isPopupImagePath(content.image.trim()) ? content.image.trim() : "");
   return <section className="manage-card popup-editor" aria-labelledby={titleId}>
-    <h2 id={titleId}>پاپ‌آپ سایت</h2>
+    <header className="manage-head"><h1 id={titleId}>پاپ‌آپ سایت</h1>
+      {loaded && <span className="popup-editor__publication" aria-label="وضعیت انتشار پاپ‌آپ">در سایت: {savedContent.enabled ? "فعال" : "غیرفعال"}</span>}
+    </header>
     {!loaded ? <>
       {!error && <p role="status">در حال دریافت…</p>}
       <Notice message={error} />
@@ -112,9 +118,9 @@ export function PopupEditor() {
       <form ref={form} className="manage-form popup-editor__form" data-draft-editor noValidate onSubmit={event => void save(event)}>
         <div className="popup-editor__fields">
           <label className="popup-editor__toggle"><input type="checkbox" checked={content.enabled} disabled={saving} onChange={event => change({ enabled: event.target.checked })} />نمایش پاپ‌آپ</label>
+          <small>نمایش در سایت پس از ذخیره تغییر می‌کند. عنوان و متن اختیاری‌اند.</small>
           <label>عنوان<input name="popupTitle" maxLength={90} value={content.title} disabled={saving} onChange={event => change({ title: event.target.value })} /></label>
           <label>متن<textarea name="popupBody" rows={5} maxLength={800} value={content.body} disabled={saving} onChange={event => change({ body: event.target.value })} /></label>
-          <label>نشانی تصویر<input name="popupImage" dir="ltr" maxLength={500} value={content.image} disabled={saving} placeholder="/uploads/image.webp" onChange={event => { setLocalImage(null); change({ image: event.target.value }); }} /></label>
           <label>تصویر پاپ‌آپ<input type="file" accept="image/png,image/jpeg,image/webp" disabled={saving} onChange={event => { chooseImage(event.target.files?.[0]); event.target.value = ""; }} /></label>
           {(content.image || localImage) && <button type="button" disabled={saving} data-draft-keep onClick={() => { setLocalImage(null); change({ image: "" }); }}>حذف تصویر</button>}
           <button type="submit" className="manage-primary" disabled={saving}>{saving ? "در حال ذخیره…" : "ذخیره پاپ‌آپ"}</button>
@@ -123,7 +129,7 @@ export function PopupEditor() {
           <span className="popup-editor__preview-label">پیش‌نمایش</span>
           <div className="popup-editor__dialog">
             {previewImage && <img key={previewImage} src={previewImage} alt="" referrerPolicy="no-referrer" onError={event => { event.currentTarget.hidden = true; }} />}
-            <h3>{content.title || "عنوان پاپ‌آپ"}</h3>
+            {content.title.trim() && <h3>{content.title}</h3>}
             {content.body && <p>{content.body}</p>}
           </div>
         </aside>
