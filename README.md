@@ -40,7 +40,7 @@
 
 **ادمین (اپ مستقل):** ورود با نام کاربری/رمز یا OTP و کنترل نقش `ADMIN`، افزودن حساب مدیر و تعیین/بازنشانی اطلاعات ورود، داشبورد KPI، گزارش‌ها + CSV، مدیریت کاربران/کاتالوگ/سفارش/پرداخت/کوپن/دارو/داروخانه/کلینیک، تنظیمات، لاگ تغییرات — همه با جست‌وجو/فیلتر/صفحه‌بندی (query-driven).
 
-**خارج از MVP:** دامپزشک/نوبت‌دهی، پرونده پزشکی، نسخه، پانسیون، گفتگو، اشتراک، نظرات، بلاگ.
+**خارج از MVP:** دامپزشک/نوبت‌دهی، پرونده پزشکی، نسخه، پانسیون، گفتگو، اشتراک، بلاگ. (نظر و امتیاز خریدار تحویل‌گرفته دیگر خارج از MVP نیست — پروندهٔ ۳۷.)
 
 ## ۳. استک فنی
 
@@ -286,10 +286,11 @@ npm run start:dev                  # http://localhost:3000/api/v1  ·  Swagger: 
 | بازیابی رمز | `POST /auth/password/forgot/request` · `POST /auth/password/forgot/reset` |
 | مدیریت اطلاعات ورود | `POST /admin/users/password-account` (حساب جدید) · `POST /admin/users/:id/password-account` (حساب موجود)؛ فقط `ADMIN` و با ثبت رویداد |
 | کاربر | `GET/PATCH /users/me`، `GET/POST/PATCH/DELETE /users/me/addresses...` (+default)، پت‌ها (`/pets...` + tags) |
-| کاتالوگ | `GET /products` (جست‌وجو/فیلتر)، `GET /products/:slug`، `/brands`، `/categories`، `/pet-types`، `/breeds`، `/tags` |
+| کاتالوگ | `GET /products` (جست‌وجو/فیلتر)، `GET /products/:slug` (شامل `rating:{average,count}`)، `/brands`، `/categories`، `/pet-types`، `/breeds`، `/tags` |
+| نظر خریدار | `GET /products/:slug/reviews` (عمومی، صفحه‌بندی‌شده)، `GET /products/:slug/review-eligibility`، `POST /products/:slug/reviews`، `PATCH\|DELETE /products/:slug/reviews/mine`؛ فقط خریدار سفارش `DELIVERED` همان محصول، یک نظر برای هر کاربر و محصول |
 | پیشنهاد | `GET /recommendations?petId=` |
 | علاقه‌مندی | `GET/POST/DELETE /favorites...` |
-| سبد | `GET /cart`، `POST /cart/items`، `PATCH/DELETE /cart/items/:id`، `DELETE /cart` |
+| سبد | `GET /cart` (شامل `version`)، `POST /cart/items`، `PATCH/DELETE /cart/items/:id`، `DELETE /cart`، `POST /cart/guest-transfer` (اتمیک و idempotent با `requestId`، سیاست `replace`) |
 | کوپن | `POST /coupons/validate` |
 | سفارش | `POST /orders`، `GET /orders`، `GET /orders/:id`، `POST /orders/:id/cancel` |
 | پرداخت | `POST /payments/start`، `GET /payments/callback` (امضاشده)، `GET /payments/mock-pay` (فقط توسعه) |
@@ -351,7 +352,7 @@ npm run start:dev                  # http://localhost:3000/api/v1  ·  Swagger: 
 | لاگ‌ها | `GET /admin/audit-logs` · `GET /admin/sms/logs` (فیلتر phone/kind/status) |
 | کاربران | `GET/POST/PATCH/DELETE /admin/users...` + `PATCH /admin/users/:id/restore` |
 | کاتالوگ | `admin/products` (+ `variants`/`images`/`tags`)، `admin/brands`، `admin/categories`، `admin/pet-types`، `admin/breeds`، `admin/tags` — همه با `search`/`isActive` |
-| CSV کاتالوگ | `GET /admin/products/export.csv` با `columns` و فیلترهای فهرست؛ `POST /admin/products/sync/preview` و `/sync` برای پیش‌نمایش و ثبت اتمیک ایجاد/ویرایش حداکثر ۵۰۰ ردیف گزینه |
+| CSV کاتالوگ | `GET /admin/products/export.csv` با `columns` و فیلترهای فهرست؛ `POST /admin/products/sync/preview` و `/sync` برای پیش‌نمایش و ثبت اتمیک ایجاد/ویرایش حداکثر ۵۰۰ ردیف گزینه. ستون موجودیِ دست‌نخورده فروش واقعی را بازنویسی نمی‌کند (یادداشت نگه‌داری برمی‌گردد) و تضاد با ردیف/محصول/فیلد در `details` گزارش می‌شود. در پنل یک مسیر واحد است: فایلی که فقط `sku,variantId,name,price,compareAtPrice` داشته باشد «فایل قیمت» شناخته می‌شود و ستون نام در آن فقط برچسب است؛ همان صفحهٔ «ویرایش با CSV» آن را می‌خواند و «دریافت فایل قیمت» همین قالب را می‌دهد (`DEC-043`) |
 | سفارش‌ها | `GET/PATCH /admin/orders...` — `:id/transition`، `:id/tracking`، `:id/cancel`، `:id/refund` (ساخت سفارش فقط از `POST /orders`) |
 | پرداخت‌ها | `GET /admin/payments...` — `:id/reconcile`، `:id/mark-failed` |
 | کوپن‌ها | CRUD `/admin/coupons` + آمار مصرف |
@@ -361,7 +362,7 @@ npm run start:dev                  # http://localhost:3000/api/v1  ·  Swagger: 
 
 **مرحلهٔ ۱۷ اکتبر:** خروجی CSV ستون‌پذیر و ورود مجدد با حفظ شناسه‌ها و snapshot موجودی، بخش‌بندی مستقیم تنظیمات صفحهٔ اصلی، فضای مستقل داده‌های مرجع، تغییر مستقیم وضعیت سفارش و اصلاح اعتبارسنجی فیلترهای ادمین آماده شده‌اند. DTO هر مسیر، فیلترهای همان مسیر را همراه صفحه‌بندی می‌پذیرد؛ whitelist سراسری خاموش نشده است. کارت/فیلتر فروشگاه نیز طبق نمونهٔ مالک فشرده و کناری شده‌اند. مالک طرح را دیده و انتشار با ترتیب «VPS، سپس GitHub» را تأیید کرده است؛ [گزارش پذیرش مرحله](frontend/docs/ADMIN_WORKFLOW_20261017.md) شواهد و حدود آزمون را ثبت می‌کند. مجوز انتشار، به‌تنهایی شاهد موفقیت انتشار نیست؛ revision واقعی سرو‌شده باید بررسی شود.
 
-- **واحد بک‌اند (Jest):** آخرین gate انتشار ثبت‌شده **۴۵ سوییت / ۴۳۴ تست** است؛ OTP (هش، سقف‌ها، همزمانی)، جریان `requestOtp`، درایورهای SMS + لاگ `SmsLog`، سخت‌سازی callback پرداخت، cancel/expire اتمیک، سهمیه/تبدیل آپلود، `POST /admin/users`، CSV injection، جستجوها، سبد/پت/آدرس/علاقه‌مندی و ابزارها را پوشش می‌دهد. مرحلهٔ جدید قیمت/سرعت بک‌اند را تغییر نداده و این gate تاریخی را دوباره اجرا نکرده است.
+- **واحد بک‌اند (Jest):** در بازبینی ۲۴ اکتبر ۲۰۲۶، **۶۷ سوییت / ۷۷۲ تست** پاس شد. چهار سوییت (`password-policy`، `auth.registration-template`، `auth.admin-otp`، `admin-query.http`) در این سندباکس فقط به‌دلیل نبود binding نیتیو `bcrypt` اجرا نمی‌شوند؛ با جانشین JS همان ۴ سوییت/۱۱۱ تست هم پاس شد. gate HTTP جدا با `test/jest-e2e.json` (۲۵ تست: پیشوند، ValidationPipe، envelope، ۴۰۴، DTOهای care و نظر) اجرا می‌شود. جزئیات و محدودیت‌ها در [گزارش بازبینی](.issue/BACKEND-SWEEP-20261024.md).
 - **رابط‌ها (Vitest):** در کاندید محلی ۱۳ اکتبر، فرانت‌اند **۵۹ فایل / ۴۲۵ تست** و ادمین **۱۹ فایل / ۱۱۸ تست** پاس شدند؛ lint، TypeScript و build تولیدی نیز پاس شدند. تست‌های ایزولهٔ درخواست‌ها، پذیرش زندهٔ SMS، درگاه یا ذخیرهٔ واقعی دیتابیس محسوب نمی‌شوند.
 - **E2E (Supertest):** MySQL (دیتابیس تستی) + Redis واقعی؛ `PAYMENT_DRIVER=mock` و `SMS_DRIVER=console`.
 - سناریوهای حتمی: خرید کامل؛ جداسازی مالکیت؛ همزمانی آخرین موجودی؛ سقف کوپن؛ idempotency کال‌بک؛ دسترسی غیرمجاز/مسدود.
@@ -398,7 +399,7 @@ tar czf /backups/uploads-$(date +%F).tar.gz -C /opt/drgupet/backend uploads
 
 **فرانت‌اند (F0–F11) و پنل ادمین (A0–A5):** مسیرهای اصلی پیاده‌اند و با بک‌اند کار می‌کنند؛ پذیرش نهایی (به‌ویژه با API زنده و بررسی بصری/دسترس‌پذیری) با مالک پروژه است.
 
-**اصلاح تأییدشدهٔ ۱۹ اکتبر ۲۰۲۶:** کاتالوگ چهار/دوستونه با بارگذاری هنگام اسکرول، فیلتر فشردهٔ محصولات و مراکز، سبد مهمان با حفظ مقصد ورود، اعلان همهٔ صفحات و خوانایی Liquid Glass آمادهٔ انتشار با تأیید مالک‌اند. [گزارش و محدودهٔ پذیرش](frontend/docs/CATALOG_REFINEMENT_20261019.md). نیاز سرورِ پاپ‌آپ فقط‌تصویری، نظر خریدار تحویل‌گرفته و انتقال اتمیک بین دستگاه‌ها در پرونده‌های ۳۶–۳۸ باز است؛ هیچ قابلیت وابسته به آن‌ها تکمیل‌شده اعلام نمی‌شود.
+**اصلاح تأییدشدهٔ ۱۹ اکتبر ۲۰۲۶:** کاتالوگ چهار/دوستونه با بارگذاری هنگام اسکرول، فیلتر فشردهٔ محصولات و مراکز، سبد مهمان با حفظ مقصد ورود، اعلان همهٔ صفحات و خوانایی Liquid Glass آمادهٔ انتشار با تأیید مالک‌اند. [گزارش و محدودهٔ پذیرش](frontend/docs/CATALOG_REFINEMENT_20261019.md). پاپ‌آپ بدون متن (۳۶)، نظر خریدار تحویل‌گرفته (۳۷) و انتقال اتمیک سبد مهمان (۳۸) در بازبینی ۲۴ اکتبر در بک‌اند پیاده و واحدآزمون شدند؛ پذیرش زنده روی MySQL/SMS/درگاه همچنان انجام نشده و ادعا نمی‌شود.
 
 **انتشارهای تأییدشدهٔ ۱۴ اکتبر ۲۰۲۶:** تغییر برنامهٔ قیمت/سرعت در `d36b00d76436ba00f0f14c4c07645fc05d48f42c` به GitHub و VPS رفت؛ revision مشتری، ادمین و بک‌اند یکسان، سرویس‌ها healthy و کاتالوگ/تعداد رکوردها ثابت بودند. commitهای بعدیِ صرفاً گزارش همین کد آزموده‌شده را توضیح می‌دهند؛ revision دقیق هر انتشار از GitHub `main` و `/release.json` هر دو دامنه خوانده و با label کانتینر تطبیق داده می‌شود. جدول زیر وضعیت امروز را مشخص می‌کند؛ بندهای تاریخ‌دار بعدی تاریخچه‌اند. امکانات تازهٔ ادمین در بند مستقل زیر با تأیید مالک و شواهد انتشار ثبت شده‌اند. پرداخت تولید همچنان disabled است.
 

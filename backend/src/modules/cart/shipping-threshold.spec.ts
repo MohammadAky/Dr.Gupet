@@ -105,7 +105,8 @@ describe('Six-million-Toman shipping threshold, server totals and override', () 
       shippingCost: 0,
       finalAmount: 4000000,
     });
-    expect(h.coupons.evaluate).toHaveBeenCalledWith('LOCAL-ONLY', 7, 6000000);
+    // Issue #16: the coupon is evaluated inside the checkout transaction.
+    expect(h.coupons.evaluate).toHaveBeenCalledWith('LOCAL-ONLY', 7, 6000000, expect.anything());
   });
   it.each([
     [7000000, 6000000, 50000],

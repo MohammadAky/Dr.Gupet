@@ -208,14 +208,71 @@ describe('Reviewed CSV synchronization', () => {
     expect(h.state.products[0]).toMatchObject({ id: 1, description: 'توضیح قبلی' });
     expect(h.locks).toHaveBeenCalled();
   });
-  it('rejects stale exported stock instead of restoring a sold unit', async () => {
+  it('never restores a sold unit when the exported stock cell was not edited', async () => {
+    const h = harness();
+    h.state.variants[0].stock = 9;
+    const preview = await h.service.synchronize(
+      { rows: [{ sku: 'SKU-1', price: 90, stock: 10, expectedStock: 10 }] },
+      true,
+    );
+    if (!('rows' in preview)) throw Error('preview');
+    // The untouched stock column is dropped with a note instead of failing the file.
+    expect(preview.notes).toEqual([
+      expect.objectContaining({ line: 2, variant: 'SKU-1', field: 'stock' }),
+    ]);
+    expect(preview.rows[0]?.changes).toEqual([{ field: 'price', before: 100, after: 90 }]);
+    await h.service.synchronize({ rows: preview.rows.map((r) => r.data) }, false);
+    expect(h.state.variants[0]).toMatchObject({ stock: 9, price: 90 });
+    expect(h.state.variants[1]).toMatchObject({ stock: 5, price: 200 });
+  });
+  it('rejects an edited stock cell whose exported snapshot is stale', async () => {
     const h = harness();
     h.state.variants[0].stock = 9;
     await expect(
-      h.service.synchronize({ rows: [{ sku: 'SKU-1', stock: 10, expectedStock: 10 }] }, true),
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+      h.service.synchronize({ rows: [{ sku: 'SKU-1', stock: 12, expectedStock: 10 }] }, true),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      details: [expect.objectContaining({ line: 2, field: 'stock', variant: 'SKU-1' })],
+    });
     expect(h.writes).not.toHaveBeenCalled();
     expect(h.state.variants[0].stock).toBe(9);
+  });
+  it('reports the row and product of a stale metadata edit instead of a generic conflict', async () => {
+    const h = harness();
+    await expect(
+      h.service.synchronize(
+        { rows: [{ sku: 'SKU-1', name: 'نام تازه', expectedUpdatedAt: '2026-10-16T00:00:00Z' }] },
+        true,
+      ),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: expect.stringContaining('غذای سگ'),
+      details: [expect.objectContaining({ line: 2, field: 'name', product: 'غذای سگ' })],
+    });
+    expect(h.writes).not.toHaveBeenCalled();
+  });
+  it('applies price-only edits even when product metadata moved after the export', async () => {
+    const h = harness();
+    h.state.products[0].updatedAt = new Date('2026-10-18T00:00:00Z');
+    const preview = await h.service.synchronize(
+      {
+        rows: [
+          {
+            sku: 'SKU-1',
+            price: 120,
+            expectedUpdatedAt: '2026-10-17T00:00:00.000Z',
+          },
+        ],
+      },
+      true,
+    );
+    if (!('rows' in preview)) throw Error('preview');
+    expect(preview.rows[0]?.action).toBe('update');
+    expect(preview.notes).toEqual([]);
+    await h.service.synchronize({ rows: preview.rows.map((r) => r.data) }, false);
+    expect(h.state.variants[0]).toMatchObject({ id: 11, price: 120, stock: 10 });
+    // The concurrent metadata edit is preserved; only the price-derived minPrice moves.
+    expect(h.state.products[0]).toMatchObject({ name: 'غذای سگ', description: 'توضیح قبلی', minPrice: 120 });
   });
   it('rejects a race after preview and metadata edits from stale exports', async () => {
     const h = harness();

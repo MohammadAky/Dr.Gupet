@@ -1,5 +1,42 @@
 # Pet System Backend - Changelog
 
+## [Unreleased] - Backend issue sweep (2026-10-24)
+
+### Added
+- **Verified-buyer product reviews (issue #37)**: `ProductReview` model + migration
+  (`20261024120000_product_reviews`). Public `GET /products/:slug/reviews`,
+  authenticated eligibility/create/edit/delete under `/products/:slug/...`; only a
+  `DELIVERED` order containing that product may write, one review per user+product,
+  plain-text sanitized bodies, and `rating: {average, count}` on catalog cards,
+  product detail, favorites and recommendations (one grouped query per page).
+- **Atomic guest-cart handoff (issue #38)**: `POST /cart/guest-transfer` with a stable
+  `requestId`, `(userId, requestId)` idempotency record + payload hash, `FOR UPDATE`
+  cart lock, `replace` overlap policy, optional `expectedCartVersion`, and per-row
+  `ADDED/REPLACED/UNCHANGED` results. `GET /cart` now returns `version`.
+- Runtime DTOs for care writes: `CreateClinicDto`/`UpdateClinicDto`,
+  `CreateMedicineDto`/`UpdateMedicineDto`, `CreatePharmacyDto`/`UpdatePharmacyDto`
+  and `CreateAdminUserDto`/`UpdateAdminUserDto` (issue #19 and #10).
+
+### Fixed
+- **Multer advisory GHSA-72gw-mp4g-v24j (issue #24)**: `multer` bumped to `2.5.0`
+  and forced through `overrides`, so the copy nested under
+  `@nestjs/platform-express` is fixed too. Parser limits are now `files: 1`,
+  `fields: 1`, `parts: 2`, `fieldNameSize: 64`, `fieldSize: 256`, `headerPairs: 20`
+  plus the `UPLOAD_MAX_MB` byte cap; `MulterError` maps to `413 PAYLOAD_TOO_LARGE`
+  or `400 VALIDATION_ERROR` instead of a 500.
+- **Restored users kept old tokens (issue #35)**: `restoreByAdmin`, `updateByAdmin`
+  (role/status changes) and `softDeleteByAdmin` bump `sessionVersion`, so access and
+  refresh tokens issued before a block/delete/restore are rejected.
+- Care services now map an explicit allow-list of fields into Prisma instead of
+  forwarding the request body.
+
+### Tests
+- 6 suites/55 review + rating tests, 17 guest-transfer tests, care-DTO HTTP cases in
+  `test/http-pipeline.e2e-spec.ts`, upload-limit and multer-error tests, directory
+  search tests (`q`), and session-invalidation cases. Full run: 67 suites / 772 tests
+  green; four suites are blocked in the sandbox by the missing native `bcrypt`
+  binding and pass against a pure-JS substitute.
+
 ## [Unreleased] - Fix Prisma/openssl crash-loop on Alpine (2026-10-05)
 
 ### Fixed

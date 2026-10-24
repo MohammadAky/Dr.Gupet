@@ -31,22 +31,26 @@ export class OtpService {
     const maxPerHour = this.configService.get<number>('otp.maxPerHour') || 5;
     const devCode = this.configService.get<string>('otp.devCode');
 
-    // Check hourly limit (atomic counter)
-    const countKey = otpKeys.count(phone);
-    const count = await this.redis.incr(countKey);
-    if (count === 1) {
-      await this.redis.expire(countKey, OTP_HOURLY_WINDOW_SECONDS);
-    }
-    if (count > maxPerHour) {
-      throw new AppException('OTP_RATE_LIMITED', 'تعداد درخواست‌ها از حد مجاز فراتر رفته است', 429);
-    }
-
     // Atomically claim the resend cooldown (issue #03): SET NX — only one of
     // two concurrent requests wins the claim; the loser is rate-limited.
     const cooldownKey = otpKeys.cooldown(phone);
     const claimedCooldown = await this.redis.setNx(cooldownKey, '1', cooldown);
     if (!claimedCooldown) {
       throw new AppException('OTP_RATE_LIMITED', 'لطفاً چند لحظه صبر کنید و دوباره تلاش کنید', 429);
+    }
+
+    // Hourly budget is consumed only by requests that actually generate a code
+    // (issue #27): a rejected resend no longer burns the victim's quota, and a
+    // request over the limit releases its cooldown claim instead of blocking it.
+    const countKey = otpKeys.count(phone);
+    const count = await this.redis.incr(countKey);
+    if (count === 1) {
+      await this.redis.expire(countKey, OTP_HOURLY_WINDOW_SECONDS);
+    }
+    if (count > maxPerHour) {
+      await this.redis.incrBy(countKey, -1);
+      await this.redis.del(cooldownKey);
+      throw new AppException('OTP_RATE_LIMITED', 'تعداد درخواست‌ها از حد مجاز فراتر رفته است', 429);
     }
 
     // Generate code

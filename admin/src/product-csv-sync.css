@@ -23,9 +23,16 @@
 .csv-sync-changes dt { color: var(--muted); font-size: .8rem; }
 .csv-sync-changes dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 4px 0 0; white-space: pre-wrap; }
 .csv-sync-changes dd > span:first-child { color: var(--muted); }
+.csv-export-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .csv-export-options fieldset { min-width: 0; border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
 .csv-export-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 18px; padding-block-start: 10px; }
 .csv-export-check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: .9rem; }
 .csv-export-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--gold); }
 .csv-export-filter { font-weight: 700; }
 @media (max-width: 600px) { .csv-sync-heading { align-items: start; } .csv-export-columns { grid-template-columns: minmax(0, 1fr); } .csv-sync-page .catalog-panel { padding: 18px; } }
+.csv-sync-conflicts { display: grid; gap: 10px; padding: 16px; border: 1px solid #d8a2a2; border-radius: 16px; background: rgba(166, 38, 38, .06); }
+.csv-sync-conflicts h2, .csv-sync-notes h2 { margin: 0; font-size: 1rem; color: var(--title); }
+.csv-sync-conflicts ul, .csv-sync-notes ul { display: grid; gap: 6px; margin: 0; padding-inline-start: 20px; line-height: 1.85; }
+.csv-sync-conflicts p, .csv-sync-notes p { margin: 0; line-height: 1.9; color: var(--muted); }
+.csv-sync-notes { display: grid; gap: 10px; }
+[data-theme="dark"] .csv-sync-conflicts { border-color: #7a3b3b; background: rgba(255, 180, 169, .08); }

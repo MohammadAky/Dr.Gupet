@@ -278,6 +278,11 @@ export class UsersService {
             avatar: data.avatar,
             role: data.role,
             status: data.status,
+            // Issue #35: any role/status change invalidates outstanding access
+            // and refresh tokens, including a later block → active transition.
+            ...(data.role !== undefined || data.status !== undefined
+              ? { sessionVersion: { increment: 1 } }
+              : {}),
           },
           select: USER_SAFE_SELECT,
         });
@@ -300,7 +305,8 @@ export class UsersService {
       }
       await tx.user.update({
         where: { id },
-        data: { deletedAt: new Date(), status: 'BLOCKED' },
+        // Deletion also invalidates every session/token issued before it.
+        data: { deletedAt: new Date(), status: 'BLOCKED', sessionVersion: { increment: 1 } },
         select: { id: true },
       });
     });
@@ -322,7 +328,9 @@ export class UsersService {
 
     const restored = await this.prisma.user.update({
       where: { id },
-      data: { deletedAt: null, status: 'ACTIVE' },
+      // Issue #35: restoration requires a fresh login. Tokens minted before the
+      // suspension/deletion stay invalid after the account comes back.
+      data: { deletedAt: null, status: 'ACTIVE', sessionVersion: { increment: 1 } },
       select: USER_SAFE_SELECT,
     });
     return withUsername(restored);

@@ -3,6 +3,14 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Issue #22: this file inserts DEMO catalog/medicine content with made-up
+  // prices and stock. It must never run unattended against production data.
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+    console.error(
+      '❌ Demo seed is disabled when NODE_ENV=production. Use the reference/bootstrap tooling instead; set ALLOW_DEMO_SEED=true only on an isolated demo database.',
+    );
+    process.exit(1);
+  }
   console.log('Seeding database...');
 
   // 1. Pet Types
@@ -273,35 +281,44 @@ async function main() {
   ];
 
   for (const pharmacy of pharmacies) {
-    await prisma.pharmacy.create({ data: pharmacy });
+    // Idempotent on the demo natural key (name+city) so re-running never inserts duplicates.
+    const existing = await prisma.pharmacy.findFirst({
+      where: { name: pharmacy.name, city: pharmacy.city },
+      select: { id: true },
+    });
+    if (!existing) await prisma.pharmacy.create({ data: pharmacy });
   }
 
   console.log('✅ Pharmacies created');
 
-  // 11. Medicines
-  const med1 = await prisma.medicine.create({
-    data: {
-      name: 'قرص ضد انگل سگ',
-      activeIngredient: 'پراکسیکوانل',
-      type: 'قرص',
-      usage: 'درمان انگل‌های روده‌ای',
-      requiresPrescription: false,
-    },
-  });
+  // 11. Medicines (demo) — idempotent on name; relations use Prisma's own
+  // implicit m2m writes because hand-written `ON CONFLICT` is SQLite syntax and
+  // fails on the MySQL production provider (issue #22).
+  async function demoMedicine(name: string, data: { activeIngredient: string; type: string; usage: string }, petTypeId: number) {
+    const existing = await prisma.medicine.findFirst({ where: { name }, select: { id: true } });
+    const medicine =
+      existing ??
+      (await prisma.medicine.create({
+        data: { name, ...data, requiresPrescription: false },
+        select: { id: true },
+      }));
+    await prisma.medicine.update({
+      where: { id: medicine.id },
+      data: { petTypes: { connect: { id: petTypeId } } },
+    });
+    return medicine;
+  }
 
-  const med2 = await prisma.medicine.create({
-    data: {
-      name: 'قطره گوش گربه',
-      activeIngredient: 'کلوتریمازول',
-      type: 'قطره',
-      usage: 'درمان عفونت قارچی گوش',
-      requiresPrescription: false,
-    },
-  });
-
-  // Link medicines to pet types
-  await prisma.$executeRaw`INSERT INTO _MedicineToPetType (A, B) VALUES (${med1.id}, ${dog.id}) ON CONFLICT DO NOTHING`;
-  await prisma.$executeRaw`INSERT INTO _MedicineToPetType (A, B) VALUES (${med2.id}, ${cat.id}) ON CONFLICT DO NOTHING`;
+  await demoMedicine(
+    'قرص ضد انگل سگ',
+    { activeIngredient: 'پراکسیکوانل', type: 'قرص', usage: 'درمان انگل‌های روده‌ای' },
+    dog.id,
+  );
+  await demoMedicine(
+    'قطره گوش گربه',
+    { activeIngredient: 'کلوتریمازول', type: 'قطره', usage: 'درمان عفونت قارچی گوش' },
+    cat.id,
+  );
 
   console.log('✅ Medicines created');
 

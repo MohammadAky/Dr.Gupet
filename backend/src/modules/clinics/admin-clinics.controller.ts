@@ -17,6 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
 import { AdminClinicListQueryDto } from '../../admin/dto/admin-query.dto';
+import { CreateClinicDto, UpdateClinicDto } from './dto/admin-clinic.dto';
 
 @ApiTags('Admin - Clinics')
 @Controller('admin/clinics')
@@ -33,21 +34,7 @@ export class AdminClinicsController {
   @ApiOperation({ summary: 'Create a new clinic (admin only)' })
   @ApiResponse({ status: 201, description: 'Clinic created' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  async create(
-    @Body()
-    body: {
-      name: string;
-      province: string;
-      city: string;
-      address: string;
-      lat?: number;
-      lng?: number;
-      phone?: string;
-      workingHours?: string;
-      is24h?: boolean;
-    },
-    @Req() req: any,
-  ) {
+  async create(@Body() body: CreateClinicDto, @Req() req: any) {
     const clinic = await this.clinicsService.create(body);
     await this.auditService.record({
       adminId: req.user.sub,
@@ -81,20 +68,7 @@ export class AdminClinicsController {
   @ApiResponse({ status: 404, description: 'Clinic not found' })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    body: Partial<{
-      name: string;
-      province: string;
-      city: string;
-      address: string;
-      lat?: number;
-      lng?: number;
-      phone?: string;
-      workingHours?: string;
-      is24h?: boolean;
-      isVerified?: boolean;
-      isActive?: boolean;
-    }>,
+    @Body() body: UpdateClinicDto,
     @Req() req: any,
   ) {
     const clinic = await this.clinicsService.update(id, body);

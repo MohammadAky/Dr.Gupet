@@ -7,6 +7,7 @@ import {
   DOG_SMALL_MAX_KG,
   DOG_MEDIUM_MAX_KG,
 } from '../../common/constants';
+import { EMPTY_RATING, ratingSummaries } from '../reviews/rating.util';
 
 @Injectable()
 export class ProductsRecommendationService {
@@ -120,6 +121,12 @@ export class ProductsRecommendationService {
       this.prisma.product.count({ where }),
     ]);
 
+    // Issue #37: the same rating shape as every other product card.
+    const ratings = await ratingSummaries(
+      this.prisma,
+      products.map((product) => product.id),
+    );
+
     // Calculate match score and transform
     const items = products.map((product) => {
       const productDietTagIds = product.tags.map((pt) => pt.tag.id);
@@ -142,6 +149,7 @@ export class ProductsRecommendationService {
         sizeClass: product.sizeClass,
         matchedTags,
         matchScore: matchedDietTagIds.length,
+        rating: ratings.get(product.id) ?? EMPTY_RATING,
       };
     });
 

@@ -164,7 +164,7 @@ it("keeps product editors unavailable until references are ready and moves refer
   const create = screen.getByRole("button", { name: "+ ثبت محصول" }) as HTMLButtonElement;
   expect(create.disabled).toBe(true);
   expect(screen.queryByRole("button", { name: "داده‌های مرجع" })).toBeNull();
-  expect((screen.getByRole("button", { name: "ورود از CSV" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "افزودن محصول از CSV" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("در حال دریافت داده‌های مرجع…")).toBeTruthy();
   await waitFor(() => expect(resolveBrands).toBeTypeOf("function"));
   await act(async () => { resolveBrands?.([]); });
@@ -176,7 +176,7 @@ it("keeps product editors unavailable until references are ready and moves refer
 it("opens the separate CSV review screen after references are ready without writing products", async () => {
   requestMock.mockImplementation((path: string) => path.startsWith("/admin/products?") ? Promise.resolve(page()) : Promise.resolve([]));
   render(<Catalog />);
-  const button = screen.getByRole("button", { name: "ورود از CSV" });
+  const button = screen.getByRole("button", { name: "افزودن محصول از CSV" });
   await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(button);
   expect(screen.getByRole("heading", { name: "ورود محصولات از CSV" })).toBeTruthy();
@@ -218,7 +218,7 @@ it("retains sync success while products and references refresh after an accepted
   });
   render(<Catalog />);
   await screen.findByText("محصول ثبت‌شده");
-  fireEvent.click(screen.getByRole("button", { name: "به‌روزرسانی با CSV" }));
+  fireEvent.click(screen.getByRole("button", { name: "ویرایش با CSV" }));
   const source = "variantId,stock\n8,0";
   const selected = new File([source], "stock.csv", { type: "text/csv" });
   Object.defineProperty(selected, "text", { value: () => Promise.resolve(source) });
@@ -252,7 +252,7 @@ it("refreshes imported brands and categories for the next product editor while r
     return Promise.resolve([]);
   });
   render(<Catalog />);
-  const openImport = screen.getByRole("button", { name: "ورود از CSV" });
+  const openImport = screen.getByRole("button", { name: "افزودن محصول از CSV" });
   await waitFor(() => expect((openImport as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(openImport);
   const source = "name,price,brandName,categoryName,petTypeId\nمحصول واردشده,100,برند تازه,دسته تازه,3";

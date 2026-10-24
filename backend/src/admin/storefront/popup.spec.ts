@@ -235,6 +235,42 @@ describe('Storefront popup publication and administrator boundaries', () => {
     );
   });
 
+  it.each([
+    ['image only', { enabled: true, title: '', body: '', image: '/uploads/banner.webp' }],
+    ['title only', { enabled: true, title: 'تخفیف هفته', body: '', image: '' }],
+    ['body only', { enabled: true, title: '', body: 'ارسال رایگان', image: '' }],
+    ['mixed', activePopup],
+  ])('publishes an enabled %s popup (issue #36)', async (_label, content) => {
+    const response = await request(app.getHttpServer())
+      .put(adminPath)
+      .set('Authorization', `Bearer ${token(1)}`)
+      .send(content);
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(content);
+    expect(JSON.parse(rows.get(POPUP_SETTING_KEY)!.value)).toEqual(content);
+    const published = await request(app.getHttpServer()).get(publicPath);
+    expect(published.body.data).toEqual(content);
+  });
+
+  it('refuses to enable a completely empty popup but keeps it as a draft', async () => {
+    const empty = { enabled: true, title: '  ', body: '', image: '' };
+    const response = await request(app.getHttpServer())
+      .put(adminPath)
+      .set('Authorization', `Bearer ${token(1)}`)
+      .send(empty);
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain('تصویر، عنوان یا متن');
+    expect(prisma.setting.upsert).not.toHaveBeenCalled();
+    const draft = { ...empty, enabled: false };
+    const draftResponse = await request(app.getHttpServer())
+      .put(adminPath)
+      .set('Authorization', `Bearer ${token(1)}`)
+      .send(draft);
+    expect(draftResponse.status).toBe(200);
+    // Stored drafts keep the server's trimmed text; nothing else is invented.
+    expect(draftResponse.body.data).toEqual({ enabled: false, title: '', body: '', image: '' });
+  });
+
   it('accepts maximum supported text lengths and an empty optional image', async () => {
     const content = { enabled: true, title: 'ت'.repeat(90), body: 'م'.repeat(800), image: '' };
     const response = await request(app.getHttpServer())
@@ -253,8 +289,7 @@ describe('Storefront popup publication and administrator boundaries', () => {
     ['long title', { ...activePopup, title: 'ت'.repeat(91) }],
     ['long body', { ...activePopup, body: 'م'.repeat(801) }],
     ['long image path', { ...activePopup, image: '/uploads/' + 'a'.repeat(500) + '.png' }],
-    ['blank enabled title', { ...activePopup, title: ' \n\t ' }],
-    ['blank enabled body', { ...activePopup, body: ' \n\t ' }],
+    ['completely empty enabled popup', { enabled: true, title: ' \n\t ', body: ' \n\t ', image: '' }],
     ['extra field', { ...activePopup, userId: 8 }],
     ['partial body', { enabled: true, title: 'عنوان' }],
   ] as const;
@@ -317,8 +352,7 @@ describe('Storefront popup publication and administrator boundaries', () => {
       'not an object',
       {},
       { ...activePopup, enabled: 'true' },
-      { ...activePopup, title: '' },
-      { ...activePopup, body: ' \n ' },
+      { enabled: true, title: '', body: '', image: '' },
       { ...activePopup, image: 'https://remote.example/x.png' },
       { ...activePopup, title: 'x'.repeat(91) },
       { ...activePopup, body: 'x'.repeat(801) },

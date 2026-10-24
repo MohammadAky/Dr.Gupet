@@ -111,16 +111,28 @@ export class ClinicsService {
     province: string;
     city: string;
     address: string;
-    lat?: number;
-    lng?: number;
-    phone?: string;
-    workingHours?: string;
+    lat?: number | null;
+    lng?: number | null;
+    phone?: string | null;
+    workingHours?: string | null;
     is24h?: boolean;
+    isVerified?: boolean;
+    isActive?: boolean;
   }) {
+    // Issue #19: explicit whitelist — only contract fields ever reach Prisma.
     return this.prisma.clinic.create({
       data: {
-        ...data,
-        isVerified: false,
+        name: data.name,
+        province: data.province,
+        city: data.city,
+        address: data.address,
+        lat: data.lat,
+        lng: data.lng,
+        phone: data.phone,
+        workingHours: data.workingHours,
+        is24h: data.is24h ?? false,
+        isVerified: data.isVerified ?? false,
+        isActive: data.isActive ?? true,
       },
     });
   }
@@ -135,13 +147,13 @@ export class ClinicsService {
       province: string;
       city: string;
       address: string;
-      lat?: number;
-      lng?: number;
-      phone?: string;
-      workingHours?: string;
-      is24h?: boolean;
-      isVerified?: boolean;
-      isActive?: boolean;
+      lat: number | null;
+      lng: number | null;
+      phone: string | null;
+      workingHours: string | null;
+      is24h: boolean;
+      isVerified: boolean;
+      isActive: boolean;
     }>,
   ) {
     const clinic = await this.prisma.clinic.findUnique({ where: { id } });
@@ -149,9 +161,28 @@ export class ClinicsService {
       throw new NotFoundException('کلینیک یافت نشد');
     }
 
+    // Issue #19: copy allowed keys only, so nothing outside the contract is
+    // forwarded to the ORM even if a caller bypasses the HTTP DTO.
+    const payload: Record<string, unknown> = {};
+    for (const field of [
+      'name',
+      'province',
+      'city',
+      'address',
+      'lat',
+      'lng',
+      'phone',
+      'workingHours',
+      'is24h',
+      'isVerified',
+      'isActive',
+    ] as const) {
+      if (data[field] !== undefined) payload[field] = data[field];
+    }
+
     return this.prisma.clinic.update({
       where: { id },
-      data,
+      data: payload,
     });
   }
 

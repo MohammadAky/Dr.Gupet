@@ -36,14 +36,42 @@ const metaKeys = [
   'isActive',
 ] as const;
 const variantKeys = ['price', 'stock', 'weightGram', 'compareAtPrice'] as const;
+type Conflict = {
+  line: number;
+  productId: number;
+  product: string;
+  variant: string | null;
+  field: string;
+  message: string;
+};
+type Note = Conflict;
+const productFieldLabels: Record<string, string> = {
+  name: 'نام',
+  brandId: 'برند',
+  categoryId: 'دسته‌بندی',
+  petTypeId: 'نوع حیوان',
+  ingredientsText: 'ترکیبات',
+  description: 'توضیحات',
+  isActive: 'انتشار',
+};
 const invalid = (message: string, line?: number) =>
   new AppException('VALIDATION_ERROR', (line ? `ردیف ${line}: ` : '') + message, 400);
-const stale = () =>
-  new AppException(
+/**
+ * A conflict names the exact rows and fields that moved after the export, so the
+ * owner can re-export and retry instead of guessing which cell is stale.
+ */
+const stale = (conflicts: Conflict[] = []) => {
+  const base = 'موجودی یا اطلاعات محصول تغییر کرده است؛ خروجی تازه بگیرید و دوباره بررسی کنید';
+  const first = conflicts[0];
+  if (!first) return new AppException('CONFLICT', base, 409);
+  const where = `ردیف ${first.line}${first.variant ? ` / ${first.variant}` : ''} «${first.product}»`;
+  return new AppException(
     'CONFLICT',
-    'موجودی یا اطلاعات محصول تغییر کرده است؛ خروجی تازه بگیرید و دوباره بررسی کنید',
+    `${base} (${where}: ${first.message}${conflicts.length > 1 ? `؛ ${conflicts.length} ردیف تغییر کرده` : ''})`,
     409,
+    conflicts,
   );
+};
 
 @Injectable()
 export class ProductsSyncService {
@@ -177,6 +205,8 @@ export class ProductsSyncService {
           const newSlugs = new Set<string>();
           const reviews: Review[] = [];
           const creates: SyncProductRowDto[] = [];
+          const conflicts: Conflict[] = [];
+          const notes: Note[] = [];
           const [brands, categories, petTypes] = await Promise.all([
             tx.brand.findMany(),
             tx.productCategory.findMany(),
@@ -291,17 +321,36 @@ export class ProductsSyncService {
               throw invalid('ابتدا پیش‌نمایش اطلاعات محصول را دریافت کنید', line);
             if (row.slug && slugify(row.slug) !== product.slug)
               throw invalid('نشانی محصول موجود قابل تغییر نیست', line);
-            if (
-              row.expectedUpdatedAt &&
-              Date.parse(row.expectedUpdatedAt) !== product.updatedAt.getTime()
-            )
-              throw stale();
+            // A stock cell that was never edited must not rewrite live stock: an
+            // untouched stale value is dropped (with a note) instead of failing the
+            // whole file, while an edited stale value stays a conflict.
+            const ignored = new Set<string>();
             if (variant && row.stock !== undefined) {
-              if (row.expectedStock !== undefined && row.expectedStock !== variant.stock)
-                throw stale();
               if (!preview && row.expectedStock === undefined)
                 throw invalid('ابتدا پیش‌نمایش تغییرات را دریافت کنید', line);
-              data.expectedStock = variant.stock;
+              const edited = row.expectedStock === undefined || row.stock !== row.expectedStock;
+              const drifted = row.expectedStock !== undefined && row.expectedStock !== variant.stock;
+              if (edited && drifted)
+                conflicts.push({
+                  line,
+                  productId: product.id,
+                  product: product.name,
+                  variant: variant.sku,
+                  field: 'stock',
+                  message: `موجودی از ${row.expectedStock} به ${variant.stock} رسیده است`,
+                });
+              else if (drifted) {
+                ignored.add('stock');
+                notes.push({
+                  line,
+                  productId: product.id,
+                  product: product.name,
+                  variant: variant.sku,
+                  field: 'stock',
+                  message: `موجودی بعد از خروجی از ${row.expectedStock} به ${variant.stock} رسیده بود؛ موجودی فعلی حفظ شد و مقدار فایل اعمال نشد`,
+                });
+              }
+              if (!ignored.has('stock')) data.expectedStock = variant.stock;
             }
             data.productId = product.id;
             data.expectedUpdatedAt = product.updatedAt.toISOString();
@@ -347,6 +396,26 @@ export class ProductsSyncService {
             }
             if (Object.keys(group.patch).length && !preview && !row.expectedUpdatedAt)
               throw invalid('ابتدا پیش‌نمایش اطلاعات محصول را دریافت کنید', line);
+            // Price/stock-only rows do not depend on the product row version; only a
+            // row that really rewrites product fields needs the export to be current.
+            const metadata = changes.filter((change) =>
+              (metaKeys as readonly string[]).includes(change.field),
+            );
+            if (
+              metadata.length &&
+              row.expectedUpdatedAt &&
+              Date.parse(row.expectedUpdatedAt) !== product.updatedAt.getTime()
+            )
+              conflicts.push({
+                line,
+                productId: product.id,
+                product: product.name,
+                variant: variant?.sku ?? null,
+                field: metadata[0]!.field,
+                message: `محصول بعد از خروجی ویرایش شده است (${metadata
+                  .map((change) => productFieldLabels[change.field] ?? change.field)
+                  .join('، ')})`,
+              });
             if (variant) {
               if (claimedVariants.has(variant.id))
                 throw invalid('یک گزینهٔ محصول بیش از یک بار هدف ویرایش است', line);
@@ -354,7 +423,7 @@ export class ProductsSyncService {
               data.variantId = variant.id;
               const patch: Prisma.ProductVariantUpdateInput = {};
               for (const key of variantKeys)
-                if (row[key] !== undefined && row[key] !== variant[key]) {
+                if (row[key] !== undefined && !ignored.has(key) && row[key] !== variant[key]) {
                   Object.assign(patch, { [key]: row[key] });
                   changes.push({ field: key, before: variant[key], after: row[key] });
                 }
@@ -393,6 +462,9 @@ export class ProductsSyncService {
               });
             }
           }
+          // Nothing is written before this point, so reporting every conflict at once
+          // never leaves a partially applied file.
+          if (conflicts.length) throw stale(conflicts);
           for (const group of groups.values()) {
             const effective = { ...group.product, ...group.patch } as Product;
             for (const [key, list] of [
@@ -419,7 +491,7 @@ export class ProductsSyncService {
             unchanged: reviews.filter((r) => r.action === 'unchanged').length,
             variantsAdded: reviews.filter((r) => r.action === 'add-variant').length,
           };
-          if (preview) return { rows: reviews, totals };
+          if (preview) return { rows: reviews, totals, notes };
           // Existing services' create validation and all new reference writes join this transaction.
           const importer = new ProductsImportService({
             $transaction: <T>(fn: (inner: Prisma.TransactionClient) => Promise<T>) => fn(tx),
@@ -470,7 +542,7 @@ export class ProductsSyncService {
               });
             }
           }
-          return totals;
+          return { ...totals, notes };
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,

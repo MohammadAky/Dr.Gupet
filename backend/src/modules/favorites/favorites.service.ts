@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { EMPTY_RATING, ratingSummaries } from '../reviews/rating.util';
 
 @Injectable()
 export class FavoritesService {
@@ -41,6 +42,12 @@ export class FavoritesService {
       this.prisma.favorite.count({ where: { userId } }),
     ]);
 
+    // Issue #37: same rating shape as the catalog cards.
+    const ratings = await ratingSummaries(
+      this.prisma,
+      favorites.map((fav) => fav.product.id),
+    );
+
     // Transform to product card shape
     const items = favorites
       .filter((fav) => fav.product.isActive) // Skip inactive products
@@ -62,6 +69,7 @@ export class FavoritesService {
           inStock,
           lifeStage: product.lifeStage,
           sizeClass: product.sizeClass,
+          rating: ratings.get(product.id) ?? EMPTY_RATING,
         };
       });
 

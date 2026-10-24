@@ -36,6 +36,8 @@ model User {
   orders            Order[]
   couponRedemptions CouponRedemption[]
   passwordCredential PasswordCredential?
+  productReviews     ProductReview[]
+  guestTransfers     GuestTransfer[]
 }
 
 model PasswordCredential {
@@ -195,6 +197,27 @@ model Product {
   images    ProductImage[]
   tags      ProductTag[]
   favorites Favorite[]
+  reviews   ProductReview[]
+}
+
+/// Issue #37: one review per buyer per product, visible only after a real
+/// DELIVERED order containing this product. Aggregates are computed from
+/// visible rows only, so a hidden review never moves a public rating.
+model ProductReview {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  userId    Int
+  rating    Int
+  body      String   @db.Text
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId, isVisible])
 }
 
 model ProductVariant {
@@ -246,6 +269,23 @@ model Favorite {
 // ---------------------------------------------------------------------
 // سبد خرید، کوپن، سفارش، پرداخت
 // ---------------------------------------------------------------------
+
+/// Issue #38: idempotency record for the guest-cart handoff. The unique
+/// (userId, requestId) pair makes a network retry safe; a reused requestId with
+/// a different payload is a conflict, never a silent second write.
+model GuestTransfer {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  requestId   String   @db.VarChar(64)
+  payloadHash String   @db.VarChar(64)
+  result      String   @db.Text
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, requestId])
+  @@index([createdAt])
+}
 
 model Cart {
   id        Int      @id @default(autoincrement())
