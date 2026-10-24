@@ -23,9 +23,18 @@ class FakeRedis {
   }
 
   async incr(key: string): Promise<number> {
-    const next = (this.counters.get(key) ?? 0) + 1;
+    return this.incrBy(key, 1);
+  }
+
+  async incrBy(key: string, by: number): Promise<number> {
+    const next = (this.counters.get(key) ?? 0) + by;
     this.counters.set(key, next);
     return next;
+  }
+
+  /** Test-only view of the hourly counter. */
+  countOf(key: string): number {
+    return this.counters.get(key) ?? 0;
   }
 
   async expire(): Promise<boolean> {
@@ -110,7 +119,7 @@ describe('OtpService', () => {
     });
 
     it('rate-limits after maxPerHour requests even without cooldown', async () => {
-      const { redis, otp } = makeOtp({ 'otp.maxPerHour': 2, 'otp.resendCooldownSeconds': 0 });
+      const { redis, otp } = makeOtp({ 'otp.maxPerHour': 2, 'otp.resendCooldownSeconds': 60 });
 
       await otp.generate('09121234567');
       // Simulate cooldown elapsed
@@ -120,6 +129,31 @@ describe('OtpService', () => {
       await expect(otp.generate('09121234567')).rejects.toMatchObject({
         code: 'OTP_RATE_LIMITED',
       });
+    });
+
+    it('does not spend the hourly budget on requests rejected by the cooldown (issue #27)', async () => {
+      const { redis, otp } = makeOtp({ 'otp.maxPerHour': 2 });
+      const phone = '09121234567';
+
+      await otp.generate(phone);
+      const countKey = 'otp:count:' + phone;
+      expect(redis.countOf(countKey)).toBe(1);
+
+      // Repeated rejected resends must not consume the victim's hourly quota.
+      for (let attempt = 0; attempt < 5; attempt++)
+        await expect(otp.generate(phone)).rejects.toMatchObject({ code: 'OTP_RATE_LIMITED' });
+      expect(redis.countOf(countKey)).toBe(1);
+
+      await redis.del('otp:cooldown:' + phone);
+      await expect(otp.generate(phone)).resolves.toMatch(/^\d{6}$/);
+      expect(redis.countOf(countKey)).toBe(2);
+
+      // The two allowed requests are now exhausted: the next attempt is refused
+      // and neither the counter nor the cooldown claim is left behind.
+      await redis.del('otp:cooldown:' + phone);
+      await expect(otp.generate(phone)).rejects.toMatchObject({ code: 'OTP_RATE_LIMITED' });
+      expect(redis.countOf(countKey)).toBe(2);
+      expect(await redis.exists('otp:cooldown:' + phone)).toBe(false);
     });
   });
 

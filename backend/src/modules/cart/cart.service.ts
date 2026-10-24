@@ -125,6 +125,8 @@ export class CartService {
     return {
       items,
       itemsTotal,
+      // Issue #38: the optimistic version a client may echo back on transfer.
+      version: cart.updatedAt?.toISOString?.() ?? null,
       estimate: {
         itemsTotal,
         shippingCost: estimatedShipping,

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AppException } from '../../common/filters/all-exceptions.filter';
 
 export const SETTING_KEYS = [
   'SHIPPING_FLAT_COST',
@@ -8,6 +9,30 @@ export const SETTING_KEYS = [
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
+
+/**
+ * Accepted numeric range for each overridable setting (issue #17). Money values
+ * are integer Toman; the expiry window is a positive whole number of minutes.
+ * Values are validated on write and re-checked on read so a hand-edited row can
+ * never feed a negative, fractional or absurd number into cart/order math.
+ */
+export const SETTING_BOUNDS: Record<SettingKey, { min: number; max: number; label: string }> = {
+  SHIPPING_FLAT_COST: { min: 0, max: 2147483647, label: 'هزینهٔ ارسال' },
+  FREE_SHIPPING_THRESHOLD: { min: 0, max: 2147483647, label: 'آستانهٔ ارسال رایگان' },
+  ORDER_EXPIRE_MINUTES: { min: 1, max: 1440, label: 'مهلت پرداخت' },
+};
+
+export function isSettingKey(key: string): key is SettingKey {
+  return (SETTING_KEYS as readonly string[]).includes(key);
+}
+
+/** Integer-only parse inside the documented bounds; null when out of contract. */
+export function parseSettingValue(key: SettingKey, raw: string): number | null {
+  if (!/^\d{1,10}$/.test(raw.trim())) return null;
+  const value = Number(raw.trim());
+  const bounds = SETTING_BOUNDS[key];
+  return Number.isSafeInteger(value) && value >= bounds.min && value <= bounds.max ? value : null;
+}
 
 const CACHE_TTL_MS = 30_000;
 
@@ -38,12 +63,14 @@ export class SettingsService {
     return null;
   }
 
-  /** Number setting: DB value wins; otherwise the provided fallback (usually env). */
+  /**
+   * Number setting: a stored value wins only while it still satisfies the
+   * documented integer bounds; otherwise the fallback (usually env) applies.
+   */
   async getNumber(key: SettingKey, fallback: number): Promise<number> {
     const raw = await this.getRaw(key);
     if (raw == null) return fallback;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : fallback;
+    return parseSettingValue(key, raw) ?? fallback;
   }
 
   async findAll() {
@@ -68,6 +95,17 @@ export class SettingsService {
   }
 
   async set(key: string, value: string) {
+    if (!isSettingKey(key)) {
+      throw new AppException('VALIDATION_ERROR', 'کلید تنظیمات نامعتبر است', 400);
+    }
+    if (parseSettingValue(key, value) === null) {
+      const bounds = SETTING_BOUNDS[key];
+      throw new AppException(
+        'VALIDATION_ERROR',
+        `${bounds.label} باید عدد صحیح بین ${bounds.min.toLocaleString('fa-IR')} و ${bounds.max.toLocaleString('fa-IR')} باشد`,
+        400,
+      );
+    }
     const row = await this.prisma.setting.upsert({
       where: { key },
       create: { key, value },

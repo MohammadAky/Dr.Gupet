@@ -35,13 +35,20 @@ export class PopupService {
       typeof item.image === 'string' &&
       item.image.length <= 500 &&
       POPUP_IMAGE_PATH.test(item.image) &&
-      (!item.enabled || Boolean(item.title.trim() && item.body.trim()))
+      // Issue #36: an enabled popup may be image-only, text-only or mixed; only
+      // a completely empty enabled popup is invalid.
+      (!item.enabled ||
+        Boolean(item.title.trim() || item.body.trim() || item.image.trim()))
     );
   }
 
   async save(value: PopupDto) {
     if (!this.valid(value))
-      throw new AppException('VALIDATION_ERROR', 'عنوان و متن پاپ‌آپ را کامل کنید', 400);
+      throw new AppException(
+        'VALIDATION_ERROR',
+        'پاپ‌آپ فعال باید دست‌کم یک تصویر، عنوان یا متن داشته باشد',
+        400,
+      );
     const content = {
       enabled: value.enabled,
       title: value.title.trim(),

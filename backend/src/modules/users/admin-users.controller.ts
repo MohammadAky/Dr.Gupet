@@ -19,6 +19,7 @@ import { AuditService } from '../../admin/audit/audit.service';
 import { AdminUserListQueryDto } from '../../admin/dto/admin-query.dto';
 import { PasswordService } from '../auth/password.service';
 import { AdminPasswordRegisterDto, PasswordCredentialDto } from '../auth/dto/password.dto';
+import { CreateAdminUserDto, UpdateAdminUserDto } from './dto/admin-user.dto';
 
 @ApiTags('Admin - Users')
 @Controller('admin/users')
@@ -85,16 +86,7 @@ export class AdminUsersController {
   @ApiOperation({ summary: 'Create user by phone + role (admin only)' })
   @ApiResponse({ status: 201, description: 'Created user' })
   @ApiResponse({ status: 409, description: 'Phone already taken' })
-  async create(
-    @Body()
-    body: {
-      phone: string;
-      role?: string;
-      firstName?: string;
-      lastName?: string;
-    },
-    @Req() req: any,
-  ) {
+  async create(@Body() body: CreateAdminUserDto, @Req() req: any) {
     const user = await this.usersService.createByAdmin(body);
     await this.auditService.record({
       adminId: req.user.sub,
@@ -113,14 +105,7 @@ export class AdminUsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    body: {
-      firstName?: string;
-      lastName?: string;
-      avatar?: string;
-      role?: string;
-      status?: string;
-    },
+    @Body() body: UpdateAdminUserDto,
     @Req() req: any,
   ) {
     const user = await this.usersService.updateByAdmin(id, body, req.user.sub);

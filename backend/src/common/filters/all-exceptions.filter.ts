@@ -1,12 +1,13 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
+import { MulterError } from 'multer';
 
 export class AppException extends HttpException {
   constructor(
     public readonly code: string,
     message: string,
     statusCode: number = HttpStatus.BAD_REQUEST,
-    details?: any[],
+    public readonly details?: any[],
   ) {
     super({ code, message, statusCode, details }, statusCode);
   }
@@ -28,6 +29,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       code = exception.code;
       message = exception.message;
       details = (exception.getResponse() as { details?: unknown[] }).details;
+    } else if (exception instanceof MulterError) {
+      // Issue #24: parser limits are a client mistake, never a 500.
+      statusCode =
+        exception.code === 'LIMIT_FILE_SIZE'
+          ? HttpStatus.PAYLOAD_TOO_LARGE
+          : HttpStatus.BAD_REQUEST;
+      code = exception.code === 'LIMIT_FILE_SIZE' ? 'PAYLOAD_TOO_LARGE' : 'VALIDATION_ERROR';
+      message =
+        exception.code === 'LIMIT_FILE_SIZE'
+          ? 'حجم فایل بیش از حد مجاز است'
+          : 'درخواست آپلود معتبر نیست';
+      details = [{ field: exception.field, reason: exception.code }];
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const response = exception.getResponse();
@@ -56,6 +69,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         return 'NOT_FOUND';
       case 409:
         return 'CONFLICT';
+      case 413:
+        return 'PAYLOAD_TOO_LARGE';
       case 429:
         return 'RATE_LIMITED';
       default:

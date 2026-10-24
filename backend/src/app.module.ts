@@ -24,6 +24,7 @@ import { PetsModule } from './modules/pets/pets.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
@@ -82,6 +83,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
     BrandsModule,
     CategoriesModule,
     ProductsModule,
+    ReviewsModule,
     FavoritesModule,
     CartModule,
     CouponsModule,

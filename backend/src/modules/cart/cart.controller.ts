@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CartService } from './cart.service';
+import { GuestTransferService } from './guest-transfer.service';
+import { GuestTransferDto } from './dto/guest-transfer.dto';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -20,13 +22,28 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @ApiBearerAuth()
 @Controller('cart')
 export class CartController {
-  constructor(private cartService: CartService) {}
+  constructor(
+    private cartService: CartService,
+    private guestTransfer: GuestTransferService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get my cart' })
   @ApiResponse({ status: 200, description: 'Cart returned' })
   async getCart(@CurrentUser('sub') userId: number) {
     return this.cartService.getCart(userId);
+  }
+
+  @Post('guest-transfer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Atomically hand a guest cart over to the signed-in account' })
+  @ApiResponse({ status: 200, description: 'Transfer result with the authoritative cart' })
+  @ApiResponse({ status: 409, description: 'Row rejected, version conflict or reused request id' })
+  async transferGuestCart(
+    @CurrentUser('sub') userId: number,
+    @Body() dto: GuestTransferDto,
+  ) {
+    return this.guestTransfer.transfer(userId, dto);
   }
 
   @Post('items')

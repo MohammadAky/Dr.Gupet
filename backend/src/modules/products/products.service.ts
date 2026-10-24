@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeFa } from '../../common/utils/normalize-fa.util';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { EMPTY_RATING, ratingSummaries, ratingSummary } from '../reviews/rating.util';
 
 @Injectable()
 export class ProductsService {
@@ -164,6 +165,12 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
+    // Issue #37: one grouped query for the whole page, never per card.
+    const ratings = await ratingSummaries(
+      this.prisma,
+      products.map((product) => product.id),
+    );
+
     // Transform to product card shape
     const items = products.map((product) => {
       const activeVariants = product.variants;
@@ -190,6 +197,7 @@ export class ProductsService {
         inStock,
         lifeStage: product.lifeStage,
         sizeClass: product.sizeClass,
+        rating: ratings.get(product.id) ?? EMPTY_RATING,
       };
     });
 
@@ -258,6 +266,7 @@ export class ProductsService {
       isSample: product.slug.startsWith(PRESENTATION_PREFIX),
       variants,
       tags: product.tags.map((pt) => pt.tag),
+      rating: await ratingSummary(this.prisma, product.id),
     };
   }
 

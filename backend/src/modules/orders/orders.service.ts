@@ -74,26 +74,7 @@ export class OrdersService {
     // 4. Calculate itemsTotal
     const itemsTotal = cartItems.reduce((sum, item) => sum + item.variant.price * item.quantity, 0);
 
-    // 5. Validate coupon if provided
-    let discountAmount = 0;
-    let couponId: number | null = null;
-
-    if (data.couponCode) {
-      const result = await this.couponsService.evaluate(
-        data.couponCode.toUpperCase(),
-        userId,
-        itemsTotal,
-      );
-      discountAmount = result.discountAmount;
-
-      // Get coupon ID for recording
-      const coupon = await this.prisma.coupon.findUnique({
-        where: { code: data.couponCode.toUpperCase() },
-      });
-      couponId = coupon?.id || null;
-    }
-
-    // 6. Calculate shipping (Setting table overrides env values)
+    // 5. Calculate shipping fallbacks (Setting table overrides env values)
     const freeShippingThreshold = await this.settingsService.getNumber(
       'FREE_SHIPPING_THRESHOLD',
       this.configService.get<number>('app.freeShippingThreshold') || 6000000,
@@ -102,13 +83,26 @@ export class OrdersService {
       'SHIPPING_FLAT_COST',
       this.configService.get<number>('app.shippingFlatCost') || 50000,
     );
-    const shippingCost = itemsTotal >= freeShippingThreshold ? 0 : shippingFlatCost;
 
-    // 7. Calculate finalAmount
-    const finalAmount = Math.max(0, itemsTotal - discountAmount + shippingCost);
-
-    // 8. Reserve stock and create order in transaction
+    // 6. Coupon evaluation, stock reservation and order creation share one
+    // transaction (issue #16): the coupon row is locked and its redemption limits
+    // are re-read under that lock, so two concurrent checkouts cannot both use the
+    // last remaining redemption.
     const created = await this.prisma.$transaction(async (tx) => {
+      let discountAmount = 0;
+      let couponId: number | null = null;
+
+      if (data.couponCode) {
+        const code = data.couponCode.toUpperCase();
+        const result = await this.couponsService.evaluate(code, userId, itemsTotal, tx);
+        discountAmount = result.discountAmount;
+        const coupon = await tx.coupon.findUnique({ where: { code }, select: { id: true } });
+        couponId = coupon?.id ?? null;
+      }
+
+      const shippingCost = itemsTotal >= freeShippingThreshold ? 0 : shippingFlatCost;
+      const finalAmount = Math.max(0, itemsTotal - discountAmount + shippingCost);
+
       // Reserve stock
       await this.orderStockService.reserve(
         tx,

@@ -17,6 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from '../../admin/audit/audit.service';
 import { AdminPharmacyListQueryDto } from '../../admin/dto/admin-query.dto';
+import { CreatePharmacyDto, UpdatePharmacyDto } from './dto/admin-pharmacy.dto';
 
 @ApiTags('Admin - Pharmacies')
 @Controller('admin/pharmacies')
@@ -43,24 +44,7 @@ export class AdminPharmaciesController {
 
   @Post()
   @ApiOperation({ summary: 'Create pharmacy (admin only)' })
-  async create(
-    @Body()
-    body: {
-      name: string;
-      province: string;
-      city: string;
-      address: string;
-      lat?: number;
-      lng?: number;
-      phone?: string;
-      workingHours?: string;
-      is24h?: boolean;
-      isVerified?: boolean;
-      isActive?: boolean;
-      onDuty?: boolean;
-    },
-    @Req() req: any,
-  ) {
+  async create(@Body() body: CreatePharmacyDto, @Req() req: any) {
     const pharmacy = await this.pharmaciesService.create(body);
     await this.auditService.record({
       adminId: req.user.sub,
@@ -77,21 +61,7 @@ export class AdminPharmaciesController {
   @ApiOperation({ summary: 'Update pharmacy (admin only)' })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    body: Partial<{
-      name: string;
-      province: string;
-      city: string;
-      address: string;
-      lat: number;
-      lng: number;
-      phone: string;
-      workingHours: string;
-      is24h: boolean;
-      isVerified: boolean;
-      isActive: boolean;
-      onDuty: boolean;
-    }>,
+    @Body() body: UpdatePharmacyDto,
     @Req() req: any,
   ) {
     const pharmacy = await this.pharmaciesService.update(id, body);

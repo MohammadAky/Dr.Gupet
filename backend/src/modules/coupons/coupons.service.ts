@@ -32,6 +32,13 @@ export class CouponsService {
       throw new AppException('COUPON_INVALID', 'کد تخفیف معتبر نیست', 400);
     }
 
+    // Issue #16: inside checkout, serialize every redemption of the same coupon
+    // with a row lock. The limit queries below are the first consistent reads of
+    // the transaction, so they see every redemption committed before this lock.
+    if (tx) {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM Coupon WHERE id = ${coupon.id} FOR UPDATE`);
+    }
+
     // 2. Check date validity
     const now = new Date();
     if (coupon.startAt && coupon.startAt > now) {

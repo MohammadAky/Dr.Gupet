@@ -191,13 +191,13 @@ export class MedicinesService {
 
   async create(data: {
     name: string;
-    activeIngredient?: string;
-    type?: string;
-    brand?: string;
-    usage?: string;
-    notes?: string;
+    activeIngredient?: string | null;
+    type?: string | null;
+    brand?: string | null;
+    usage?: string | null;
+    notes?: string | null;
     requiresPrescription?: boolean;
-    image?: string;
+    image?: string | null;
     isActive?: boolean;
     petTypeIds?: number[];
   }) {
@@ -224,13 +224,13 @@ export class MedicinesService {
     id: number,
     data: Partial<{
       name: string;
-      activeIngredient: string;
-      type: string;
-      brand: string;
-      usage: string;
-      notes: string;
+      activeIngredient: string | null;
+      type: string | null;
+      brand: string | null;
+      usage: string | null;
+      notes: string | null;
       requiresPrescription: boolean;
-      image: string;
+      image: string | null;
       isActive: boolean;
       petTypeIds: number[];
     }>,

@@ -14,6 +14,25 @@ function harness(admins = [{ id: 1 }, { id: 2 }]) {
   return { service: new UsersService(prisma as any), tx, prisma };
 }
 
+describe('Session invalidation on restoration (issue #35)', () => {
+  it('bumps sessionVersion when a deleted user is restored so old tokens stay dead', async () => {
+    const update = jest.fn(async ({ data }: any) => ({ id: 5, firstName: null, lastName: null, role: 'USER', status: 'ACTIVE', ...data }));
+    const prisma = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 5, deletedAt: new Date('2026-10-01') }),
+        update,
+      },
+    };
+    const service = new UsersService(prisma as any);
+    await service.restoreByAdmin(5);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 5 },
+      data: { deletedAt: null, status: 'ACTIVE', sessionVersion: { increment: 1 } },
+      select: expect.anything(),
+    });
+  });
+});
+
 describe('Server-side administrator access protection', () => {
   it.each([{ role: 'USER' }, { status: 'BLOCKED' }])(
     'rejects self access removal %j',
@@ -47,6 +66,16 @@ describe('Server-side administrator access protection', () => {
     await h.service.updateByAdmin(2, { role: 'USER' }, 1);
     expect(h.tx.$queryRaw).toHaveBeenCalledTimes(1);
     expect(h.tx.user.update).toHaveBeenCalledTimes(1);
+    // Issue #35: the demotion invalidates tokens issued before it.
+    expect(h.tx.user.update.mock.calls[0][0].data).toMatchObject({
+      sessionVersion: { increment: 1 },
+    });
+  });
+
+  it('does not invalidate sessions for a profile-only edit', async () => {
+    const h = harness();
+    await h.service.updateByAdmin(2, { firstName: 'سارا' }, 1);
+    expect(h.tx.user.update.mock.calls[0][0].data).not.toHaveProperty('sessionVersion');
   });
 
   it('soft-deletes a blocked user without deleting related records or credentials', async () => {
@@ -57,7 +86,7 @@ describe('Server-side administrator access protection', () => {
     expect(await h.service.softDeleteByAdmin(2, 1)).toEqual({ deleted: true });
     expect(h.tx.user.update).toHaveBeenCalledWith({
       where: { id: 2 },
-      data: { deletedAt: expect.any(Date), status: 'BLOCKED' },
+      data: { deletedAt: expect.any(Date), status: 'BLOCKED', sessionVersion: { increment: 1 } },
       select: { id: true },
     });
     expect(h.tx.$queryRaw).toHaveBeenCalledTimes(2);

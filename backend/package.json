@@ -39,6 +39,7 @@
     "class-validator": "^0.14.1",
     "helmet": "^7.2.0",
     "ioredis": "^5.4.2",
+    "multer": "2.5.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "prisma": "^5.15.0",
@@ -68,5 +69,8 @@
     "ts-jest": "^29.1.5",
     "tsconfig-paths": "^4.2.0",
     "typescript-eslint": "^8.71.0"
+  },
+  "overrides": {
+    "multer": "2.5.0"
   }
 }
