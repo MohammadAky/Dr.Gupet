@@ -10,6 +10,7 @@ interface Envelope<T> {
   meta?: PageMeta;
   message?: string;
   code?: string;
+  details?: unknown[];
 }
 
 export interface PageMeta {
@@ -24,11 +25,21 @@ export interface PageResult<T> {
   meta: PageMeta;
 }
 
+export interface ApiErrorDetail {
+  line?: number;
+  product?: string;
+  variant?: string | null;
+  field?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly details?: ApiErrorDetail[],
   ) {
     super(message);
   }
@@ -85,6 +96,7 @@ export async function apiRequest<T>(
         payload?.message || `خطای سرور (${response.status})`,
         response.status,
         payload?.code,
+        Array.isArray(payload?.details) ? (payload.details as ApiErrorDetail[]) : undefined,
       );
     }
     if (!payload || payload.success !== true || !("data" in payload)) {

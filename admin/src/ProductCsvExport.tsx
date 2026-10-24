@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./auth";
 import { errorMessage } from "./management";
-import { COLUMN_LABELS, EXPORT_COLUMNS, productExportPath, ROUNDTRIP_COLUMNS, type ExportColumn, type ProductExportFilters } from "./product-csv-sync";
+import { COLUMN_LABELS, EXPORT_COLUMNS, PRICE_FILE_EXPORT_COLUMNS, productExportPath, ROUNDTRIP_COLUMNS, type ExportColumn, type ProductExportFilters } from "./product-csv-sync";
 import "./product-csv-sync.css";
 
 export function ProductCsvExport({ filters, onBack }: { filters: ProductExportFilters; onBack(): void }) {
@@ -9,7 +9,9 @@ export function ProductCsvExport({ filters, onBack }: { filters: ProductExportFi
   const mounted = useRef(true), pending = useRef(false), all = useRef<HTMLInputElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const files = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const [columns, setColumns] = useState<ExportColumn[]>([...ROUNDTRIP_COLUMNS]);
+  // Price is the most frequent bulk edit, so it starts selected next to the locked
+  // round-trip columns instead of forcing every owner to find it in the list.
+  const [columns, setColumns] = useState<ExportColumn[]>([...new Set<ExportColumn>([...ROUNDTRIP_COLUMNS, "price"])]);
   const [roundtrip, setRoundtrip] = useState(true);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -23,16 +25,16 @@ export function ProductCsvExport({ filters, onBack }: { filters: ProductExportFi
     if (busy || (roundtrip && ROUNDTRIP_COLUMNS.includes(column))) return;
     setColumns(current => current.includes(column) ? current.filter(value => value !== column) : [...current, column]);
   }
-  async function exportFile() {
-    if (pending.current || !columns.length) return;
+  async function exportFile(selected: ExportColumn[] = columns, filename = "dr-gupet-products.csv") {
+    if (pending.current || !selected.length) return;
     pending.current = true; setBusy(true); setError(""); setNotice("");
     try {
-      const blob = await download(productExportPath(filters, columns), { timeoutMs: 70_000 });
+      const blob = await download(productExportPath(filters, selected), { timeoutMs: 70_000 });
       if (!mounted.current) return;
       const url = URL.createObjectURL(blob);
       const timer = setTimeout(() => { URL.revokeObjectURL(url); files.current.delete(url); }, 10000);
       files.current.set(url, timer);
-      const anchor = document.createElement("a"); anchor.href = url; anchor.download = "dr-gupet-products.csv";
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename;
       try { document.body.append(anchor); anchor.click(); } finally { anchor.remove(); }
       setNotice("فایل خروجی آماده شد.");
     } catch (problem) { if (mounted.current) setError(errorMessage(problem)); }
@@ -43,6 +45,7 @@ export function ProductCsvExport({ filters, onBack }: { filters: ProductExportFi
       <button type="button" className="button button--ghost" onClick={onBack}>بازگشت به محصولات</button></header>
     <div className="catalog-panel csv-export-options" aria-busy={busy}>
       <p>همهٔ نتایج فیلتر جاری، با یک ردیف برای هر گزینهٔ محصول صادر می‌شوند. حداکثر ۵۰۰ ردیف؛ برای خروجی بزرگ‌تر، فیلتر را محدود کنید.</p>
+      <p>برای تغییر گروهی <bdi>قیمت</bdi>، از «فایل قیمت» استفاده کنید: فقط <bdi>sku</bdi>، نام، قیمت و قیمت پیش از تخفیف را می‌دهد؛ بدون موجودی و بدون ستون نسخه، پس ویرایش قیمت به تضاد نمی‌خورد. همین فایل را می‌توانید بی‌تغییر در صفحهٔ «ویرایش با CSV» بگذارید.</p>
       <p className="csv-export-filter">{filters.search ? `جستجو: ${filters.search} · ` : ""}{filters.isActive === undefined ? "همهٔ وضعیت‌ها" : filters.isActive ? "فعال" : "پیش‌نویس"}</p>
       <label className="csv-export-check"><input type="checkbox" checked={roundtrip} disabled={busy} onChange={event => {
         setRoundtrip(event.target.checked);
@@ -55,7 +58,10 @@ export function ProductCsvExport({ filters, onBack }: { filters: ProductExportFi
       </fieldset>
       {error && <p className="catalog-notice catalog-notice--warning" role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
-      <button type="button" className="button button--primary" disabled={busy || !columns.length} onClick={() => void exportFile()}>{busy ? "در حال دریافت…" : "دریافت CSV"}</button>
+      <div className="csv-export-actions">
+        <button type="button" className="button button--primary" disabled={busy || !columns.length} onClick={() => void exportFile()}>{busy ? "در حال دریافت…" : "دریافت CSV"}</button>
+        <button type="button" className="button button--outline" disabled={busy} onClick={() => void exportFile([...PRICE_FILE_EXPORT_COLUMNS], "dr-gupet-prices.csv")}>دریافت فایل قیمت</button>
+      </div>
     </div>
   </section>;
 }

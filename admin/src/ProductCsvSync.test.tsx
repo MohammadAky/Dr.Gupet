@@ -53,6 +53,24 @@ it("previews without mutation, shows before/after, cancels safely and applies on
   fireEvent.submit(screen.getByLabelText("فایل CSV").closest("form")!);
   expect(request).toHaveBeenCalledTimes(2);
 });
+it("recognizes a price file, says what it will not touch and names skipped rows", async () => {
+  mount(); await file("sku,name,price\nSKU-1,غذای گربه,1200\n,بدون گزینه,\nSKU-2,غذای سگ,0");
+  expect(screen.getByText(/این فایل قیمت‌محور است/)).toBeTruthy();
+  expect(screen.getByText(/۱ ردیف بدون گزینه و بدون قیمت نادیده گرفته شد/)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "بررسی تغییرات" }) as HTMLButtonElement).disabled).toBe(false);
+});
+it("keeps the file label on price preview rows and explains an unknown SKU instead of quoting a creation error", async () => {
+  request.mockImplementation((path: string) => path.endsWith("/preview")
+    ? Promise.resolve({ rows: [2, 3, 4].map(line => ({ line, action: "update", data: { sku: `SKU-${line}`, price: 1200 + line }, changes: [{ field: "price", before: 1000, after: 1200 + line }] })), totals: { ...totals, updated: 3 } })
+    : Promise.reject(new Error("ردیف ۳: محصول جدید به نام، قیمت، برند، دسته‌بندی و نوع حیوان نیاز دارد")));
+  mount(); await file("sku,name,price\nSKU-1,غذای گربه,1200\nSKU-9,غذای تازه,900\nSKU-3,غذای سگ,800");
+  fireEvent.click(screen.getByRole("button", { name: "بررسی تغییرات" }));
+  await screen.findByRole("heading", { name: "پیش‌نمایش تغییرات" });
+  expect(screen.getByText("غذای گربه")).toBeTruthy();
+  await confirm();
+  expect(await screen.findByText(/SKU «SKU-9»/)).toBeTruthy();
+  expect(screen.queryByText(/محصول جدید به نام/)).toBeNull();
+});
 it("guards same-tick preview requests and rejects malformed responses instead of enabling apply", async () => {
   let finish: ((value: unknown) => void) | undefined;
   request.mockReturnValue(new Promise(resolve => { finish = resolve; })); mount(); await file();
@@ -71,6 +89,22 @@ it("drops stale preview after a conflict and requires a new server review before
   fireEvent.click(screen.getByRole("button", { name: "بررسی تغییرات" }));
   await screen.findByRole("heading", { name: "پیش‌نمایش تغییرات" });
   expect(request).toHaveBeenCalledTimes(3);
+});
+it("shows the conflicted rows and the preserved live values instead of a bare conflict message", async () => {
+  const { ApiError } = await import("./api/client");
+  request.mockImplementation((path: string) => path.endsWith("/preview")
+    ? Promise.resolve({ ...preview(), notes: [{ line: 3, field: "stock", variant: "SKU-2", message: "موجودی فعلی حفظ شد" }] })
+    : Promise.reject(new ApiError("موجودی یا اطلاعات محصول تغییر کرده است", 409, "CONFLICT", [
+      { line: 3, product: "غذای سگ", variant: "SKU-2", field: "stock", message: "موجودی از ۵ به ۴ رسیده است" },
+    ])));
+  mount(); await review();
+  expect(screen.getByRole("heading", { name: "مقدارهایی که بازنویسی نشدند" })).toBeTruthy();
+  expect(screen.getByText(/موجودی فعلی حفظ شد/)).toBeTruthy();
+  await confirm();
+  expect(await screen.findByRole("heading", { name: "هیچ تغییری ثبت نشد — ردیف‌های مانع" })).toBeTruthy();
+  expect(screen.getByText("هیچ تغییری اعمال نشد.")).toBeTruthy();
+  expect(screen.getByText(/موجودی از ۵ به ۴ رسیده است/)).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "پیش‌نمایش تغییرات" })).toBeNull();
 });
 it("does not post invalid local rows and ignores an older file read after replacement", async () => {
   mount(); await file("variantId,stock\n8,-1");
@@ -101,11 +135,22 @@ it("keeps round-trip identifiers checked, exports all selected columns through a
   expect(query.has("page")).toBe(false); expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
   rendered.unmount(); expect(revokeUrl).toHaveBeenCalledExactlyOnceWith("blob:products-test"); expect(request).not.toHaveBeenCalled();
 });
+it("offers a one-click price file that skips stock and version columns", async () => {
+  download.mockResolvedValue(new Blob(["sku,name,price,compareAtPrice"]));
+  render(<ProductCsvExport filters={{ search: "غذا" }} onBack={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "دریافت فایل قیمت" }));
+  await waitFor(() => expect(download).toHaveBeenCalledOnce());
+  const query = new URLSearchParams(download.mock.calls[0]![0].split("?")[1]);
+  expect(query.get("columns")).toBe("sku,name,price,compareAtPrice");
+  expect(query.get("search")).toBe("غذا");
+  expect((screen.getByRole("status").textContent)).toContain("فایل خروجی آماده شد");
+});
 it("supports arbitrary report subsets without silently readding hidden columns and does not download an empty selection", async () => {
   download.mockResolvedValue(new Blob(["report"])); render(<ProductCsvExport filters={{}} onBack={vi.fn()} />);
+  expect((screen.getByRole("checkbox", { name: "قیمت (تومان)" }) as HTMLInputElement).checked).toBe(true);
   fireEvent.click(screen.getByRole("checkbox", { name: "حفظ شناسه‌ها و نسخه برای ورود مجدد" }));
-  for (const key of ROUNDTRIP_COLUMNS) {
-    const names: Record<string, string> = { productId: "شناسهٔ محصول", variantId: "شناسهٔ گزینه", sku: "شناسهٔ کالا (SKU)", stock: "موجودی", expectedStock: "موجودی هنگام خروجی", expectedUpdatedAt: "زمان نسخهٔ محصول" };
+  for (const key of [...ROUNDTRIP_COLUMNS, "price"]) {
+    const names: Record<string, string> = { productId: "شناسهٔ محصول", variantId: "شناسهٔ گزینه", sku: "شناسهٔ کالا (SKU)", stock: "موجودی", expectedStock: "موجودی هنگام خروجی", expectedUpdatedAt: "زمان نسخهٔ محصول", price: "قیمت (تومان)" };
     fireEvent.click(screen.getByRole("checkbox", { name: names[key] }));
   }
   expect((screen.getByRole("button", { name: "دریافت CSV" }) as HTMLButtonElement).disabled).toBe(true);
